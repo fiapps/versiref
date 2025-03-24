@@ -72,6 +72,12 @@ A `Style` defines how a `SimpleBibleRef` or `BibleRef` is converted to a string 
 We need to have a way of supplying named sets of book names and book name abbreviations, so users can select, e.g., short SBL abbreviations.
 These sets are simply dictionaries, but perhaps we need to store them in files or allow users to define their own set of abbreviations in a file.
 
+### Bible IDs that require special handling
+
+* PSA: we need to allow for both a singular and a plural form. The latter can be coded in abbreviation lists as PSAS, e.g., `"PSA": "Psalm", "PSAS": "Psalms"
+* PS2: this is Psalm 151. It uses the PSA abbreviation (or PSAS when referenced with other psalms). Any abbreviation defined for PS2 will be ignored. Perhaps we should issue a warning if it's defined.
+* ESG: this is Greek portions of Esther. Special handling may be required when it uses the same name as EST but letters for chapters (e.g., NABRE).
+
 ## RefParser
 
 The constructor takes a `Style` and builds a PEG parser that recognizes Bible references in that style.
