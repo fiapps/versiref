@@ -22,7 +22,7 @@ class Style:
         names: Maps Bible book IDs to string abbreviations or full names
         chapter_verse_separator: Separates chapter number from verse ranges
         verse_range_separator: Separates ranges of verses in a single chapter
-        chapter_separator: Separates different chapters in a reference
+        chapter_separator: Separates ranges of verses in different chapters
         recognized_names: Maps abbreviations/names to Bible book IDs for parsing
     """
     
