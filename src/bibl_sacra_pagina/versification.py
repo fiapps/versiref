@@ -1,10 +1,11 @@
 import json
 import os
+from dataclasses import dataclass, field
 from importlib import resources
-from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 
+@dataclass
 class Versification:
     """
     Represents a way of dividing the text of the Bible into chapters and verses.
@@ -14,61 +15,48 @@ class Versification:
     of a given chapter in a given book.
     """
     
-    def __init__(self, data: Optional[Dict] = None, file_path: Optional[str] = None, abbreviation: Optional[str] = None):
-        """
-        Initialize a Versification instance.
-        
+    max_verses: Dict[str, List[int]] = field(default_factory=dict)
+    identifier: str = None
+    
+    @classmethod
+    def from_file(cls, file_path: str, identifier: str = None) -> "Versification":
+        """Create an instance from a JSON file.
+
         Args:
-            data: Optional dictionary containing versification data
-            file_path: Optional path to a JSON file containing versification data
-            abbreviation: Optional standard versification abbreviation (e.g., "org", "eng", "lxx", "vul")
-        
-        If none of the arguments are provided, a trivial implementation is used.
+            file_path: path to a JSON file containing an object with maxVerses
+            identifier: identifier to store in the constructed Versififaction
+        This can throw FileNotFoundError, json.JSONDecodeError, ValueError
         """
-        self.max_verses = {}
-        self.abbreviation = None
-        
-        if data:
-            self._load_from_data(data)
-        elif file_path:
-            self._load_from_file(file_path)
-        elif abbreviation:
-            self.load_standard_versification(abbreviation)
+        with open(file_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            if "maxVerses" in data:
+                return cls(data["maxVerses"], identifier)
+            else:
+                # Is there a better way to report a malformed JSON file?
+                raise ValueError()
     
-    def _load_from_file(self, file_path: str) -> None:
-        """Load versification data from a JSON file."""
-        try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                self._load_from_data(data)
-        except (FileNotFoundError, json.JSONDecodeError) as e:
-            # If file loading fails, we'll use the trivial implementation
-            print(f"Warning: Failed to load versification data from {file_path}: {e}")
-    
-    def _load_from_data(self, data: Dict) -> None:
-        """Load versification data from a dictionary."""
-        if "maxVerses" in data:
-            self.max_verses = data["maxVerses"]
-    
-    def load_standard_versification(self, abbreviation: str) -> None:
+    @classmethod
+    def standard_versification(cls, identifier: str) -> Optional["Versification"]:
         """
-        Load a standard versification by its abbreviation.
+        Create an instance of a standard versification.
         
+        Constructs an instance by loading JSON data or returns None if the
+        identifier is unknown.
         Args:
-            abbreviation: Standard versification abbreviation (e.g., "org", "eng", "lxx", "vul")
+            identifier: Standard versification identifier (e.g., "org", "eng",
+            "LXX", "Vul")
+                This is converted to lowercase to find the file to load.
         
-        Standard versifications are loaded from JSON files in the package's data directory.
+        Standard versifications are loaded from JSON files in the package's data
+        directory.
         """
-        self.abbreviation = abbreviation
-        filename = f"{abbreviation}.json"
+        filename = f"{identifier.lower()}.json"
         
-        try:
-            # Use importlib.resources to access package data files
-            with resources.files("bibl_sacra_pagina").joinpath("data").joinpath(filename).open("r", encoding="utf-8") as f:
-                data = json.load(f)
-                self._load_from_data(data)
-        except (FileNotFoundError, json.JSONDecodeError) as e:
-            print(f"Warning: Failed to load standard versification '{abbreviation}': {e}")
+        path = resources.files("bibl_sacra_pagina").joinpath("data", "versifications", filename)
+        if os.path.exists(path):
+            return cls.from_file(path, identifier)
+        else:
+            return None
     
     def last_verse(self, book: str, chapter: int) -> int:
         """
@@ -89,11 +77,8 @@ class Versification:
         if book not in self.max_verses:
             return -1
         
-        # Convert chapter to string since JSON keys are strings
-        chapter_str = str(chapter)
-        
         # Check if the chapter exists in the book
-        if chapter_str not in self.max_verses[book]:
+        if chapter < 0 or chapter > len(self.max_verses[book]):
             return -1
         
-        return self.max_verses[book][chapter_str]
+        return self.max_verses[book][chapter]
