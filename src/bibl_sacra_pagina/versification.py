@@ -81,4 +81,4 @@ class Versification:
         if chapter < 0 or chapter > len(self.max_verses[book]):
             return -1
         
-        return self.max_verses[book][chapter]
+        return self.max_verses[book][chapter-1]
