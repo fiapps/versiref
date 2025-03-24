@@ -63,9 +63,10 @@ However, we might not at first need code to handle the case where a location map
 A `Style` defines how a `SimpleBibleRef` or `BibleRef` is converted to a string and how strings are parsed to produce these classes.
 
 * `names`: maps Bible book IDs to string abbreviations or to full names, depending on the style.
-* `verse_separator`: Defaults to ", "
-* `chapter_separator`: Defaults to "; "
-* `recognized_names`: maps abbreviations and/or full names to Bible book IDs. For flexibility in parsing, this typically recognizes additional abbreviations beyond those used in `names`.
+* `chapter_verse_separator`: Separates chapter number from verse ranges Defaults to ":".
+* `verse_range_separator`: Separates ranges of verses in a single chapter. Defaults to ", ".
+* `chapter_separator`: Defaults to "; ".
+* `recognized_names`: maps abbreviations and/or full names to Bible book IDs. For flexibility in parsing, this typically recognizes additional abbreviations beyond those used in `names`. It defaults to the inverse of `names`.
 
 ### Named sets of book names/abbreviations
 
