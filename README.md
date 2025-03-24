@@ -1,6 +1,6 @@
-# SacraPagina
+# VersiRef
 
-SacraPagina is a Python package for sophisticated parsing, manipulation, and printing of references to the Bible.
+VersiRef is a Python package for sophisticated parsing, manipulation, and printing of references to the Bible.
 
 ## Features
 
