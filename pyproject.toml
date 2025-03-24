@@ -1,0 +1,14 @@
+[project]
+name = "bibl-sacra-pagina"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Fr. John Lawrence M. Polis", email = "emptier-sank-dose@duck.com" }
+]
+requires-python = ">=3.13"
+dependencies = []
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
