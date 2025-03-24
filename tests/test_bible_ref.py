@@ -3,7 +3,7 @@ Tests for the bible_ref module.
 """
 
 import pytest
-from bibl_sacra_pagina.bible_ref import SimpleBibleRef, VerseRange
+from versiref.bible_ref import SimpleBibleRef, VerseRange
 
 
 def test_verse_range_initialization():

@@ -1,5 +1,5 @@
 """
-Bible reference handling for bibl_sacra_pagina.
+Bible reference handling for versiref.
 
 This module provides classes for representing and manipulating Bible references.
 """

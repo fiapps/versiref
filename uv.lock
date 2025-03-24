@@ -3,7 +3,7 @@ revision = 1
 requires-python = ">=3.13"
 
 [[package]]
-name = "bibl-sacra-pagina"
+name = "versiref"
 version = "0.1.0"
 source = { editable = "." }
 

@@ -56,7 +56,7 @@ class Versification:
         """
         filename = f"{identifier.lower()}.json"
         
-        path = resources.files("bibl_sacra_pagina").joinpath("data", "versifications", filename)
+        path = resources.files("versiref").joinpath("data", "versifications", filename)
         if os.path.exists(path):
             return cls.from_file(path, identifier)
         else:

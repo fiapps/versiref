@@ -1,6 +1,6 @@
 import os
 import pytest
-from bibl_sacra_pagina.versification import Versification
+from versiref.versification import Versification
 
 
 def test_empty_versification():
@@ -48,7 +48,7 @@ def test_from_file():
     """Test loading a versification from a file."""
     # Get the path to one of the standard versification files
     from importlib import resources
-    path = resources.files("bibl_sacra_pagina").joinpath("data", "versifications", "eng.json")
+    path = resources.files("versiref").joinpath("data", "versifications", "eng.json")
     
     v = Versification.from_file(str(path), "test-eng")
     assert v is not None
