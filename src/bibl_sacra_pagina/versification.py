@@ -30,7 +30,11 @@ class Versification:
         with open(file_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
             if "maxVerses" in data:
-                return cls(data["maxVerses"], identifier)
+                # Convert string verse counts to integers
+                max_verses = {}
+                for book, verses in data["maxVerses"].items():
+                    max_verses[book] = [int(v) for v in verses]
+                return cls(max_verses, identifier)
             else:
                 # Is there a better way to report a malformed JSON file?
                 raise ValueError()
@@ -81,4 +85,5 @@ class Versification:
         if chapter < 0 or chapter > len(self.max_verses[book]):
             return -1
         
+        # Return the verse count as an integer
         return self.max_verses[book][chapter-1]
