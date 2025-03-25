@@ -5,8 +5,10 @@ This module provides the Style class which defines how Bible references
 are converted to and from strings.
 """
 
+import json
 from dataclasses import dataclass, field
-from typing import Dict
+from importlib import resources
+from typing import Dict, Optional
 
 
 @dataclass
@@ -42,3 +44,28 @@ class Style:
         if not self.recognized_names:
             # Create inverse mapping of names by default
             self.recognized_names = {name: book_id for book_id, name in self.names.items()}
+
+    @staticmethod
+    def standard_names(identifier: str) -> Optional[Dict[str, str]]:
+        """
+        Load and return a standard set of book names.
+        
+        These can be passed to Style(). Since the return value has been created
+        by loading a JSON file, it can be modified to customize the
+        abbreviations (e.g, names["SNG"] = "Cant") without fear of changing the
+        set of names for other callers.
+
+        Args:
+            identifier: The identifier for the names file, e.g.,
+            "en-sbl_abbreviations"
+        
+        Returns:
+            A dictionary mapping book IDs to names or abbreviations, or None if
+            the file doesn't exist
+        """
+        try:
+            # Use importlib.resources to find the file
+            with resources.open_text("versiref.data.book_names", f"{identifier}.json") as f:
+                return json.load(f)
+        except (FileNotFoundError, ModuleNotFoundError):
+            return None
