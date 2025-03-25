@@ -206,6 +206,50 @@ def test_format_cross_chapter_range():
     assert formatted == "John 7:53–8:11"
 
 
+def test_format_whole_chapter_range():
+    """Test formatting a reference that spans multiple whole chapters."""
+    # Create a style
+    names = Style.standard_names("en-sbl_abbreviations")
+    style = Style(names=names)
+    
+    # Create a reference for Isaiah 1-39
+    vr = VerseRange(
+        start_chapter=1,
+        start_verse=-1,  # Unspecified verse number
+        start_sub_verse="",
+        end_chapter=39,
+        end_verse=-1,  # Unspecified verse number
+        end_sub_verse="",
+    )
+    ref = SimpleBibleRef(book_id="ISA", ranges=[vr])
+    
+    # Format the reference
+    formatted = ref.format(style)
+    assert formatted == "Isa 1–39"
+
+
+def test_format_ff_reference():
+    """Test formatting a reference with 'ff' notation."""
+    # Create a style
+    names = Style.standard_names("en-sbl_abbreviations")
+    style = Style(names=names)
+    
+    # Create a reference for Philippians 2:5ff
+    vr = VerseRange(
+        start_chapter=2,
+        start_verse=5,
+        start_sub_verse="",
+        end_chapter=2,
+        end_verse=-1,  # Unspecified end verse means "ff"
+        end_sub_verse="",
+    )
+    ref = SimpleBibleRef(book_id="PHP", ranges=[vr])
+    
+    # Format the reference
+    formatted = ref.format(style)
+    assert formatted == "Phil 2:5ff"
+
+
 def test_format_with_custom_style():
     """Test formatting with a custom style."""
     # Create a custom style
