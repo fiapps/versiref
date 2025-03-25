@@ -209,16 +209,16 @@ def test_format_cross_chapter_range():
 def test_format_with_custom_style():
     """Test formatting with a custom style."""
     # Create a custom style
-    names = {"GEN": "Genesis", "EXO": "Exodus"}
+    names = {"GEN": "Genesi", "EXO": "Esodo"}
     style = Style(
         names=names,
-        chapter_verse_separator=".",
-        verse_range_separator="; ",
-        chapter_separator=" / ",
+        chapter_verse_separator=", ",
+        verse_range_separator=".",
+        chapter_separator="; ",
     )
     
     # Create a reference for Genesis 1:1-5
-    vr = VerseRange(
+    vr1 = VerseRange(
         start_chapter=1,
         start_verse=1,
         start_sub_verse="",
@@ -226,11 +226,19 @@ def test_format_with_custom_style():
         end_verse=5,
         end_sub_verse="",
     )
-    ref = SimpleBibleRef(book_id="GEN", ranges=[vr])
+    vr2 = VerseRange(
+        start_chapter=1,
+        start_verse=8,
+        start_sub_verse="b",
+        end_chapter=1,
+        end_verse=10,
+        end_sub_verse="a",
+    )
+    ref = SimpleBibleRef(book_id="GEN", ranges=[vr1, vr2])
     
     # Format the reference
     formatted = ref.format(style)
-    assert formatted == "Genesis 1.1-5"
+    assert formatted == "Genesi 1, 1-5.8b-10a"
 
 
 def test_format_unknown_book():
