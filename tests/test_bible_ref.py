@@ -184,6 +184,28 @@ def test_format_with_subverses():
     assert formatted == "Mark 5:3b-5a"
 
 
+def test_format_cross_chapter_range():
+    """Test formatting a reference that spans across chapters."""
+    # Create a style
+    names = Style.standard_names("en-sbl_abbreviations")
+    style = Style(names=names)
+    
+    # Create a reference for John 7:53-8:11 (the pericope adulterae)
+    vr = VerseRange(
+        start_chapter=7,
+        start_verse=53,
+        start_sub_verse="",
+        end_chapter=8,
+        end_verse=11,
+        end_sub_verse="",
+    )
+    ref = SimpleBibleRef(book_id="JHN", ranges=[vr])
+    
+    # Format the reference
+    formatted = ref.format(style)
+    assert formatted == "John 7:53-8:11"
+
+
 def test_format_with_custom_style():
     """Test formatting with a custom style."""
     # Create a custom style
