@@ -23,6 +23,7 @@ class Style:
     Attributes:
         names: Maps Bible book IDs to string abbreviations or full names
         chapter_verse_separator: Separates chapter number from verse ranges
+        range_separator: Separates the ends of a range. Defaults to an en dash.
         verse_range_separator: Separates ranges of verses in a single chapter
         chapter_separator: Separates ranges of verses in different chapters
         recognized_names: Maps abbreviations/names to Bible book IDs for parsing
@@ -30,6 +31,7 @@ class Style:
     
     names: Dict[str, str]
     chapter_verse_separator: str = ":"
+    range_separator: str = "–"
     verse_range_separator: str = ", "
     chapter_separator: str = "; "
     recognized_names: Dict[str, str] = field(default_factory=dict)
