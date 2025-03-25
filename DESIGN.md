@@ -2,6 +2,8 @@
 
 SacraPagina is a Python package for sophisticated parsing, manipulation, and printing of references to the Bible.
 
+This design document was created prior to the implementation, and so may not fully correspond to it.
+
 ## SimpleBibleRef
 
 An instance of `SimpleBibleRef` represents a sequence of verse ranges within a single book of the Bible.
