@@ -15,8 +15,8 @@ class VerseRange:
     """
     Represents a range of verses within a single book of the Bible.
 
-    A verse range has a start and end point, each defined by chapter, verse, and sub-verse.
-    The original text from which this range was parsed can be stored.
+    A verse range has a start and end point, each defined by chapter, verse, and
+    sub-verse. The original text from which this range was parsed can be stored.
 
     A verse number less than 0 means "unspecified". When a verse number is less
     than 0, the corresponding sub-verse should be "", but it is ignored
@@ -26,7 +26,9 @@ class VerseRange:
     start_chapter == end_chapter. Nor is it allowed to have start_verse < 0 and
     end_verse >= 0, start_chapter == end_chapter && start_verse > end_verse, or
     start_chapter < end_chapter. The result of SimpleBibleRef.format() is
-    undefined if the class contains a VerseRange with disallowed values.
+    undefined if the class contains a VerseRange with disallowed values. Where a
+    definite end is needed, applications can interpret "ff"
+    (style.following_verses) as "until the end of the chapter."
     """
 
     start_chapter: int
@@ -114,7 +116,7 @@ class SimpleBibleRef:
                     # Add end verse if different from start verse
                     if verse_range.end_verse < 0:
                         # This is a "ff" reference (e.g., "Phil 2:5ff")
-                        range_text += "ff"
+                        range_text += style.following_verses
                     elif verse_range.end_verse != 0 and (
                         verse_range.end_chapter != verse_range.start_chapter
                         or verse_range.end_verse != verse_range.start_verse
