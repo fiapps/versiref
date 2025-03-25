@@ -58,36 +58,36 @@ class SimpleBibleRef:
     def is_whole_book(self) -> bool:
         """Return True if this reference refers to the entire book."""
         return len(self.ranges) == 0
-        
+
     def format(self, style: Style) -> str:
         """
         Format this Bible reference as a string according to the given style.
-        
+
         Args:
             style: The Style to use for formatting
-            
+
         Returns:
             A formatted string representation of this Bible reference
         """
         # Get the book name according to the style
         if self.book_id not in style.names:
             raise ValueError(f"Unknown book ID: {self.book_id}")
-        
+
         book_name = style.names[self.book_id]
-        
+
         # If this is a whole book reference, just return the book name
         if self.is_whole_book():
             return book_name
-            
+
         # Format each verse range
         formatted_ranges = []
         current_chapter = None
-        
+
         for verse_range in self.ranges:
             # If we're in a new chapter, include the chapter number
             if current_chapter != verse_range.start_chapter:
                 current_chapter = verse_range.start_chapter
-                
+
                 # Format the start of the range
                 if verse_range.start_verse == 1 and verse_range.end_verse == 0:
                     # This is a whole chapter reference (e.g., "Gen 1")
@@ -95,75 +95,79 @@ class SimpleBibleRef:
                 else:
                     # This is a verse or verse range within a chapter
                     range_text = f"{current_chapter}{style.chapter_verse_separator}{verse_range.start_verse}"
-                    
+
                     # Add subverse if present
                     if verse_range.start_sub_verse:
                         range_text += verse_range.start_sub_verse
-                    
+
                     # Add end verse if different from start verse
                     if verse_range.end_verse != 0 and (
-                        verse_range.end_chapter != verse_range.start_chapter or 
-                        verse_range.end_verse != verse_range.start_verse or
-                        verse_range.end_sub_verse != verse_range.start_sub_verse
+                        verse_range.end_chapter != verse_range.start_chapter
+                        or verse_range.end_verse != verse_range.start_verse
+                        or verse_range.end_sub_verse != verse_range.start_sub_verse
                     ):
                         # If the end chapter is different, include it
                         if verse_range.end_chapter != verse_range.start_chapter:
                             range_text += f"{style.range_separator}{verse_range.end_chapter}{style.chapter_verse_separator}{verse_range.end_verse}"
                         else:
-                            range_text += f"{style.range_separator}{verse_range.end_verse}"
-                        
+                            range_text += (
+                                f"{style.range_separator}{verse_range.end_verse}"
+                            )
+
                         # Add end subverse if present
                         if verse_range.end_sub_verse:
                             range_text += verse_range.end_sub_verse
-                    
+
                     formatted_ranges.append(range_text)
             else:
                 # We're in the same chapter as the previous range
                 range_text = f"{verse_range.start_verse}"
-                
+
                 # Add subverse if present
                 if verse_range.start_sub_verse:
                     range_text += verse_range.start_sub_verse
-                
+
                 # Add end verse if different from start verse
                 if verse_range.end_verse != 0 and (
-                    verse_range.end_chapter != verse_range.start_chapter or 
-                    verse_range.end_verse != verse_range.start_verse or
-                    verse_range.end_sub_verse != verse_range.start_sub_verse
+                    verse_range.end_chapter != verse_range.start_chapter
+                    or verse_range.end_verse != verse_range.start_verse
+                    or verse_range.end_sub_verse != verse_range.start_sub_verse
                 ):
                     # If the end chapter is different, include it
                     if verse_range.end_chapter != verse_range.start_chapter:
                         range_text += f"{style.range_separator}{verse_range.end_chapter}{style.chapter_verse_separator}{verse_range.end_verse}"
                     else:
                         range_text += f"{style.range_separator}{verse_range.end_verse}"
-                    
+
                     # Add end subverse if present
                     if verse_range.end_sub_verse:
                         range_text += verse_range.end_sub_verse
-                
+
                 formatted_ranges.append(range_text)
-        
+
         # Join the formatted ranges with the appropriate separators
         result = book_name + " "
-        
+
         # Group ranges by chapter
         chapter_groups = []
         current_chapter = None
         current_group = []
-        
+
         for i, verse_range in enumerate(self.ranges):
             if current_chapter != verse_range.start_chapter:
                 if current_group:
-                    chapter_groups.append(style.verse_range_separator.join(current_group))
+                    chapter_groups.append(
+                        style.verse_range_separator.join(current_group)
+                    )
                 current_chapter = verse_range.start_chapter
                 current_group = [formatted_ranges[i]]
             else:
                 current_group.append(formatted_ranges[i])
-        
+
         # Add the last group
         if current_group:
             chapter_groups.append(style.verse_range_separator.join(current_group))
-        
+
         result += style.chapter_separator.join(chapter_groups)
-        
+
         return result
