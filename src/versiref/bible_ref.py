@@ -98,9 +98,9 @@ class SimpleBibleRef:
                     ):
                         # If the end chapter is different, include it
                         if verse_range.end_chapter != verse_range.start_chapter:
-                            range_text += f"-{verse_range.end_chapter}{style.chapter_verse_separator}{verse_range.end_verse}"
+                            range_text += f"{style.range_separator}{verse_range.end_chapter}{style.chapter_verse_separator}{verse_range.end_verse}"
                         else:
-                            range_text += f"-{verse_range.end_verse}"
+                            range_text += f"{style.range_separator}{verse_range.end_verse}"
                         
                         # Add end subverse if present
                         if verse_range.end_sub_verse:
@@ -123,9 +123,9 @@ class SimpleBibleRef:
                 ):
                     # If the end chapter is different, include it
                     if verse_range.end_chapter != verse_range.start_chapter:
-                        range_text += f"-{verse_range.end_chapter}{style.chapter_verse_separator}{verse_range.end_verse}"
+                        range_text += f"{style.range_separator}{verse_range.end_chapter}{style.chapter_verse_separator}{verse_range.end_verse}"
                     else:
-                        range_text += f"-{verse_range.end_verse}"
+                        range_text += f"{style.range_separator}{verse_range.end_verse}"
                     
                     # Add end subverse if present
                     if verse_range.end_sub_verse:

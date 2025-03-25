@@ -85,7 +85,7 @@ def test_format_simple_reference():
     
     # Format the reference
     formatted = ref.format(style)
-    assert formatted == "Gen 1:1-5"
+    assert formatted == "Gen 1:1–5"
 
 
 def test_format_whole_book():
@@ -129,7 +129,7 @@ def test_format_multiple_ranges():
     
     # Format the reference
     formatted = ref.format(style)
-    assert formatted == "John 3:16, 18-20"
+    assert formatted == "John 3:16, 18–20"
 
 
 def test_format_multiple_chapters():
@@ -159,7 +159,7 @@ def test_format_multiple_chapters():
     
     # Format the reference
     formatted = ref.format(style)
-    assert formatted == "Rom 1:18-32; 2:1-5"
+    assert formatted == "Rom 1:18–32; 2:1–5"
 
 
 def test_format_with_subverses():
@@ -181,7 +181,7 @@ def test_format_with_subverses():
     
     # Format the reference
     formatted = ref.format(style)
-    assert formatted == "Mark 5:3b-5a"
+    assert formatted == "Mark 5:3b–5a"
 
 
 def test_format_cross_chapter_range():
@@ -203,7 +203,7 @@ def test_format_cross_chapter_range():
     
     # Format the reference
     formatted = ref.format(style)
-    assert formatted == "John 7:53-8:11"
+    assert formatted == "John 7:53–8:11"
 
 
 def test_format_with_custom_style():
@@ -213,6 +213,7 @@ def test_format_with_custom_style():
     style = Style(
         names=names,
         chapter_verse_separator=", ",
+        range_separator="-",  # Use hyphen instead of en dash
         verse_range_separator=".",
         chapter_separator="; ",
     )
