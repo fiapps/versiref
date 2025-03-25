@@ -92,11 +92,16 @@ class SimpleBibleRef:
                 if verse_range.start_verse < 0:
                     # This is a whole chapter reference (e.g., "Gen 1")
                     range_text = f"{current_chapter}"
-                    
+
                     # If end_chapter is different, this is a chapter range (e.g., "Isa 1-39")
-                    if verse_range.end_chapter != verse_range.start_chapter and verse_range.end_verse < 0:
-                        range_text += f"{style.range_separator}{verse_range.end_chapter}"
-                        
+                    if (
+                        verse_range.end_chapter != verse_range.start_chapter
+                        and verse_range.end_verse < 0
+                    ):
+                        range_text += (
+                            f"{style.range_separator}{verse_range.end_chapter}"
+                        )
+
                     formatted_ranges.append(range_text)
                 else:
                     # This is a verse or verse range within a chapter
