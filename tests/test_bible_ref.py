@@ -4,6 +4,7 @@ Tests for the bible_ref module.
 
 import pytest
 from versiref.bible_ref import SimpleBibleRef, VerseRange
+from versiref.style import Style
 
 
 def test_verse_range_initialization():
@@ -63,3 +64,162 @@ def test_simple_bible_ref():
     assert ref.book_id == "ROM"
     assert len(ref.ranges) == 3
     assert ref.original_text == "Rom."
+
+
+def test_format_simple_reference():
+    """Test formatting a simple Bible reference."""
+    # Create a style
+    names = Style.standard_names("en-sbl_abbreviations")
+    style = Style(names=names)
+    
+    # Create a reference for Genesis 1:1-5
+    vr = VerseRange(
+        start_chapter=1,
+        start_verse=1,
+        start_sub_verse="",
+        end_chapter=1,
+        end_verse=5,
+        end_sub_verse="",
+    )
+    ref = SimpleBibleRef(book_id="GEN", ranges=[vr])
+    
+    # Format the reference
+    formatted = ref.format(style)
+    assert formatted == "Gen 1:1-5"
+
+
+def test_format_whole_book():
+    """Test formatting a whole book reference."""
+    # Create a style
+    names = Style.standard_names("en-sbl_abbreviations")
+    style = Style(names=names)
+    
+    # Create a whole book reference
+    ref = SimpleBibleRef(book_id="GEN")
+    
+    # Format the reference
+    formatted = ref.format(style)
+    assert formatted == "Gen"
+
+
+def test_format_multiple_ranges():
+    """Test formatting a reference with multiple verse ranges."""
+    # Create a style
+    names = Style.standard_names("en-sbl_abbreviations")
+    style = Style(names=names)
+    
+    # Create a reference for John 3:16, 18-20
+    vr1 = VerseRange(
+        start_chapter=3,
+        start_verse=16,
+        start_sub_verse="",
+        end_chapter=3,
+        end_verse=16,
+        end_sub_verse="",
+    )
+    vr2 = VerseRange(
+        start_chapter=3,
+        start_verse=18,
+        start_sub_verse="",
+        end_chapter=3,
+        end_verse=20,
+        end_sub_verse="",
+    )
+    ref = SimpleBibleRef(book_id="JHN", ranges=[vr1, vr2])
+    
+    # Format the reference
+    formatted = ref.format(style)
+    assert formatted == "John 3:16, 18-20"
+
+
+def test_format_multiple_chapters():
+    """Test formatting a reference spanning multiple chapters."""
+    # Create a style
+    names = Style.standard_names("en-sbl_abbreviations")
+    style = Style(names=names)
+    
+    # Create a reference for Romans 1:18-32; 2:1-5
+    vr1 = VerseRange(
+        start_chapter=1,
+        start_verse=18,
+        start_sub_verse="",
+        end_chapter=1,
+        end_verse=32,
+        end_sub_verse="",
+    )
+    vr2 = VerseRange(
+        start_chapter=2,
+        start_verse=1,
+        start_sub_verse="",
+        end_chapter=2,
+        end_verse=5,
+        end_sub_verse="",
+    )
+    ref = SimpleBibleRef(book_id="ROM", ranges=[vr1, vr2])
+    
+    # Format the reference
+    formatted = ref.format(style)
+    assert formatted == "Rom 1:18-32; 2:1-5"
+
+
+def test_format_with_subverses():
+    """Test formatting a reference with subverses."""
+    # Create a style
+    names = Style.standard_names("en-sbl_abbreviations")
+    style = Style(names=names)
+    
+    # Create a reference for Mark 5:3b-5a
+    vr = VerseRange(
+        start_chapter=5,
+        start_verse=3,
+        start_sub_verse="b",
+        end_chapter=5,
+        end_verse=5,
+        end_sub_verse="a",
+    )
+    ref = SimpleBibleRef(book_id="MRK", ranges=[vr])
+    
+    # Format the reference
+    formatted = ref.format(style)
+    assert formatted == "Mark 5:3b-5a"
+
+
+def test_format_with_custom_style():
+    """Test formatting with a custom style."""
+    # Create a custom style
+    names = {"GEN": "Genesis", "EXO": "Exodus"}
+    style = Style(
+        names=names,
+        chapter_verse_separator=".",
+        verse_range_separator="; ",
+        chapter_separator=" / ",
+    )
+    
+    # Create a reference for Genesis 1:1-5
+    vr = VerseRange(
+        start_chapter=1,
+        start_verse=1,
+        start_sub_verse="",
+        end_chapter=1,
+        end_verse=5,
+        end_sub_verse="",
+    )
+    ref = SimpleBibleRef(book_id="GEN", ranges=[vr])
+    
+    # Format the reference
+    formatted = ref.format(style)
+    assert formatted == "Genesis 1.1-5"
+
+
+def test_format_unknown_book():
+    """Test formatting with an unknown book ID."""
+    # Create a style
+    names = Style.standard_names("en-sbl_abbreviations")
+    style = Style(names=names)
+    
+    # Create a reference with an unknown book ID
+    ref = SimpleBibleRef(book_id="XYZ")
+    
+    # Formatting should raise a ValueError
+    with pytest.raises(ValueError):
+        ref.format(style)
