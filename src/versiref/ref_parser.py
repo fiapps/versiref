@@ -43,10 +43,7 @@ class RefParser:
         book = pp.one_of(list(self.style.recognized_names.keys()))
         chapter = common.integer
         verse = common.integer
-        subverse = pp.Word(pp.alphas.lower(), max=2).set_parse_action(lambda t: t[0] if t else "")
-        
-        # Optional subverse
-        subverse = subverse.copy().set_parse_action(lambda t: t[0] if t else "")
+        subverse = pp.Optional(pp.Word(pp.alphas.lower(), max=2)).set_parse_action(lambda t: t[0] if t else "")
         
         # Single verse reference: book chapter:verse[subverse]
         single_verse = (
@@ -54,14 +51,14 @@ class RefParser:
             + chapter.copy().set_results_name("chapter")
             + pp.Suppress(self.style.chapter_verse_separator)
             + verse.copy().set_results_name("verse")
-            + subverse.copy().set_results_name("subverse", default="")
+            + subverse.copy().set_results_name("subverse")
         )
         
         # For single-chapter books: book verse[subverse]
         single_chapter_verse = (
             book.copy().set_results_name("book")
             + verse.copy().set_results_name("verse")
-            + subverse.copy().set_results_name("subverse", default="")
+            + subverse.copy().set_results_name("subverse")
         )
         
         # Combine the parsers
