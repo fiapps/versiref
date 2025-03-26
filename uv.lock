@@ -3,25 +3,6 @@ revision = 1
 requires-python = ">=3.13"
 
 [[package]]
-name = "versiref"
-version = "0.1.0"
-source = { editable = "." }
-
-[package.dev-dependencies]
-dev = [
-    { name = "black" },
-    { name = "pytest" },
-]
-
-[package.metadata]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "black", specifier = ">=25.1.0" },
-    { name = "pytest", specifier = ">=8.3.5" },
-]
-
-[[package]]
 name = "black"
 version = "25.1.0"
 source = { registry = "https://pypi.org/simple" }
@@ -117,6 +98,15 @@ wheels = [
 ]
 
 [[package]]
+name = "pyparsing"
+version = "3.2.3"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/bb/22/f1129e69d94ffff626bdb5c835506b3a5b4f3d070f17ea295e12c2c6f60f/pyparsing-3.2.3.tar.gz", hash = "sha256:b9c13f1ab8b3b542f72e28f634bad4de758ab3ce4546e4301970ad6fa77c38be", size = 1088608 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/05/e7/df2285f3d08fee213f2d041540fa4fc9ca6c2d44cf36d3a035bf2a8d2bcc/pyparsing-3.2.3-py3-none-any.whl", hash = "sha256:a749938e02d6fd0b59b356ca504a24982314bb090c383e3cf201c95ef7e2bfcf", size = 111120 },
+]
+
+[[package]]
 name = "pytest"
 version = "8.3.5"
 source = { registry = "https://pypi.org/simple" }
@@ -129,4 +119,27 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/ae/3c/c9d525a414d506893f0cd8a8d0de7706446213181570cdbd766691164e40/pytest-8.3.5.tar.gz", hash = "sha256:f4efe70cc14e511565ac476b57c279e12a855b11f48f212af1080ef2263d3845", size = 1450891 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/30/3d/64ad57c803f1fa1e963a7946b6e0fea4a70df53c1a7fed304586539c2bac/pytest-8.3.5-py3-none-any.whl", hash = "sha256:c69214aa47deac29fad6c2a4f590b9c4a9fdb16a403176fe154b79c0b4d4d820", size = 343634 },
+]
+
+[[package]]
+name = "versiref"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "pyparsing" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "black" },
+    { name = "pytest" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "pyparsing", specifier = ">=3.2.3" }]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "black", specifier = ">=25.1.0" },
+    { name = "pytest", specifier = ">=8.3.5" },
 ]
