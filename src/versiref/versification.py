@@ -62,6 +62,23 @@ class Versification:
         else:
             return None
 
+    def is_single_chapter(self, book: str) -> bool:
+        """
+        Check if the given book is a single-chapter book.
+
+        Args:
+            book: The book ID (using Paratext three-letter codes)
+
+        Returns:
+            True if the book has only one chapter, False otherwise.
+        """
+        if book not in self.max_verses:
+            return False
+        # The plural form of PSA requires special handling.
+        if book == "PSAS":
+            book = "PSA"
+        return len(self.max_verses[book]) == 1
+
     def last_verse(self, book: str, chapter: int) -> int:
         """
         Return the number of the last verse of the given chapter of the given book.

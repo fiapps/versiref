@@ -74,3 +74,10 @@ def test_multiple_versifications():
     # Just verify we can get values, not testing specific differences
     assert isinstance(eng_psa_9, int)
     assert isinstance(lxx_psa_9, int)
+
+def test_is_single_chapter():
+    """Test ."""
+    v = Versification.standard_versification("eng")
+    assert v.is_single_chapter("GEN") == False
+    assert v.is_single_chapter("PSAS") == False
+    assert v.is_single_chapter("2JN") == True
