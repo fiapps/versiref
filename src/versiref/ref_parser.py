@@ -41,29 +41,109 @@ class RefParser:
         """Build the pyparsing parser based on the style and versification."""
         # Define basic elements
         book = pp.one_of(list(self.style.recognized_names.keys()))
+        book.set_parse_action(lambda t: self.style.recognized_names[t[0]])  # Get the book ID from the name
         chapter = common.integer
         verse = common.integer
-        subverse = pp.Optional(pp.Word(pp.alphas.lower(), max=2)).set_parse_action(lambda t: t[0] if t else "")
+        subverse = pp.Optional(pp.Word(pp.alphas.lower(), max=2), default="")
         
-        # Single verse reference: book chapter:verse[subverse]
-        single_verse = (
-            book.copy().set_results_name("book")
-            + chapter.copy().set_results_name("chapter")
-            + pp.Suppress(self.style.chapter_verse_separator)
-            + verse.copy().set_results_name("verse")
-            + subverse.copy().set_results_name("subverse")
+        # For now, we only parse ranges of a single verse.
+        verse_range = (verse.copy().set_results_name("start_verse") + subverse.copy().set_results_name("start_sub_verse"))
+        verse_range.set_parse_action(self._make_verse_range)
+        
+        verse_ranges = pp.DelimitedList(verse_range, delim=pp.Suppress(Style.verse_range_separator.strip())).set_results_name("verse_ranges")
+        
+        chapter_range = (chapter.copy().set_results_name("start_chapter") + pp.Suppress(self.style.chapter_verse_separator) + verse_ranges)
+        chapter_range.set_parse_action(self._make_chapter_range)
+
+        chapter_ranges = pp.DelimitedList(chapter_range, delim=pp.Suppress(self.style.chapter_separator.strip())).set_results_name("chapter_ranges")
+
+        book_chapter_verse_ranges = (book.copy().set_results_name("book") + chapter_ranges)
+        book_chapter_verse_ranges.set_parse_action(self._make_simple_ref)
+
+        # The chapter can be omitted for single-chapter (sc) books
+        sc_books = [name for name,id in self.style.recognized_names.items() if self.versification.is_single_chapter(id)]
+        sc_verse_range = (verse.copy().set_results_name("start_verse") + subverse.copy().set_results_name("start_sub_verse"))
+        sc_book_verse_ranges = (pp.one_of(sc_books).set_results_name("book") + sc_verse_range)
+ 
+        # Try the parser with longer matches first, lest Jude 1:5 parse as Jude 1.
+        self.simple_ref_parser = book_chapter_verse_ranges | sc_book_verse_ranges
+
+    @staticmethod
+    def _make_verse_range(original_text: str, loc: int, tokens: pp.ParseResults) -> VerseRange:
+        """
+        Create a VerseRange from parsed tokens.
+
+        Chapter numbers that cannot be determined locally are set to -1.
+
+        Args:
+            original_text: The original text being parsed
+            loc: The location of the match in the original text
+            tokens: The parsed tokens from pyparsing
+
+        Returns:
+            A VerseRange instance based on the parsed tokens
+        """
+        start_chapter = tokens.get("start_chapter", -1)
+        start_verse = tokens.start_verse
+        start_sub_verse = tokens.start_sub_verse
+        end_chapter = tokens.get("end_chapter", start_chapter)
+        end_verse = tokens.get("end_verse", start_verse)
+        end_sub_verse = tokens.get("end_sub_verse", start_sub_verse)
+        return VerseRange(  
+            start_chapter=start_chapter,
+            start_verse=start_verse,
+            start_sub_verse=start_sub_verse,
+            end_chapter=end_chapter,
+            end_verse=end_verse,
+            end_sub_verse=end_sub_verse,
+            original_text=original_text
         )
-        
-        # For single-chapter books: book verse[subverse]
-        single_chapter_verse = (
-            book.copy().set_results_name("book")
-            + verse.copy().set_results_name("verse")
-            + subverse.copy().set_results_name("subverse")
+
+    @staticmethod
+    def _make_chapter_range(tokens: pp.ParseResults) -> List[VerseRange]:
+        """
+        Set the chapter for the verse ranges.
+
+        Here we supply chapter numbers that cannot be determined locally.
+
+        Args:
+            tokens: The parsed tokens from pyparsing
+        """
+        this_chapter = tokens.start_chapter
+        verse_ranges = tokens.verse_ranges
+        for range in verse_ranges:
+            # Set the chapter for each verse range
+            range.start_chapter = this_chapter
+            if range.end_chapter < 0:
+                range.end_chapter = this_chapter
+            else:
+                this_chapter = range.end_chapter
+        return verse_ranges
+
+    @staticmethod
+    def _make_simple_ref(original_text: str, loc: int, tokens: pp.ParseResults) -> SimpleBibleRef:
+        """
+        Create a SimpleBibleRef from parsed tokens.
+
+        Args:
+            original_text: The original text being parsed
+            loc: The location of the match in the original text
+            tokens: The parsed tokens from pyparsing
+
+        Returns:
+            A SimpleBibleRef instance based on the parsed tokens
+        """
+        # Extract the book ID and verse ranges
+        book_name = tokens.book
+        verse_ranges = tokens.chapter_ranges
+
+        # Create a SimpleBibleRef with the parsed data
+        return SimpleBibleRef(
+            book_id=book_name,
+            ranges=verse_ranges,
+            original_text=original_text
         )
-        
-        # Combine the parsers
-        self.simple_ref_parser = single_verse | single_chapter_verse
-        
+
     def parse_simple(self, text: str) -> Optional[SimpleBibleRef]:
         """
         Parse a string to produce a SimpleBibleRef.
@@ -79,44 +159,7 @@ class RefParser:
         try:
             # Try to parse the text
             result = self.simple_ref_parser.parse_string(text, parse_all=True)
-            
-            # Get the book ID from the recognized name
-            book_name = result.book
-            book_id = self.style.recognized_names.get(book_name)
-            
-            if not book_id:
-                return None
-                
-            # Determine if this is a single-chapter book reference
-            is_single_chapter_book = False
-            if "chapter" not in result:
-                # This is a reference to a verse in a single-chapter book
-                is_single_chapter_book = True
-                chapter = 1  # Single-chapter books have chapter 1
-            else:
-                chapter = int(result.chapter)
-                
-            # Get the verse and subverse
-            verse = int(result.verse)
-            subverse = result.subverse if hasattr(result, "subverse") else ""
-            
-            # Create a VerseRange for the single verse
-            verse_range = VerseRange(
-                start_chapter=chapter,
-                start_verse=verse,
-                start_sub_verse=subverse,
-                end_chapter=chapter,
-                end_verse=verse,
-                end_sub_verse=subverse,
-                original_text=text
-            )
-            
-            # Create and return the SimpleBibleRef
-            return SimpleBibleRef(
-                book_id=book_id,
-                ranges=[verse_range],
-                original_text=text
-            )
+            return result[0]
             
         except pp.ParseException:
             # Parsing failed
