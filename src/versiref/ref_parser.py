@@ -41,18 +41,17 @@ class RefParser:
         """Build the pyparsing parser based on the style and versification."""
         # Define basic elements
         book = pp.one_of(list(self.style.recognized_names.keys()))
-        book.set_parse_action(
-            lambda t: self.style.recognized_names[t[0]]
-        )  # Get the book ID from the name
+        # Parse name to book ID.
+        book.set_parse_action(lambda t: self.style.recognized_names[t[0]])
         chapter = common.integer
         verse = common.integer
         subverse = pp.Optional(pp.Word(pp.alphas.lower(), max=2), default="")
 
         # For now, we only parse ranges of a single verse.
-        verse_range = verse.copy().set_results_name(
-            "start_verse"
-        ) + subverse.copy().set_results_name("start_sub_verse")
-        verse_range.set_parse_action(self._make_verse_range)
+        verse_range = (
+            verse.copy().set_results_name("start_verse")
+            + subverse.copy().set_results_name("start_sub_verse")
+        ).set_parse_action(self._make_verse_range)
 
         verse_ranges = pp.DelimitedList(
             verse_range, delim=pp.Suppress(Style.verse_range_separator.strip())
@@ -62,8 +61,7 @@ class RefParser:
             chapter.copy().set_results_name("start_chapter")
             + pp.Suppress(self.style.chapter_verse_separator)
             + verse_ranges
-        )
-        chapter_range.set_parse_action(self._make_chapter_range)
+        ).set_parse_action(self._make_chapter_range)
 
         chapter_ranges = pp.DelimitedList(
             chapter_range, delim=pp.Suppress(self.style.chapter_separator.strip())
@@ -71,8 +69,7 @@ class RefParser:
 
         book_chapter_verse_ranges = (
             book.copy().set_results_name("book") + chapter_ranges
-        )
-        book_chapter_verse_ranges.set_parse_action(self._make_simple_ref)
+        ).set_parse_action(self._make_simple_ref)
 
         # The chapter can be omitted for single-chapter (sc) books
         sc_books = [
