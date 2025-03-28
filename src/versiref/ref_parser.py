@@ -33,7 +33,7 @@ class RefParser:
         """
         self.style = style
         self.versification = versification
-        
+
         # Build the parser
         self._build_parser()
 
@@ -41,35 +41,59 @@ class RefParser:
         """Build the pyparsing parser based on the style and versification."""
         # Define basic elements
         book = pp.one_of(list(self.style.recognized_names.keys()))
-        book.set_parse_action(lambda t: self.style.recognized_names[t[0]])  # Get the book ID from the name
+        book.set_parse_action(
+            lambda t: self.style.recognized_names[t[0]]
+        )  # Get the book ID from the name
         chapter = common.integer
         verse = common.integer
         subverse = pp.Optional(pp.Word(pp.alphas.lower(), max=2), default="")
-        
+
         # For now, we only parse ranges of a single verse.
-        verse_range = (verse.copy().set_results_name("start_verse") + subverse.copy().set_results_name("start_sub_verse"))
+        verse_range = verse.copy().set_results_name(
+            "start_verse"
+        ) + subverse.copy().set_results_name("start_sub_verse")
         verse_range.set_parse_action(self._make_verse_range)
-        
-        verse_ranges = pp.DelimitedList(verse_range, delim=pp.Suppress(Style.verse_range_separator.strip())).set_results_name("verse_ranges")
-        
-        chapter_range = (chapter.copy().set_results_name("start_chapter") + pp.Suppress(self.style.chapter_verse_separator) + verse_ranges)
+
+        verse_ranges = pp.DelimitedList(
+            verse_range, delim=pp.Suppress(Style.verse_range_separator.strip())
+        ).set_results_name("verse_ranges")
+
+        chapter_range = (
+            chapter.copy().set_results_name("start_chapter")
+            + pp.Suppress(self.style.chapter_verse_separator)
+            + verse_ranges
+        )
         chapter_range.set_parse_action(self._make_chapter_range)
 
-        chapter_ranges = pp.DelimitedList(chapter_range, delim=pp.Suppress(self.style.chapter_separator.strip())).set_results_name("chapter_ranges")
+        chapter_ranges = pp.DelimitedList(
+            chapter_range, delim=pp.Suppress(self.style.chapter_separator.strip())
+        ).set_results_name("chapter_ranges")
 
-        book_chapter_verse_ranges = (book.copy().set_results_name("book") + chapter_ranges)
+        book_chapter_verse_ranges = (
+            book.copy().set_results_name("book") + chapter_ranges
+        )
         book_chapter_verse_ranges.set_parse_action(self._make_simple_ref)
 
         # The chapter can be omitted for single-chapter (sc) books
-        sc_books = [name for name,id in self.style.recognized_names.items() if self.versification.is_single_chapter(id)]
-        sc_verse_range = (verse.copy().set_results_name("start_verse") + subverse.copy().set_results_name("start_sub_verse"))
-        sc_book_verse_ranges = (pp.one_of(sc_books).set_results_name("book") + sc_verse_range)
- 
+        sc_books = [
+            name
+            for name, id in self.style.recognized_names.items()
+            if self.versification.is_single_chapter(id)
+        ]
+        sc_verse_range = verse.copy().set_results_name(
+            "start_verse"
+        ) + subverse.copy().set_results_name("start_sub_verse")
+        sc_book_verse_ranges = (
+            pp.one_of(sc_books).set_results_name("book") + sc_verse_range
+        )
+
         # Try the parser with longer matches first, lest Jude 1:5 parse as Jude 1.
         self.simple_ref_parser = book_chapter_verse_ranges | sc_book_verse_ranges
 
     @staticmethod
-    def _make_verse_range(original_text: str, loc: int, tokens: pp.ParseResults) -> VerseRange:
+    def _make_verse_range(
+        original_text: str, loc: int, tokens: pp.ParseResults
+    ) -> VerseRange:
         """
         Create a VerseRange from parsed tokens.
 
@@ -89,14 +113,14 @@ class RefParser:
         end_chapter = tokens.get("end_chapter", start_chapter)
         end_verse = tokens.get("end_verse", start_verse)
         end_sub_verse = tokens.get("end_sub_verse", start_sub_verse)
-        return VerseRange(  
+        return VerseRange(
             start_chapter=start_chapter,
             start_verse=start_verse,
             start_sub_verse=start_sub_verse,
             end_chapter=end_chapter,
             end_verse=end_verse,
             end_sub_verse=end_sub_verse,
-            original_text=original_text
+            original_text=original_text,
         )
 
     @staticmethod
@@ -106,8 +130,7 @@ class RefParser:
 
         Here we supply chapter numbers that cannot be determined locally.
 
-        Args:
-            tokens: The parsed tokens from pyparsing
+        This is a parse action for use with pyparsing.
         """
         this_chapter = tokens.start_chapter
         verse_ranges = tokens.verse_ranges
@@ -121,7 +144,9 @@ class RefParser:
         return verse_ranges
 
     @staticmethod
-    def _make_simple_ref(original_text: str, loc: int, tokens: pp.ParseResults) -> SimpleBibleRef:
+    def _make_simple_ref(
+        original_text: str, loc: int, tokens: pp.ParseResults
+    ) -> SimpleBibleRef:
         """
         Create a SimpleBibleRef from parsed tokens.
 
@@ -139,20 +164,19 @@ class RefParser:
 
         # Create a SimpleBibleRef with the parsed data
         return SimpleBibleRef(
-            book_id=book_name,
-            ranges=verse_ranges,
-            original_text=original_text
+            book_id=book_name, ranges=verse_ranges, original_text=original_text
         )
 
     def parse_simple(self, text: str, fail_silently=True) -> Optional[SimpleBibleRef]:
         """
         Parse a string to produce a SimpleBibleRef.
-        
-        This method attempts to parse the entire string as a single Bible reference.
-        
+
+        This method attempts to parse the entire string as a reference to a single book of the Bible.
+
         Args:
             text: The string to parse
-            
+            fail_silently: If True, return None on failure instead of raising an exception
+
         Returns:
             A SimpleBibleRef instance, or None if parsing fails
         """
@@ -160,7 +184,7 @@ class RefParser:
             # Try to parse the text
             result = self.simple_ref_parser.parse_string(text, parse_all=True)
             return result[0]
-            
+
         except pp.ParseException as e:
             if fail_silently:
                 return None
