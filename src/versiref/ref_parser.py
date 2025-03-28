@@ -144,7 +144,7 @@ class RefParser:
             original_text=original_text
         )
 
-    def parse_simple(self, text: str) -> Optional[SimpleBibleRef]:
+    def parse_simple(self, text: str, fail_silently=True) -> Optional[SimpleBibleRef]:
         """
         Parse a string to produce a SimpleBibleRef.
         
@@ -161,6 +161,8 @@ class RefParser:
             result = self.simple_ref_parser.parse_string(text, parse_all=True)
             return result[0]
             
-        except pp.ParseException:
-            # Parsing failed
-            return None
+        except pp.ParseException as e:
+            if fail_silently:
+                return None
+            else:
+                raise e
