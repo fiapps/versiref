@@ -4,7 +4,7 @@ Bible reference parsing for versiref.
 This module provides the RefParser class for parsing Bible references from strings.
 """
 
-from typing import Dict, List, Optional, Tuple
+from typing import List, Optional
 
 import pyparsing as pp
 from pyparsing import common
