@@ -133,7 +133,7 @@ class RefParser:
             end_chapter=end_chapter,
             end_verse=end_verse,
             end_sub_verse=end_sub_verse,
-            original_text=range_original_text
+            original_text=range_original_text,
         )
 
     @staticmethod

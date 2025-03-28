@@ -13,16 +13,16 @@ def test_parse_simple_verse():
     # Create a style
     names = Style.standard_names("en-sbl_abbreviations")
     style = Style(names=names)
-    
+
     # Create a versification
     versification = Versification.standard_versification("eng")
-    
+
     # Create a parser
     parser = RefParser(style, versification)
-    
+
     # Parse a simple reference: "Gen 1:1"
     ref = parser.parse_simple("Gen 1:1")
-    
+
     assert ref is not None
     assert ref.book_id == "GEN"
     assert len(ref.ranges) == 1
@@ -40,16 +40,16 @@ def test_parse_verse_with_subverse():
     # Create a style
     names = Style.standard_names("en-sbl_abbreviations")
     style = Style(names=names)
-    
+
     # Create a versification
     versification = Versification.standard_versification("eng")
-    
+
     # Create a parser
     parser = RefParser(style, versification)
-    
+
     # Parse a reference with a subverse: "John 3:16b"
     ref = parser.parse_simple("John 3:16b")
-    
+
     assert ref is not None
     assert ref.book_id == "JHN"
     assert len(ref.ranges) == 1
@@ -67,16 +67,16 @@ def test_parse_single_chapter_book():
     # Create a style
     names = Style.standard_names("en-sbl_abbreviations")
     style = Style(names=names)
-    
+
     # Create a versification with Jude as a single-chapter book
     versification = Versification.standard_versification("eng")
-    
+
     # Create a parser
     parser = RefParser(style, versification)
-    
+
     # Parse a reference to a verse in Jude: "Jude 5"
     ref = parser.parse_simple("Jude 5")
-    
+
     assert ref is not None
     assert ref.book_id == "JUD"
     assert len(ref.ranges) == 1
@@ -92,16 +92,16 @@ def test_parse_nonexistent_reference():
     # Create a style
     names = Style.standard_names("en-sbl_abbreviations")
     style = Style(names=names)
-    
+
     # Create a versification
     versification = Versification.standard_versification("eng")
-    
+
     # Create a parser
     parser = RefParser(style, versification)
-    
+
     # Try to parse a non-reference
     ref = parser.parse_simple("This is not a Bible reference")
-    
+
     assert ref is None
 
 
@@ -110,16 +110,16 @@ def test_parse_book_with_space():
     # Create a style
     names = Style.standard_names("en-sbl_abbreviations")
     style = Style(names=names)
-    
+
     # Create a versification
     versification = Versification.standard_versification("eng")
-    
+
     # Create a parser
     parser = RefParser(style, versification)
-    
+
     # Parse a reference with a space in the book name: "2 John 5"
     ref = parser.parse_simple("2 John 5")
-    
+
     assert ref is not None
     assert ref.book_id == "2JN"
     assert len(ref.ranges) == 1
@@ -133,16 +133,16 @@ def test_parse_multi_chapter_book_with_space():
     # Create a style
     names = Style.standard_names("en-sbl_abbreviations")
     style = Style(names=names)
-    
+
     # Create a versification
     versification = Versification.standard_versification("eng")
-    
+
     # Create a parser
     parser = RefParser(style, versification)
-    
+
     # Parse a reference with a space in the book name: "1 Kgs 8:10"
     ref = parser.parse_simple("1 Kgs 8:10")
-    
+
     assert ref is not None
     assert ref.book_id == "1KI"
     assert len(ref.ranges) == 1
