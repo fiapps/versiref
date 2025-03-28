@@ -32,8 +32,7 @@ def test_parse_simple_verse():
     assert ref.ranges[0].end_chapter == 1
     assert ref.ranges[0].end_verse == 1
     assert ref.ranges[0].end_sub_verse == ""
-    assert ref.original_text == "Gen"
-    assert ref.ranges[0].original_text == "1:1"
+    assert ref.ranges[0].original_text == "Gen 1:1"
 
 
 def test_parse_verse_with_subverse():
@@ -60,8 +59,7 @@ def test_parse_verse_with_subverse():
     assert ref.ranges[0].end_chapter == 3
     assert ref.ranges[0].end_verse == 16
     assert ref.ranges[0].end_sub_verse == "b"
-    assert ref.original_text == "John"
-    assert ref.ranges[0].original_text == "3:16b"
+    assert ref.ranges[0].original_text == "John 3:16b"
 
 
 def test_parse_single_chapter_book():
@@ -86,8 +84,7 @@ def test_parse_single_chapter_book():
     assert ref.ranges[0].start_verse == 5
     assert ref.ranges[0].end_chapter == 1
     assert ref.ranges[0].end_verse == 5
-    assert ref.original_text == "Jude"
-    assert ref.ranges[0].original_text == "5"
+    assert ref.ranges[0].original_text == "Jude 5"
 
 
 def test_parse_nonexistent_reference():
@@ -128,8 +125,7 @@ def test_parse_book_with_space():
     assert len(ref.ranges) == 1
     assert ref.ranges[0].start_chapter == 1  # Single-chapter books have chapter 1
     assert ref.ranges[0].start_verse == 5
-    assert ref.original_text == "2 John"
-    assert ref.ranges[0].original_text == "5"
+    assert ref.ranges[0].original_text == "2 John 5"
 
 
 def test_parse_multi_chapter_book_with_space():
@@ -152,5 +148,4 @@ def test_parse_multi_chapter_book_with_space():
     assert len(ref.ranges) == 1
     assert ref.ranges[0].start_chapter == 8
     assert ref.ranges[0].start_verse == 10
-    assert ref.original_text == "1 Kings"
-    assert ref.ranges[0].original_text == "8:10"
+    assert ref.ranges[0].original_text == "1 Kings 8:10"
