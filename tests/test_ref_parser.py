@@ -140,12 +140,12 @@ def test_parse_multi_chapter_book_with_space():
     # Create a parser
     parser = RefParser(style, versification)
     
-    # Parse a reference with a space in the book name: "1 Kings 8:10"
-    ref = parser.parse_simple("1 Kings 8:10")
+    # Parse a reference with a space in the book name: "1 Kgs 8:10"
+    ref = parser.parse_simple("1 Kgs 8:10")
     
     assert ref is not None
     assert ref.book_id == "1KI"
     assert len(ref.ranges) == 1
     assert ref.ranges[0].start_chapter == 8
     assert ref.ranges[0].start_verse == 10
-    assert ref.ranges[0].original_text == "1 Kings 8:10"
+    assert ref.ranges[0].original_text == "1 Kgs 8:10"
