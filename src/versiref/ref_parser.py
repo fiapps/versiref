@@ -46,11 +46,14 @@ class RefParser:
         chapter = common.integer
         verse = common.integer
         subverse = pp.Optional(pp.Word(pp.alphas.lower(), max=2), default="")
+        # Empty marker to record location
+        location_marker = pp.Empty().set_parse_action(lambda s, l, t: l)
 
         # For now, we only parse ranges of a single verse.
         verse_range = (
             verse.copy().set_results_name("start_verse")
             + subverse.copy().set_results_name("start_sub_verse")
+            + location_marker.copy().set_results_name("end_location")
         ).set_parse_action(self._make_verse_range)
 
         verse_ranges = pp.DelimitedList(
@@ -60,6 +63,7 @@ class RefParser:
         chapter_range = (
             chapter.copy().set_results_name("start_chapter")
             + pp.Suppress(self.style.chapter_verse_separator)
+            + location_marker.copy().set_results_name("verse_ranges_location")
             + verse_ranges
         ).set_parse_action(self._make_chapter_range)
 
@@ -68,7 +72,9 @@ class RefParser:
         ).set_results_name("chapter_ranges")
 
         book_chapter_verse_ranges = (
-            book.copy().set_results_name("book") + chapter_ranges
+            book.copy().set_results_name("book")
+            + location_marker.copy().set_results_name("chapter_ranges_location")
+            + chapter_ranges
         ).set_parse_action(self._make_simple_ref)
 
         # The chapter can be omitted for single-chapter (sc) books
@@ -83,15 +89,18 @@ class RefParser:
         sc_verse_range = (
             verse.copy().set_results_name("start_verse")
             + subverse.copy().set_results_name("start_sub_verse")
+            + location_marker.copy().set_results_name("end_location")
         ).set_parse_action(self._make_sc_verse_range)
 
         sc_verse_ranges = pp.DelimitedList(
             sc_verse_range, delim=pp.Suppress(Style.verse_range_separator.strip())
-        ).set_results_name("verse_ranges")
+        ).set_results_name("chapter_ranges")
 
-        sc_book_verse_ranges = (sc_book + sc_verse_ranges).set_parse_action(
-            self._make_simple_ref
-        )
+        sc_book_verse_ranges = (
+            sc_book
+            + location_marker.copy().set_results_name("chapter_ranges_location")
+            + sc_verse_ranges
+        ).set_parse_action(self._make_simple_ref)
 
         # Try the parser with longer matches first, lest Jude 1:5 parse as Jude 1.
         self.simple_ref_parser = book_chapter_verse_ranges | sc_book_verse_ranges
@@ -115,6 +124,8 @@ class RefParser:
         end_chapter = tokens.get("end_chapter", start_chapter)
         end_verse = tokens.get("end_verse", start_verse)
         end_sub_verse = tokens.get("end_sub_verse", start_sub_verse)
+        end_location = tokens.get("end_location", -1)
+        range_original_text = original_text[loc:end_location]
         return VerseRange(
             start_chapter=start_chapter,
             start_verse=start_verse,
@@ -122,11 +133,13 @@ class RefParser:
             end_chapter=end_chapter,
             end_verse=end_verse,
             end_sub_verse=end_sub_verse,
-            original_text=original_text,
+            original_text=range_original_text
         )
 
     @staticmethod
-    def _make_chapter_range(tokens: pp.ParseResults) -> List[VerseRange]:
+    def _make_chapter_range(
+        original_text: str, loc: int, tokens: pp.ParseResults
+    ) -> List[VerseRange]:
         """
         Set the chapter for the verse ranges.
 
@@ -142,6 +155,17 @@ class RefParser:
                 range.end_chapter = this_chapter
             else:
                 this_chapter = range.end_chapter
+        if verse_ranges:
+            # Expand the original text for the first verse range to include the
+            # chapter number. Why do we need to use find()? Because there could
+            # be whitespace after verse_ranges_location.
+            verse_ranges_location = tokens.get("verse_ranges_location", loc)
+            range_0_start = original_text.find(
+                verse_ranges[0].original_text, verse_ranges_location
+            )
+            verse_ranges[0].original_text = original_text[
+                loc : range_0_start + len(verse_ranges[0].original_text)
+            ]
         return verse_ranges
 
     @staticmethod
@@ -163,6 +187,8 @@ class RefParser:
         end_chapter = 1
         end_verse = tokens.get("end_verse", start_verse)
         end_sub_verse = tokens.get("end_sub_verse", start_sub_verse)
+        end_location = tokens.get("end_location", -1)
+        range_original_text = original_text[loc:end_location]
         return VerseRange(
             start_chapter=start_chapter,
             start_verse=start_verse,
@@ -170,7 +196,7 @@ class RefParser:
             end_chapter=end_chapter,
             end_verse=end_verse,
             end_sub_verse=end_sub_verse,
-            original_text=original_text,
+            original_text=range_original_text,
         )
 
     @staticmethod
@@ -188,6 +214,17 @@ class RefParser:
         # Extract the book ID and verse ranges
         book_name = tokens.book
         verse_ranges = tokens.get("chapter_ranges", tokens.verse_ranges)
+        if verse_ranges:
+            # Expand the original text for the first verse range to include the
+            # book name. Why do we need to use find()? Because there could
+            # be whitespace after verse_ranges_location.
+            chapter_ranges_location = tokens.get("chapter_ranges_location", loc)
+            range_0_start = original_text.find(
+                verse_ranges[0].original_text, chapter_ranges_location
+            )
+            verse_ranges[0].original_text = original_text[
+                loc : range_0_start + len(verse_ranges[0].original_text)
+            ]
 
         # Create a SimpleBibleRef with the parsed data
         return SimpleBibleRef(
