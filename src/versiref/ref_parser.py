@@ -77,11 +77,20 @@ class RefParser:
             for name, id in self.style.recognized_names.items()
             if self.versification.is_single_chapter(id)
         ]
-        sc_verse_range = verse.copy().set_results_name(
-            "start_verse"
-        ) + subverse.copy().set_results_name("start_sub_verse")
-        sc_book_verse_ranges = (
-            pp.one_of(sc_books).set_results_name("book") + sc_verse_range
+        sc_book = pp.one_of(sc_books).set_results_name("book")
+        sc_book.set_parse_action(lambda t: self.style.recognized_names[t[0]])
+
+        sc_verse_range = (
+            verse.copy().set_results_name("start_verse")
+            + subverse.copy().set_results_name("start_sub_verse")
+        ).set_parse_action(self._make_sc_verse_range)
+
+        sc_verse_ranges = pp.DelimitedList(
+            sc_verse_range, delim=pp.Suppress(Style.verse_range_separator.strip())
+        ).set_results_name("verse_ranges")
+
+        sc_book_verse_ranges = (sc_book + sc_verse_ranges).set_parse_action(
+            self._make_simple_ref
         )
 
         # Try the parser with longer matches first, lest Jude 1:5 parse as Jude 1.
@@ -95,11 +104,7 @@ class RefParser:
         Create a VerseRange from parsed tokens.
 
         Chapter numbers that cannot be determined locally are set to -1.
-
-        Args:
-            original_text: The original text being parsed
-            loc: The location of the match in the original text
-            tokens: The parsed tokens from pyparsing
+        This is a parse action for use with pyparsing.
 
         Returns:
             A VerseRange instance based on the parsed tokens
@@ -126,7 +131,6 @@ class RefParser:
         Set the chapter for the verse ranges.
 
         Here we supply chapter numbers that cannot be determined locally.
-
         This is a parse action for use with pyparsing.
         """
         this_chapter = tokens.start_chapter
@@ -141,23 +145,49 @@ class RefParser:
         return verse_ranges
 
     @staticmethod
+    def _make_sc_verse_range(
+        original_text: str, loc: int, tokens: pp.ParseResults
+    ) -> VerseRange:
+        """
+        Create a VerseRange from parsed tokens.
+
+        This is for a single-chapter book.
+        This is a parse action for use with pyparsing.
+
+        Returns:
+            A VerseRange instance based on the parsed tokens
+        """
+        start_chapter = 1
+        start_verse = tokens.start_verse
+        start_sub_verse = tokens.start_sub_verse
+        end_chapter = 1
+        end_verse = tokens.get("end_verse", start_verse)
+        end_sub_verse = tokens.get("end_sub_verse", start_sub_verse)
+        return VerseRange(
+            start_chapter=start_chapter,
+            start_verse=start_verse,
+            start_sub_verse=start_sub_verse,
+            end_chapter=end_chapter,
+            end_verse=end_verse,
+            end_sub_verse=end_sub_verse,
+            original_text=original_text,
+        )
+
+    @staticmethod
     def _make_simple_ref(
         original_text: str, loc: int, tokens: pp.ParseResults
     ) -> SimpleBibleRef:
         """
         Create a SimpleBibleRef from parsed tokens.
 
-        Args:
-            original_text: The original text being parsed
-            loc: The location of the match in the original text
-            tokens: The parsed tokens from pyparsing
+        This is a parse action for use with pyparsing.
 
         Returns:
             A SimpleBibleRef instance based on the parsed tokens
         """
         # Extract the book ID and verse ranges
         book_name = tokens.book
-        verse_ranges = tokens.chapter_ranges
+        verse_ranges = tokens.get("chapter_ranges", tokens.verse_ranges)
 
         # Create a SimpleBibleRef with the parsed data
         return SimpleBibleRef(
