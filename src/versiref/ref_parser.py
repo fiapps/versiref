@@ -102,6 +102,15 @@ class RefParser:
         sc_verse_range = (
             verse.copy().set_results_name("start_verse")
             + subverse.copy().set_results_name("start_sub_verse")
+            + pp.Opt(
+                pp.Literal(self.style.following_verses).set_name("following_verses")
+                | pp.Literal(self.style.following_verse).set_name("following_verse")
+                | (
+                    pp.Suppress(self.style.range_separator)
+                    + verse.copy().set_results_name("end_verse")
+                    + subverse.copy().set_results_name("end_sub_verse")
+                )
+            )
             + location_marker.copy().set_results_name("end_location")
         ).set_parse_action(self._make_sc_verse_range)
 
@@ -136,14 +145,18 @@ class RefParser:
         # Handle following_verse(s) mis-parsed as sub-verse.
         if "following_verse" in tokens:
             has_following_verse = True
-        elif start_sub_verse == self.style.following_verse and "end_verse" not in tokens:
+        elif (
+            start_sub_verse == self.style.following_verse and "end_verse" not in tokens
+        ):
             start_sub_verse = ""
             has_following_verse = True
         else:
             has_following_verse = False
         if "following_verses" in tokens:
             has_following_verses = True
-        elif start_sub_verse == self.style.following_verses and "end_verse" not in tokens:
+        elif (
+            start_sub_verse == self.style.following_verses and "end_verse" not in tokens
+        ):
             start_sub_verse = ""
             has_following_verses = True
         else:
@@ -204,9 +217,8 @@ class RefParser:
             ]
         return verse_ranges
 
-    @staticmethod
     def _make_sc_verse_range(
-        original_text: str, loc: int, tokens: pp.ParseResults
+        self, original_text: str, loc: int, tokens: pp.ParseResults
     ) -> VerseRange:
         """
         Create a VerseRange from parsed tokens.
@@ -221,8 +233,35 @@ class RefParser:
         start_verse = tokens.start_verse
         start_sub_verse = tokens.start_sub_verse
         end_chapter = 1
-        end_verse = tokens.get("end_verse", start_verse)
-        end_sub_verse = tokens.get("end_sub_verse", start_sub_verse)
+        # Handle following_verse(s) mis-parsed as sub-verse.
+        if "following_verse" in tokens:
+            has_following_verse = True
+        elif (
+            start_sub_verse == self.style.following_verse and "end_verse" not in tokens
+        ):
+            start_sub_verse = ""
+            has_following_verse = True
+        else:
+            has_following_verse = False
+        if "following_verses" in tokens:
+            has_following_verses = True
+        elif (
+            start_sub_verse == self.style.following_verses and "end_verse" not in tokens
+        ):
+            start_sub_verse = ""
+            has_following_verses = True
+        else:
+            has_following_verses = False
+        # Now set end based on type of range.
+        if has_following_verse or has_following_verses:
+            if has_following_verse:
+                end_verse = start_verse + 1
+            else:
+                end_verse = -1
+            end_sub_verse = ""
+        else:
+            end_verse = tokens.get("end_verse", start_verse)
+            end_sub_verse = tokens.get("end_sub_verse", start_sub_verse)
         end_location = tokens.get("end_location", -1)
         range_original_text = original_text[loc:end_location]
         return VerseRange(
