@@ -23,16 +23,23 @@ class RefParser:
     instance.
     """
 
-    def __init__(self, style: Style, versification: Versification):
+    def __init__(
+        self, style: Style, versification: Versification, strict: bool = False
+    ):
         """
         Initialize a RefParser with a style and versification.
 
         Args:
             style: The Style to use for parsing
             versification: The Versification to use for determining single-chapter books
+            strict: If True, follow the style more closely.
+
+        Non-strict parsers currently recognize as range separators hyphens, en
+        dashes, and the style's range separator if it differs from these.
         """
         self.style = style
         self.versification = versification
+        self.strict = strict
 
         # Build the parser
         self._build_parser()
@@ -46,6 +53,13 @@ class RefParser:
         chapter = common.integer
         verse = common.integer
         subverse = pp.Opt(pp.Word(pp.alphas.lower(), max=2), default="")
+        if self.strict:
+            range_separator = pp.Suppress(self.style.range_separator)
+        else:
+            range_separators = ["-", "\N{EN DASH}"]
+            if self.style.range_separator not in range_separators:
+                range_separators.append(self.style.range_separator)
+            range_separator = pp.Suppress(pp.one_of(range_separators))
         # Empty marker to record location
         location_marker = pp.Empty().set_parse_action(lambda s, l, t: l)
 
@@ -57,7 +71,7 @@ class RefParser:
                 pp.Literal(self.style.following_verses).set_name("following_verses")
                 | pp.Literal(self.style.following_verse).set_name("following_verse")
                 | (
-                    pp.Suppress(self.style.range_separator)
+                    range_separator
                     + pp.Opt(
                         chapter.copy().set_results_name("end_chapter")
                         + self.style.chapter_verse_separator
@@ -106,7 +120,7 @@ class RefParser:
                 pp.Literal(self.style.following_verses).set_name("following_verses")
                 | pp.Literal(self.style.following_verse).set_name("following_verse")
                 | (
-                    pp.Suppress(self.style.range_separator)
+                    range_separator
                     + verse.copy().set_results_name("end_verse")
                     + subverse.copy().set_results_name("end_subverse")
                 )
@@ -145,9 +159,7 @@ class RefParser:
         # Handle following_verse(s) mis-parsed as subverse.
         if "following_verse" in tokens:
             has_following_verse = True
-        elif (
-            start_subverse == self.style.following_verse and "end_verse" not in tokens
-        ):
+        elif start_subverse == self.style.following_verse and "end_verse" not in tokens:
             start_subverse = ""
             has_following_verse = True
         else:
@@ -236,9 +248,7 @@ class RefParser:
         # Handle following_verse(s) mis-parsed as subverse.
         if "following_verse" in tokens:
             has_following_verse = True
-        elif (
-            start_subverse == self.style.following_verse and "end_verse" not in tokens
-        ):
+        elif start_subverse == self.style.following_verse and "end_verse" not in tokens:
             start_subverse = ""
             has_following_verse = True
         else:
