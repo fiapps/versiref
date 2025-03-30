@@ -28,10 +28,10 @@ def test_parse_simple_verse():
     assert len(ref.ranges) == 1
     assert ref.ranges[0].start_chapter == 1
     assert ref.ranges[0].start_verse == 1
-    assert ref.ranges[0].start_sub_verse == ""
+    assert ref.ranges[0].start_subverse == ""
     assert ref.ranges[0].end_chapter == 1
     assert ref.ranges[0].end_verse == 1
-    assert ref.ranges[0].end_sub_verse == ""
+    assert ref.ranges[0].end_subverse == ""
     assert ref.ranges[0].original_text == "Gen 1:1"
 
 
@@ -55,10 +55,10 @@ def test_parse_verse_with_subverse():
     assert len(ref.ranges) == 1
     assert ref.ranges[0].start_chapter == 3
     assert ref.ranges[0].start_verse == 16
-    assert ref.ranges[0].start_sub_verse == "b"
+    assert ref.ranges[0].start_subverse == "b"
     assert ref.ranges[0].end_chapter == 3
     assert ref.ranges[0].end_verse == 16
-    assert ref.ranges[0].end_sub_verse == "b"
+    assert ref.ranges[0].end_subverse == "b"
     assert ref.ranges[0].original_text == "John 3:16b"
 
 

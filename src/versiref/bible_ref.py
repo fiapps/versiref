@@ -16,10 +16,10 @@ class VerseRange:
     Represents a range of verses within a single book of the Bible.
 
     A verse range has a start and end point, each defined by chapter, verse, and
-    sub-verse. The original text from which this range was parsed can be stored.
+    subverse. The original text from which this range was parsed can be stored.
 
     A verse number less than 0 means "unspecified". When a verse number is less
-    than 0, the corresponding sub-verse should be "", but it is ignored
+    than 0, the corresponding subverse should be "", but it is ignored
     regardless of its value. If start_verse and end_verse are both less than 0,
     the range is a whole chapter or chapters. If start_verse >= 0 and end_verse
     < 0, the verses are f"{start_verse}ff". This is only allowed if
@@ -33,10 +33,10 @@ class VerseRange:
 
     start_chapter: int
     start_verse: int
-    start_sub_verse: str
+    start_subverse: str
     end_chapter: int
     end_verse: int
-    end_sub_verse: str
+    end_subverse: str
     original_text: Optional[str] = None
 
 
@@ -110,8 +110,8 @@ class SimpleBibleRef:
                     range_text = f"{current_chapter}{style.chapter_verse_separator}{verse_range.start_verse}"
 
                     # Add subverse if present
-                    if verse_range.start_sub_verse:
-                        range_text += verse_range.start_sub_verse
+                    if verse_range.start_subverse:
+                        range_text += verse_range.start_subverse
 
                     # Add end verse if different from start verse
                     if verse_range.end_verse < 0:
@@ -120,7 +120,7 @@ class SimpleBibleRef:
                     elif verse_range.end_verse != 0 and (
                         verse_range.end_chapter != verse_range.start_chapter
                         or verse_range.end_verse != verse_range.start_verse
-                        or verse_range.end_sub_verse != verse_range.start_sub_verse
+                        or verse_range.end_subverse != verse_range.start_subverse
                     ):
                         # If the end chapter is different, include it
                         if verse_range.end_chapter != verse_range.start_chapter:
@@ -131,8 +131,8 @@ class SimpleBibleRef:
                             )
 
                         # Add end subverse if present
-                        if verse_range.end_sub_verse:
-                            range_text += verse_range.end_sub_verse
+                        if verse_range.end_subverse:
+                            range_text += verse_range.end_subverse
 
                     formatted_ranges.append(range_text)
             else:
@@ -140,14 +140,14 @@ class SimpleBibleRef:
                 range_text = f"{verse_range.start_verse}"
 
                 # Add subverse if present
-                if verse_range.start_sub_verse:
-                    range_text += verse_range.start_sub_verse
+                if verse_range.start_subverse:
+                    range_text += verse_range.start_subverse
 
                 # Add end verse if different from start verse
                 if verse_range.end_verse != 0 and (
                     verse_range.end_chapter != verse_range.start_chapter
                     or verse_range.end_verse != verse_range.start_verse
-                    or verse_range.end_sub_verse != verse_range.start_sub_verse
+                    or verse_range.end_subverse != verse_range.start_subverse
                 ):
                     # If the end chapter is different, include it
                     if verse_range.end_chapter != verse_range.start_chapter:
@@ -156,8 +156,8 @@ class SimpleBibleRef:
                         range_text += f"{style.range_separator}{verse_range.end_verse}"
 
                     # Add end subverse if present
-                    if verse_range.end_sub_verse:
-                        range_text += verse_range.end_sub_verse
+                    if verse_range.end_subverse:
+                        range_text += verse_range.end_subverse
 
                 formatted_ranges.append(range_text)
 

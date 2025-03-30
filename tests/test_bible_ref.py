@@ -15,18 +15,18 @@ def test_verse_range_initialization():
     assert vr.start_verse == 16
     assert vr.end_chapter == 3
     assert vr.end_verse == 16
-    assert vr.start_sub_verse == ""
-    assert vr.end_sub_verse == ""
+    assert vr.start_subverse == ""
+    assert vr.end_subverse == ""
     assert vr.original_text is None
 
-    # Complex case: full range with sub-verses
+    # Complex case: full range with subverses
     vr = VerseRange(1, 2, "a", 3, 4, "b", "1:2a-3:4b")
     assert vr.start_chapter == 1
     assert vr.start_verse == 2
-    assert vr.start_sub_verse == "a"
+    assert vr.start_subverse == "a"
     assert vr.end_chapter == 3
     assert vr.end_verse == 4
-    assert vr.end_sub_verse == "b"
+    assert vr.end_subverse == "b"
     assert vr.original_text == "1:2a-3:4b"
 
 
@@ -75,10 +75,10 @@ def test_format_simple_reference():
     vr = VerseRange(
         start_chapter=1,
         start_verse=1,
-        start_sub_verse="",
+        start_subverse="",
         end_chapter=1,
         end_verse=5,
-        end_sub_verse="",
+        end_subverse="",
     )
     ref = SimpleBibleRef(book_id="GEN", ranges=[vr])
 
@@ -111,18 +111,18 @@ def test_format_multiple_ranges():
     vr1 = VerseRange(
         start_chapter=3,
         start_verse=16,
-        start_sub_verse="",
+        start_subverse="",
         end_chapter=3,
         end_verse=16,
-        end_sub_verse="",
+        end_subverse="",
     )
     vr2 = VerseRange(
         start_chapter=3,
         start_verse=18,
-        start_sub_verse="",
+        start_subverse="",
         end_chapter=3,
         end_verse=20,
-        end_sub_verse="",
+        end_subverse="",
     )
     ref = SimpleBibleRef(book_id="JHN", ranges=[vr1, vr2])
 
@@ -141,18 +141,18 @@ def test_format_multiple_chapters():
     vr1 = VerseRange(
         start_chapter=1,
         start_verse=18,
-        start_sub_verse="",
+        start_subverse="",
         end_chapter=1,
         end_verse=32,
-        end_sub_verse="",
+        end_subverse="",
     )
     vr2 = VerseRange(
         start_chapter=2,
         start_verse=1,
-        start_sub_verse="",
+        start_subverse="",
         end_chapter=2,
         end_verse=5,
-        end_sub_verse="",
+        end_subverse="",
     )
     ref = SimpleBibleRef(book_id="ROM", ranges=[vr1, vr2])
 
@@ -171,10 +171,10 @@ def test_format_with_subverses():
     vr = VerseRange(
         start_chapter=5,
         start_verse=3,
-        start_sub_verse="b",
+        start_subverse="b",
         end_chapter=5,
         end_verse=5,
-        end_sub_verse="a",
+        end_subverse="a",
     )
     ref = SimpleBibleRef(book_id="MRK", ranges=[vr])
 
@@ -193,10 +193,10 @@ def test_format_cross_chapter_range():
     vr = VerseRange(
         start_chapter=7,
         start_verse=53,
-        start_sub_verse="",
+        start_subverse="",
         end_chapter=8,
         end_verse=11,
-        end_sub_verse="",
+        end_subverse="",
     )
     ref = SimpleBibleRef(book_id="JHN", ranges=[vr])
 
@@ -215,10 +215,10 @@ def test_format_whole_chapter_range():
     vr = VerseRange(
         start_chapter=1,
         start_verse=-1,  # Unspecified verse number
-        start_sub_verse="",
+        start_subverse="",
         end_chapter=39,
         end_verse=-1,  # Unspecified verse number
-        end_sub_verse="",
+        end_subverse="",
     )
     ref = SimpleBibleRef(book_id="ISA", ranges=[vr])
 
@@ -237,10 +237,10 @@ def test_format_ff_reference():
     vr = VerseRange(
         start_chapter=2,
         start_verse=5,
-        start_sub_verse="",
+        start_subverse="",
         end_chapter=2,
         end_verse=-1,  # Unspecified end verse means "ff"
-        end_sub_verse="",
+        end_subverse="",
     )
     ref = SimpleBibleRef(book_id="PHP", ranges=[vr])
 
@@ -265,18 +265,18 @@ def test_format_with_custom_style():
     vr1 = VerseRange(
         start_chapter=1,
         start_verse=1,
-        start_sub_verse="",
+        start_subverse="",
         end_chapter=1,
         end_verse=5,
-        end_sub_verse="",
+        end_subverse="",
     )
     vr2 = VerseRange(
         start_chapter=1,
         start_verse=8,
-        start_sub_verse="b",
+        start_subverse="b",
         end_chapter=1,
         end_verse=10,
-        end_sub_verse="a",
+        end_subverse="a",
     )
     ref = SimpleBibleRef(book_id="GEN", ranges=[vr1, vr2])
 

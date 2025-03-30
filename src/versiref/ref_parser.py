@@ -52,7 +52,7 @@ class RefParser:
         # For now, we only parse ranges of a single verse.
         verse_range = (
             verse.copy().set_results_name("start_verse")
-            + subverse.set_results_name("start_sub_verse")
+            + subverse.set_results_name("start_subverse")
             + pp.Opt(
                 pp.Literal(self.style.following_verses).set_name("following_verses")
                 | pp.Literal(self.style.following_verse).set_name("following_verse")
@@ -63,7 +63,7 @@ class RefParser:
                         + self.style.chapter_verse_separator
                     )
                     + verse.copy().set_results_name("end_verse")
-                    + subverse.copy().set_results_name("end_sub_verse")
+                    + subverse.copy().set_results_name("end_subverse")
                 )
             )
             + location_marker.copy().set_results_name("end_location")
@@ -101,14 +101,14 @@ class RefParser:
 
         sc_verse_range = (
             verse.copy().set_results_name("start_verse")
-            + subverse.copy().set_results_name("start_sub_verse")
+            + subverse.copy().set_results_name("start_subverse")
             + pp.Opt(
                 pp.Literal(self.style.following_verses).set_name("following_verses")
                 | pp.Literal(self.style.following_verse).set_name("following_verse")
                 | (
                     pp.Suppress(self.style.range_separator)
                     + verse.copy().set_results_name("end_verse")
-                    + subverse.copy().set_results_name("end_sub_verse")
+                    + subverse.copy().set_results_name("end_subverse")
                 )
             )
             + location_marker.copy().set_results_name("end_location")
@@ -141,23 +141,23 @@ class RefParser:
         """
         start_chapter = tokens.get("start_chapter", -1)
         start_verse = tokens.start_verse
-        start_sub_verse = tokens.start_sub_verse
-        # Handle following_verse(s) mis-parsed as sub-verse.
+        start_subverse = tokens.start_subverse
+        # Handle following_verse(s) mis-parsed as subverse.
         if "following_verse" in tokens:
             has_following_verse = True
         elif (
-            start_sub_verse == self.style.following_verse and "end_verse" not in tokens
+            start_subverse == self.style.following_verse and "end_verse" not in tokens
         ):
-            start_sub_verse = ""
+            start_subverse = ""
             has_following_verse = True
         else:
             has_following_verse = False
         if "following_verses" in tokens:
             has_following_verses = True
         elif (
-            start_sub_verse == self.style.following_verses and "end_verse" not in tokens
+            start_subverse == self.style.following_verses and "end_verse" not in tokens
         ):
-            start_sub_verse = ""
+            start_subverse = ""
             has_following_verses = True
         else:
             has_following_verses = False
@@ -168,20 +168,20 @@ class RefParser:
                 end_verse = start_verse + 1
             else:
                 end_verse = -1
-            end_sub_verse = ""
+            end_subverse = ""
         else:
             end_chapter = tokens.get("end_chapter", start_chapter)
             end_verse = tokens.get("end_verse", start_verse)
-            end_sub_verse = tokens.get("end_sub_verse", start_sub_verse)
+            end_subverse = tokens.get("end_subverse", start_subverse)
         end_location = tokens.get("end_location", -1)
         range_original_text = original_text[loc:end_location]
         return VerseRange(
             start_chapter=start_chapter,
             start_verse=start_verse,
-            start_sub_verse=start_sub_verse,
+            start_subverse=start_subverse,
             end_chapter=end_chapter,
             end_verse=end_verse,
-            end_sub_verse=end_sub_verse,
+            end_subverse=end_subverse,
             original_text=range_original_text,
         )
 
@@ -231,24 +231,24 @@ class RefParser:
         """
         start_chapter = 1
         start_verse = tokens.start_verse
-        start_sub_verse = tokens.start_sub_verse
+        start_subverse = tokens.start_subverse
         end_chapter = 1
-        # Handle following_verse(s) mis-parsed as sub-verse.
+        # Handle following_verse(s) mis-parsed as subverse.
         if "following_verse" in tokens:
             has_following_verse = True
         elif (
-            start_sub_verse == self.style.following_verse and "end_verse" not in tokens
+            start_subverse == self.style.following_verse and "end_verse" not in tokens
         ):
-            start_sub_verse = ""
+            start_subverse = ""
             has_following_verse = True
         else:
             has_following_verse = False
         if "following_verses" in tokens:
             has_following_verses = True
         elif (
-            start_sub_verse == self.style.following_verses and "end_verse" not in tokens
+            start_subverse == self.style.following_verses and "end_verse" not in tokens
         ):
-            start_sub_verse = ""
+            start_subverse = ""
             has_following_verses = True
         else:
             has_following_verses = False
@@ -258,19 +258,19 @@ class RefParser:
                 end_verse = start_verse + 1
             else:
                 end_verse = -1
-            end_sub_verse = ""
+            end_subverse = ""
         else:
             end_verse = tokens.get("end_verse", start_verse)
-            end_sub_verse = tokens.get("end_sub_verse", start_sub_verse)
+            end_subverse = tokens.get("end_subverse", start_subverse)
         end_location = tokens.get("end_location", -1)
         range_original_text = original_text[loc:end_location]
         return VerseRange(
             start_chapter=start_chapter,
             start_verse=start_verse,
-            start_sub_verse=start_sub_verse,
+            start_subverse=start_subverse,
             end_chapter=end_chapter,
             end_verse=end_verse,
-            end_sub_verse=end_sub_verse,
+            end_subverse=end_subverse,
             original_text=range_original_text,
         )
 

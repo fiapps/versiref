@@ -10,16 +10,16 @@ An instance of `SimpleBibleRef` represents a sequence of verse ranges within a s
 These ranges are not necessarily in numeric order because the person who creates the citation may prefer a different order.
 The class is naive in that it doesn't specify its versification (this is something like `datetime`'s naive classes, which don't specify a time zone).
 In the simplest case, it designates a single chapter and verse, such as John 3:16.
-More generally, each range contains a start chapter, start verse, start sub-verse, end chapter, end verse, and end sub-verse.
+More generally, each range contains a start chapter, start verse, start subverse, end chapter, end verse, and end subverse.
 Each range also has `original_text: Optional[str]`: this is the text from which the range was parsed, if any.
 The class stores a list of such ranges, a book ID, and the `original_text` from which the book ID was parsed.
 Book IDs are the three-letter codes used by Paratext, e.g., "GEN", "1CO", or "JHN".
 The start and end chapter numbers will almost always be the same, but the volume of data is probably not large enough to justify complicating the code by optimizing for that.
-Similarly, sub-verse divisions (e.g., "a" or "d") will often not be used: when there is none, the sub-verse will be an empty string.
+Similarly, subverse divisions (e.g., "a" or "d") will often not be used: when there is none, the subverse will be an empty string.
 We can just store all six values for each range, even in the trivial case where the range is a single verse.
 Chapter and verse numbers are `int`s: on careful consideration, we never need to use strings for either.
 Although some Bible translations use letters for "chapter numbers" (e.g., Greek Esther in Rahlfs and NAB), we don't need to support that explicitly: Paratext's scheme represents these as numbered chapters with a different book name (ESG instead of EST).
-The rare case of verse numbers like "4kk" can be represented as verse 4, sub-verse "kk": that is how it would parse anyway.
+The rare case of verse numbers like "4kk" can be represented as verse 4, subverse "kk": that is how it would parse anyway.
 As a special case, a `SimpleBibleRef` with an empty list of ranges refers to the entire book.
 The constructor takes a book ID and an `original_text`, which defaults to `None`.
 
