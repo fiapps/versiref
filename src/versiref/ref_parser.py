@@ -2,6 +2,8 @@
 Bible reference parsing for versiref.
 
 This module provides the RefParser class for parsing Bible references from strings.
+
+We don't call pp.ParserElement.enablePackrat() because it made parsing slower.
 """
 
 from typing import List, Optional
