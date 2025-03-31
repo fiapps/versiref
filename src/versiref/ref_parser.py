@@ -102,6 +102,7 @@ class RefParser:
             book.copy().set_results_name("book")
             + location_marker.copy().set_results_name("chapter_ranges_location")
             + chapter_ranges
+            + location_marker.copy().set_results_name("end_location")
         ).set_parse_action(self._make_simple_ref)
 
         # The chapter can be omitted for single-chapter (sc) books
@@ -136,6 +137,7 @@ class RefParser:
             sc_book
             + location_marker.copy().set_results_name("chapter_ranges_location")
             + sc_verse_ranges
+            + location_marker.copy().set_results_name("end_location")
         ).set_parse_action(self._make_simple_ref)
 
         # Try the parser with longer matches first, lest Jude 1:5 parse as Jude 1.
@@ -186,7 +188,7 @@ class RefParser:
             end_verse = tokens.get("end_verse", start_verse)
             end_subverse = tokens.get("end_subverse", start_subverse)
         end_location = tokens.get("end_location", -1)
-        range_original_text = original_text[loc:end_location]
+        range_original_text = original_text[loc:end_location].strip()
         return VerseRange(
             start_chapter=start_chapter,
             start_verse=start_verse,
@@ -273,7 +275,7 @@ class RefParser:
             end_verse = tokens.get("end_verse", start_verse)
             end_subverse = tokens.get("end_subverse", start_subverse)
         end_location = tokens.get("end_location", -1)
-        range_original_text = original_text[loc:end_location]
+        range_original_text = original_text[loc:end_location].strip()
         return VerseRange(
             start_chapter=start_chapter,
             start_verse=start_verse,
@@ -310,10 +312,12 @@ class RefParser:
             verse_ranges[0].original_text = original_text[
                 loc : range_0_start + len(verse_ranges[0].original_text)
             ]
+        end_location = tokens.get("end_location", -1)
+        ref_original_text = original_text[loc:end_location].strip()
 
         # Create a SimpleBibleRef with the parsed data
         return SimpleBibleRef(
-            book_id=book_name, ranges=verse_ranges, original_text=original_text
+            book_id=book_name, ranges=verse_ranges, original_text=ref_original_text
         )
 
     def parse_simple(self, text: str, fail_silently=True) -> Optional[SimpleBibleRef]:
