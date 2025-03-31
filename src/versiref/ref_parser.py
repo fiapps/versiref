@@ -54,7 +54,9 @@ class RefParser:
         book.set_parse_action(lambda t: self.style.recognized_names[t[0]])
         chapter = common.integer
         verse = common.integer
-        subverse = pp.Opt(pp.Word(pp.alphas.lower(), max=2) + pp. WordEnd(pp.alphas.lower()), default="")
+        subverse = pp.Opt(
+            pp.Word(pp.alphas.lower(), max=2) + pp.WordEnd(pp.alphas.lower())
+        ).set_parse_action(lambda t: t[0] if t else "")
         if self.strict:
             range_separator = pp.Suppress(self.style.range_separator)
         else:
