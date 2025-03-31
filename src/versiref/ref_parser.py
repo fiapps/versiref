@@ -321,7 +321,9 @@ class RefParser:
 
         # Create a SimpleBibleRef with the parsed data
         return SimpleBibleRef(
-            book_id=book_name, ranges=verse_ranges, original_text=ref_original_text
+            book_id=book_name,
+            ranges=verse_ranges.as_list(),
+            original_text=ref_original_text,
         )
 
     def parse_simple(self, text: str, fail_silently=True) -> Optional[SimpleBibleRef]:
