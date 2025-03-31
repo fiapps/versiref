@@ -5,6 +5,7 @@ Tests for the bible_ref module.
 import pytest
 from versiref.bible_ref import SimpleBibleRef, VerseRange
 from versiref.style import Style
+from versiref.versification import Versification
 
 
 def test_verse_range_initialization():
@@ -297,3 +298,57 @@ def test_format_unknown_book():
     # Formatting should raise a ValueError
     with pytest.raises(ValueError):
         ref.format(style)
+
+
+def test_format_single_chapter_book_with_versification():
+    """Test formatting a reference to a single-chapter book with versification."""
+    # Create a style
+    names = Style.standard_names("en-sbl_abbreviations")
+    style = Style(names=names)
+    
+    # Create a versification where Philemon (PHM) is a single-chapter book
+    versification = Versification.standard_versification("eng")
+    
+    # Create a reference for Philemon 6
+    vr = VerseRange(
+        start_chapter=1,
+        start_verse=6,
+        start_subverse="",
+        end_chapter=1,
+        end_verse=6,
+        end_subverse="",
+    )
+    ref = SimpleBibleRef(book_id="PHM", ranges=[vr])
+    
+    # Format with versification - should omit chapter number
+    formatted = ref.format(style, versification)
+    assert formatted == "Phlm 6"
+    
+    # Format without versification - should include chapter number
+    formatted_without_versification = ref.format(style)
+    assert formatted_without_versification == "Phlm 1:6"
+
+
+def test_format_single_chapter_book_verse_range():
+    """Test formatting a verse range in a single-chapter book."""
+    # Create a style
+    names = Style.standard_names("en-sbl_abbreviations")
+    style = Style(names=names)
+    
+    # Create a versification
+    versification = Versification.standard_versification("eng")
+    
+    # Create a reference for Jude 3-5
+    vr = VerseRange(
+        start_chapter=1,
+        start_verse=3,
+        start_subverse="",
+        end_chapter=1,
+        end_verse=5,
+        end_subverse="",
+    )
+    ref = SimpleBibleRef(book_id="JUD", ranges=[vr])
+    
+    # Format with versification
+    formatted = ref.format(style, versification)
+    assert formatted == "Jude 3–5"

@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from typing import List, Optional
 
 from versiref.style import Style
+from versiref.versification import Versification
 
 
 @dataclass
@@ -61,12 +62,14 @@ class SimpleBibleRef:
         """Return True if this reference refers to the entire book."""
         return len(self.ranges) == 0
 
-    def format(self, style: Style) -> str:
+    def format(self, style: Style, versification: Optional[Versification] = None) -> str:
         """
         Format this Bible reference as a string according to the given style.
 
         Args:
             style: The Style to use for formatting
+            versification: Optional Versification to use for determining book structure.
+                           If provided, chapter numbers will be omitted for one-chapter books.
 
         Returns:
             A formatted string representation of this Bible reference
@@ -84,15 +87,20 @@ class SimpleBibleRef:
         # Format each verse range
         formatted_ranges = []
         current_chapter = None
+        is_single_chapter_book = versification and versification.is_single_chapter(self.book_id)
 
         for verse_range in self.ranges:
-            # If we're in a new chapter, include the chapter number
+            # If we're in a new chapter, include the chapter number (unless it's a one-chapter book)
             if current_chapter != verse_range.start_chapter:
                 current_chapter = verse_range.start_chapter
 
                 # Format the start of the range
                 if verse_range.start_verse < 0:
                     # This is a whole chapter reference (e.g., "Gen 1")
+                    # For one-chapter books, we don't need to include the chapter number
+                    if is_single_chapter_book:
+                        continue
+                    
                     range_text = f"{current_chapter}"
 
                     # If end_chapter is different, this is a chapter range (e.g., "Isa 1-39")
@@ -107,7 +115,11 @@ class SimpleBibleRef:
                     formatted_ranges.append(range_text)
                 else:
                     # This is a verse or verse range within a chapter
-                    range_text = f"{current_chapter}{style.chapter_verse_separator}{verse_range.start_verse}"
+                    if is_single_chapter_book:
+                        # For one-chapter books, omit the chapter number
+                        range_text = f"{verse_range.start_verse}"
+                    else:
+                        range_text = f"{current_chapter}{style.chapter_verse_separator}{verse_range.start_verse}"
 
                     # Add subverse if present
                     if verse_range.start_subverse:
@@ -124,7 +136,11 @@ class SimpleBibleRef:
                     ):
                         # If the end chapter is different, include it
                         if verse_range.end_chapter != verse_range.start_chapter:
-                            range_text += f"{style.range_separator}{verse_range.end_chapter}{style.chapter_verse_separator}{verse_range.end_verse}"
+                            if is_single_chapter_book:
+                                # This shouldn't happen for single-chapter books, but handle it anyway
+                                range_text += f"{style.range_separator}{verse_range.end_verse}"
+                            else:
+                                range_text += f"{style.range_separator}{verse_range.end_chapter}{style.chapter_verse_separator}{verse_range.end_verse}"
                         else:
                             range_text += (
                                 f"{style.range_separator}{verse_range.end_verse}"
