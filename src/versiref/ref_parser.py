@@ -54,9 +54,11 @@ class RefParser:
         book.set_parse_action(lambda t: self.style.recognized_names[t[0]])
         chapter = common.integer
         verse = common.integer
-        subverse = pp.Opt(
-            pp.Word(pp.alphas.lower(), max=2) + pp.WordEnd(pp.alphas.lower())
-        ).set_parse_action(lambda t: t[0] if t else "")
+        subverse = pp.Word(pp.alphas.lower(), max=2) + pp.WordEnd(pp.alphas.lower())
+        optional_subverse = pp.Opt(subverse.copy()).set_parse_action(
+            lambda t: t[0] if t else ""
+        )
+        subverse.set_parse_action(lambda t: t[0] if t else "")
         if self.strict:
             range_separator = pp.Suppress(self.style.range_separator)
         else:
@@ -70,18 +72,25 @@ class RefParser:
         # For now, we only parse ranges of a single verse.
         verse_range = (
             verse.copy().set_results_name("start_verse")
-            + subverse.set_results_name("start_subverse")
+            + optional_subverse.set_results_name("start_subverse")
             + pp.Opt(
                 pp.Literal(self.style.following_verses).set_name("following_verses")
                 | pp.Literal(self.style.following_verse).set_name("following_verse")
                 | (
                     range_separator
-                    + pp.Opt(
-                        chapter.copy().set_results_name("end_chapter")
-                        + self.style.chapter_verse_separator
+                    + (
+                        # Either a full chapter:verse reference
+                        (
+                            pp.Opt(
+                                chapter.copy().set_results_name("end_chapter")
+                                + self.style.chapter_verse_separator
+                            )
+                            + verse.copy().set_results_name("end_verse")
+                            + optional_subverse.copy().set_results_name("end_subverse")
+                        )
+                        # Or just a subverse of the same verse
+                        | subverse.copy().set_results_name("end_subverse")
                     )
-                    + verse.copy().set_results_name("end_verse")
-                    + subverse.copy().set_results_name("end_subverse")
                 )
             )
             + location_marker.copy().set_results_name("end_location")
@@ -120,14 +129,19 @@ class RefParser:
 
         sc_verse_range = (
             verse.copy().set_results_name("start_verse")
-            + subverse.copy().set_results_name("start_subverse")
+            + optional_subverse.copy().set_results_name("start_subverse")
             + pp.Opt(
                 pp.Literal(self.style.following_verses).set_name("following_verses")
                 | pp.Literal(self.style.following_verse).set_name("following_verse")
                 | (
                     range_separator
-                    + verse.copy().set_results_name("end_verse")
-                    + subverse.copy().set_results_name("end_subverse")
+                    + (
+                        (
+                            verse.copy().set_results_name("end_verse")
+                            + optional_subverse.copy().set_results_name("end_subverse")
+                        )
+                        | subverse.copy().set_results_name("end_subverse")
+                    )
                 )
             )
             + location_marker.copy().set_results_name("end_location")
