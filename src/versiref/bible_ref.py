@@ -121,15 +121,13 @@ class SimpleBibleRef:
                     else:
                         range_text = f"{current_chapter}{style.chapter_verse_separator}{verse_range.start_verse}"
 
-                    # Add subverse if present
-                    if verse_range.start_subverse:
-                        range_text += verse_range.start_subverse
+                    range_text += str(verse_range.start_subverse)
 
                     # Add end verse if different from start verse
                     if verse_range.end_verse < 0:
                         # This is a "ff" reference (e.g., "Phil 2:5ff")
                         range_text += style.following_verses
-                    elif verse_range.end_verse != 0 and (
+                    elif (
                         verse_range.end_chapter != verse_range.start_chapter
                         or verse_range.end_verse != verse_range.start_verse
                         or verse_range.end_subverse != verse_range.start_subverse
@@ -142,25 +140,19 @@ class SimpleBibleRef:
                             else:
                                 range_text += f"{style.range_separator}{verse_range.end_chapter}{style.chapter_verse_separator}{verse_range.end_verse}"
                         else:
-                            range_text += (
-                                f"{style.range_separator}{verse_range.end_verse}"
-                            )
+                            range_text += style.range_separator
+                            if verse_range.start_verse != verse_range.end_verse:
+                                range_text += str(verse_range.end_verse)
 
-                        # Add end subverse if present
-                        if verse_range.end_subverse:
-                            range_text += verse_range.end_subverse
+                        range_text += verse_range.end_subverse
 
                     formatted_ranges.append(range_text)
             else:
                 # We're in the same chapter as the previous range
-                range_text = f"{verse_range.start_verse}"
-
-                # Add subverse if present
-                if verse_range.start_subverse:
-                    range_text += verse_range.start_subverse
+                range_text = f"{verse_range.start_verse}{verse_range.start_subverse}"
 
                 # Add end verse if different from start verse
-                if verse_range.end_verse != 0 and (
+                if (
                     verse_range.end_chapter != verse_range.start_chapter
                     or verse_range.end_verse != verse_range.start_verse
                     or verse_range.end_subverse != verse_range.start_subverse
@@ -171,9 +163,7 @@ class SimpleBibleRef:
                     else:
                         range_text += f"{style.range_separator}{verse_range.end_verse}"
 
-                    # Add end subverse if present
-                    if verse_range.end_subverse:
-                        range_text += verse_range.end_subverse
+                    range_text += verse_range.end_subverse
 
                 formatted_ranges.append(range_text)
 
