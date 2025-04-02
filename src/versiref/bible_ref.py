@@ -61,6 +61,24 @@ class SimpleBibleRef:
     def is_whole_book(self) -> bool:
         """Return True if this reference refers to the entire book."""
         return len(self.ranges) == 0
+        
+    def ranges_iter(self):
+        """
+        Generator that yields a new SimpleBibleRef for each verse range.
+        
+        Each yielded SimpleBibleRef contains only one verse range from this reference.
+        The book ID is preserved, and the original text for each new instance comes 
+        from the verse range.
+        
+        Yields:
+            SimpleBibleRef: A new reference containing a single verse range
+        """
+        for verse_range in self.ranges:
+            yield SimpleBibleRef(
+                book_id=self.book_id,
+                ranges=[verse_range],
+                original_text=verse_range.original_text
+            )
 
     def format(self, style: Style, versification: Optional[Versification] = None) -> str:
         """
