@@ -40,6 +40,37 @@ class VerseRange:
     end_subverse: str
     original_text: Optional[str] = None
 
+    def is_valid(self) -> bool:
+        """
+        Check if this verse range has valid values.
+        
+        Returns False if any of these conditions are met:
+        - start_verse >= 0 and end_verse < 0 (ff notation) but start_chapter != end_chapter
+        - start_verse < 0 and end_verse >= 0
+        - start_chapter == end_chapter and start_verse > end_verse
+        - start_chapter > end_chapter
+        
+        Returns:
+            bool: True if the verse range has valid values, False otherwise
+        """
+        # Check for invalid "ff" notation (must be in same chapter)
+        if self.start_verse >= 0 and self.end_verse < 0 and self.start_chapter != self.end_chapter:
+            return False
+            
+        # Cannot have unspecified start verse but specified end verse
+        if self.start_verse < 0 and self.end_verse >= 0:
+            return False
+            
+        # Cannot have start verse greater than end verse in same chapter
+        if self.start_chapter == self.end_chapter and self.start_verse > self.end_verse and self.end_verse >= 0:
+            return False
+            
+        # Cannot have start chapter greater than end chapter
+        if self.start_chapter > self.end_chapter:
+            return False
+            
+        return True
+
 
 @dataclass
 class SimpleBibleRef:
