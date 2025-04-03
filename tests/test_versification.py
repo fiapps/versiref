@@ -83,3 +83,13 @@ def test_is_single_chapter():
     assert v.is_single_chapter("GEN") == False
     assert v.is_single_chapter("PSAS") == False
     assert v.is_single_chapter("2JN") == True
+
+
+def test_includes():
+    """Test checking if a book is included in the versification."""
+    v = Versification.standard_versification("eng")
+    assert v.includes("GEN") == True
+    assert v.includes("PSA") == True
+    assert v.includes("PSAS") == True
+    assert v.includes("XYZ") == False  # Nonexistent book
+    assert v.includes("REV") == True

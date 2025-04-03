@@ -62,6 +62,20 @@ class Versification:
         else:
             return None
 
+    def includes(self, book_id: str) -> bool:
+        """
+        Check if the given book ID is included in this versification.
+
+        Args:
+            book_id: The book ID (using Paratext three-letter codes)
+
+        Returns:
+            True if the book is included in this versification, False otherwise.
+        """
+        if book_id == "PSAS":  # Plural form of PSA
+            book_id = "PSA"
+        return book_id in self.max_verses
+
     def is_single_chapter(self, book: str) -> bool:
         """
         Check if the given book is a single-chapter book.
