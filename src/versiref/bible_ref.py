@@ -43,32 +43,40 @@ class VerseRange:
     def is_valid(self) -> bool:
         """
         Check if this verse range has valid values.
-        
+
         Returns False if any of these conditions are met:
         - start_verse >= 0 and end_verse < 0 (ff notation) but start_chapter != end_chapter
         - start_verse < 0 and end_verse >= 0
         - start_chapter == end_chapter and start_verse > end_verse
         - start_chapter > end_chapter
-        
+
         Returns:
             bool: True if the verse range has valid values, False otherwise
         """
         # Check for invalid "ff" notation (must be in same chapter)
-        if self.start_verse >= 0 and self.end_verse < 0 and self.start_chapter != self.end_chapter:
+        if (
+            self.start_verse >= 0
+            and self.end_verse < 0
+            and self.start_chapter != self.end_chapter
+        ):
             return False
-            
+
         # Cannot have unspecified start verse but specified end verse
         if self.start_verse < 0 and self.end_verse >= 0:
             return False
-            
+
         # Cannot have start verse greater than end verse in same chapter
-        if self.start_chapter == self.end_chapter and self.start_verse > self.end_verse and self.end_verse >= 0:
+        if (
+            self.start_chapter == self.end_chapter
+            and self.start_verse > self.end_verse
+            and self.end_verse >= 0
+        ):
             return False
-            
+
         # Cannot have start chapter greater than end chapter
         if self.start_chapter > self.end_chapter:
             return False
-            
+
         return True
 
 
@@ -92,15 +100,15 @@ class SimpleBibleRef:
     def is_whole_book(self) -> bool:
         """Return True if this reference refers to the entire book."""
         return len(self.ranges) == 0
-        
+
     def ranges_iter(self):
         """
         Generator that yields a new SimpleBibleRef for each verse range.
-        
+
         Each yielded SimpleBibleRef contains only one verse range from this reference.
-        The book ID is preserved, and the original text for each new instance comes 
+        The book ID is preserved, and the original text for each new instance comes
         from the verse range.
-        
+
         Yields:
             SimpleBibleRef: A new reference containing a single verse range
         """
@@ -108,10 +116,12 @@ class SimpleBibleRef:
             yield SimpleBibleRef(
                 book_id=self.book_id,
                 ranges=[verse_range],
-                original_text=verse_range.original_text
+                original_text=verse_range.original_text,
             )
 
-    def format(self, style: Style, versification: Optional[Versification] = None) -> str:
+    def format(
+        self, style: Style, versification: Optional[Versification] = None
+    ) -> str:
         """
         Format this Bible reference as a string according to the given style.
 
@@ -136,7 +146,9 @@ class SimpleBibleRef:
         # Format each verse range
         formatted_ranges = []
         current_chapter = None
-        is_single_chapter_book = versification and versification.is_single_chapter(self.book_id)
+        is_single_chapter_book = versification and versification.is_single_chapter(
+            self.book_id
+        )
 
         for verse_range in self.ranges:
             # If we're in a new chapter, include the chapter number (unless it's a one-chapter book)
@@ -149,7 +161,7 @@ class SimpleBibleRef:
                     # For one-chapter books, we don't need to include the chapter number
                     if is_single_chapter_book:
                         continue
-                    
+
                     range_text = f"{current_chapter}"
 
                     # If end_chapter is different, this is a chapter range (e.g., "Isa 1-39")
@@ -185,7 +197,9 @@ class SimpleBibleRef:
                         if verse_range.end_chapter != verse_range.start_chapter:
                             if is_single_chapter_book:
                                 # This shouldn't happen for single-chapter books, but handle it anyway
-                                range_text += f"{style.range_separator}{verse_range.end_verse}"
+                                range_text += (
+                                    f"{style.range_separator}{verse_range.end_verse}"
+                                )
                             else:
                                 range_text += f"{style.range_separator}{verse_range.end_chapter}{style.chapter_verse_separator}{verse_range.end_verse}"
                         else:

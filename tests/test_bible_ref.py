@@ -305,10 +305,10 @@ def test_format_single_chapter_book_with_versification():
     # Create a style
     names = Style.standard_names("en-sbl_abbreviations")
     style = Style(names=names)
-    
+
     # Create a versification where Philemon (PHM) is a single-chapter book
     versification = Versification.standard_versification("eng")
-    
+
     # Create a reference for Philemon 6
     vr = VerseRange(
         start_chapter=1,
@@ -319,11 +319,11 @@ def test_format_single_chapter_book_with_versification():
         end_subverse="",
     )
     ref = SimpleBibleRef(book_id="PHM", ranges=[vr])
-    
+
     # Format with versification - should omit chapter number
     formatted = ref.format(style, versification)
     assert formatted == "Phlm 6"
-    
+
     # Format without versification - should include chapter number
     formatted_without_versification = ref.format(style)
     assert formatted_without_versification == "Phlm 1:6"
@@ -334,10 +334,10 @@ def test_format_single_chapter_book_verse_range():
     # Create a style
     names = Style.standard_names("en-sbl_abbreviations")
     style = Style(names=names)
-    
+
     # Create a versification
     versification = Versification.standard_versification("eng")
-    
+
     # Create a reference for Jude 3-5
     vr = VerseRange(
         start_chapter=1,
@@ -348,7 +348,7 @@ def test_format_single_chapter_book_verse_range():
         end_subverse="",
     )
     ref = SimpleBibleRef(book_id="JUD", ranges=[vr])
-    
+
     # Format with versification
     formatted = ref.format(style, versification)
     assert formatted == "Jude 3–5"
@@ -357,25 +357,43 @@ def test_format_single_chapter_book_verse_range():
 def test_verse_range_is_valid():
     """Test the is_valid method of VerseRange."""
     # Valid ranges
-    assert VerseRange(1, 1, "", 1, 5, "").is_valid() is True  # Simple range in same chapter
+    assert (
+        VerseRange(1, 1, "", 1, 5, "").is_valid() is True
+    )  # Simple range in same chapter
     assert VerseRange(1, -1, "", 1, -1, "").is_valid() is True  # Whole chapter
     assert VerseRange(1, -1, "", 3, -1, "").is_valid() is True  # Multiple chapters
     assert VerseRange(1, 1, "", 2, 3, "").is_valid() is True  # Cross-chapter range
-    assert VerseRange(1, 5, "", 1, -1, "").is_valid() is True  # "ff" notation in same chapter
-    
+    assert (
+        VerseRange(1, 5, "", 1, -1, "").is_valid() is True
+    )  # "ff" notation in same chapter
+
     # Invalid ranges
-    assert VerseRange(1, 5, "", 2, -1, "").is_valid() is False  # "ff" notation across chapters
-    assert VerseRange(1, -1, "", 1, 5, "").is_valid() is False  # Unspecified start, specified end
+    assert (
+        VerseRange(1, 5, "", 2, -1, "").is_valid() is False
+    )  # "ff" notation across chapters
+    assert (
+        VerseRange(1, -1, "", 1, 5, "").is_valid() is False
+    )  # Unspecified start, specified end
     assert VerseRange(1, 5, "", 1, 3, "").is_valid() is False  # Start verse > end verse
-    assert VerseRange(2, 1, "", 1, 5, "").is_valid() is False  # Start chapter > end chapter
+    assert (
+        VerseRange(2, 1, "", 1, 5, "").is_valid() is False
+    )  # Start chapter > end chapter
 
 
 def test_verse_range_is_valid_with_subverses():
     """Test the is_valid method with subverses."""
     # Subverses don't affect validity checks
-    assert VerseRange(1, 1, "a", 1, 1, "b").is_valid() is True  # Same verse, different subverses
-    assert VerseRange(1, 5, "c", 1, -1, "").is_valid() is True  # "ff" notation with subverse
-    
+    assert (
+        VerseRange(1, 1, "a", 1, 1, "b").is_valid() is True
+    )  # Same verse, different subverses
+    assert (
+        VerseRange(1, 5, "c", 1, -1, "").is_valid() is True
+    )  # "ff" notation with subverse
+
     # Invalid ranges with subverses
-    assert VerseRange(2, 1, "a", 1, 5, "b").is_valid() is False  # Start chapter > end chapter
-    assert VerseRange(1, 5, "a", 1, 3, "b").is_valid() is False  # Start verse > end verse
+    assert (
+        VerseRange(2, 1, "a", 1, 5, "b").is_valid() is False
+    )  # Start chapter > end chapter
+    assert (
+        VerseRange(1, 5, "a", 1, 3, "b").is_valid() is False
+    )  # Start verse > end verse

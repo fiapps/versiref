@@ -54,7 +54,9 @@ class RefParser:
         book.set_parse_action(lambda t: self.style.recognized_names[t[0]])
         chapter = common.integer
         verse = common.integer
-        subverse = pp.Word(pp.alphas.lower(), max=2).leave_whitespace() + pp.WordEnd(pp.alphas.lower())
+        subverse = pp.Word(pp.alphas.lower(), max=2).leave_whitespace() + pp.WordEnd(
+            pp.alphas.lower()
+        )
         optional_subverse = pp.Opt(subverse.copy()).set_parse_action(
             lambda t: t[0] if t else ""
         )
