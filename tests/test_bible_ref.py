@@ -286,6 +286,54 @@ def test_format_with_custom_style():
     assert formatted == "Genesi 1, 1-5.8b-10a"
 
 
+def test_simple_bible_ref_is_valid():
+    """Test the is_valid method of SimpleBibleRef."""
+    # Create a versification
+    versification = Versification.standard_versification("eng")
+
+    # Valid whole book reference
+    ref = SimpleBibleRef("GEN")
+    assert ref.is_valid(versification) == True
+
+    # Invalid book
+    ref = SimpleBibleRef("XYZ")
+    assert ref.is_valid(versification) == False
+
+    # Valid single verse
+    ref = SimpleBibleRef("JHN", [VerseRange(3, 16, "", 3, 16, "")])
+    assert ref.is_valid(versification) == True
+
+    # Valid verse range
+    ref = SimpleBibleRef("PSA", [VerseRange(119, 1, "", 119, 176, "")])
+    assert ref.is_valid(versification) == True
+
+    # Valid chapter range
+    ref = SimpleBibleRef("ISA", [VerseRange(1, -1, "", 66, -1, "")])
+    assert ref.is_valid(versification) == True
+
+    # Valid "ff" notation
+    ref = SimpleBibleRef("ROM", [VerseRange(8, 28, "", 8, -1, "")])
+    assert ref.is_valid(versification) == True
+
+    # Invalid chapter
+    ref = SimpleBibleRef("JHN", [VerseRange(30, 1, "", 30, 10, "")])
+    assert ref.is_valid(versification) == False
+
+    # Invalid verse (exceeds chapter limit)
+    ref = SimpleBibleRef("JHN", [VerseRange(3, 40, "", 3, 50, "")])
+    assert ref.is_valid(versification) == False
+
+    # Invalid verse range (start verse exceeds chapter limit)
+    ref = SimpleBibleRef("JHN", [VerseRange(3, 40, "", 3, -1, "")])
+    assert ref.is_valid(versification) == False
+
+    # Invalid verse range structure
+    ref = SimpleBibleRef(
+        "JHN", [VerseRange(3, 20, "", 3, 10, "")]  # End verse before start verse
+    )
+    assert ref.is_valid(versification) == False
+
+
 def test_format_unknown_book():
     """Test formatting with an unknown book ID."""
     # Create a style

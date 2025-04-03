@@ -101,6 +101,48 @@ class SimpleBibleRef:
         """Return True if this reference refers to the entire book."""
         return len(self.ranges) == 0
 
+    def is_valid(self, versification: Versification) -> bool:
+        """
+        Check if this Bible reference is valid according to the given versification.
+
+        Args:
+            versification: The Versification to check against
+
+        Returns:
+            bool: True if the reference is valid, False otherwise
+        """
+        # Check if the book ID is included in the versification
+        if not versification.includes(self.book_id):
+            return False
+
+        # Check each verse range
+        for verse_range in self.ranges:
+            # Check if the verse range itself is valid.
+            # This will catch ranges that end before they start.
+            if not verse_range.is_valid():
+                return False
+
+            # Check if the chapters and verses are within the limits of the versification.
+            if versification.last_verse(self.book_id, verse_range.end_chapter) < 0:
+                return False
+
+            # We only need to check the start if it's in a different chapter or the end is indefinite.
+            if (
+                verse_range.start_chapter != verse_range.end_chapter
+                or verse_range.end_verse < 0
+            ) and verse_range.start_verse > versification.last_verse(
+                self.book_id, verse_range.start_chapter
+            ):
+                return False
+
+            # Check end. No special handling is needed if end_verse < 0.
+            if verse_range.end_verse > versification.last_verse(
+                self.book_id, verse_range.end_chapter
+            ):
+                return False
+
+        return True
+
     def ranges_iter(self):
         """
         Generator that yields a new SimpleBibleRef for each verse range.
