@@ -307,6 +307,12 @@ def test_simple_bible_ref_is_valid():
     ref = SimpleBibleRef("PSA", [VerseRange(119, 1, "", 119, 176, "")])
     assert ref.is_valid(versification) == True
 
+    # Valid with plural form of PSA
+    ref = SimpleBibleRef(
+        "PSAS", [VerseRange(18, 7, "", 18, 7, ""), VerseRange(77, 18, "", 77, 18, "")]
+    )
+    assert ref.is_valid(versification) == True
+
     # Valid chapter range
     ref = SimpleBibleRef("ISA", [VerseRange(1, -1, "", 66, -1, "")])
     assert ref.is_valid(versification) == True

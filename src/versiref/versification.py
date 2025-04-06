@@ -109,6 +109,8 @@ class Versification:
             return 99
 
         # Check if the book exists in the versification
+        if book == "PSAS":  # plural of PSA
+            book = "PSA"
         if book not in self.max_verses:
             return -1
 
