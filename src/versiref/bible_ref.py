@@ -42,7 +42,7 @@ class VerseRange:
 
     def is_whole_chapters(self) -> bool:
         """Return True if this range does not specify verse limits."""
-        return self.start_verse >= 0 or self.end_verse >= 0
+        return self.start_verse < 0 and self.end_verse < 0
 
     def is_valid(self) -> bool:
         """
