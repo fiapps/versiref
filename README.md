@@ -5,5 +5,5 @@ VersiRef is a Python package for sophisticated parsing, manipulation, and printi
 ## Features
 
 - Parse and manipulate Bible references
-- Support for different versification systems (e.g., Original, English, LXX, Vulgate)
+- Support for different versification systems (e.g., original language (BHS + UBS GNT), English, LXX, Vulgate)
 - Query information about chapters and verses in different books of the Bible

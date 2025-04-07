@@ -451,3 +451,40 @@ def test_verse_range_is_valid_with_subverses():
     assert (
         VerseRange(1, 5, "a", 1, 3, "b").is_valid() is False
     )  # Start verse > end verse
+
+
+def test_simple_bible_ref_is_whole_chapters():
+    """Test the is_whole_chapters method of SimpleBibleRef."""
+    # Whole book reference should be considered whole chapters
+    ref1 = SimpleBibleRef("JHN")
+    assert ref1.is_whole_chapters() is True
+
+    # Chapter reference without verse specification should be whole chapters
+    ref2 = SimpleBibleRef("JHN", [VerseRange(6, -1, "", 6, -1, "")])
+    assert ref2.is_whole_chapters() is True
+
+    # Chapter range without verse specification should be whole chapters
+    ref3 = SimpleBibleRef("ISA", [VerseRange(1, -1, "", 39, -1, "")])
+    assert ref3.is_whole_chapters() is True
+
+    # Reference with verse specification should not be whole chapters
+    ref4 = SimpleBibleRef("JHN", [VerseRange(3, 16, "", 3, 16, "")])
+    assert ref4.is_whole_chapters() is False
+
+    # Reference with verse range should not be whole chapters
+    ref5 = SimpleBibleRef("ROM", [VerseRange(8, 28, "", 8, 39, "")])
+    assert ref5.is_whole_chapters() is False
+
+    # Reference with chapter range but specific verses should not be whole chapters
+    ref6 = SimpleBibleRef("PSA", [VerseRange(1, 1, "", 2, 12, "")])
+    assert ref6.is_whole_chapters() is False
+
+    # Mixed reference with both whole chapter and specific verses should not be whole chapters
+    ref7 = SimpleBibleRef(
+        "MAT",
+        [
+            VerseRange(5, -1, "", 5, -1, ""),  # Whole chapter
+            VerseRange(6, 9, "", 6, 13, ""),  # Specific verses
+        ],
+    )
+    assert ref7.is_whole_chapters() is False
