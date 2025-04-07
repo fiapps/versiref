@@ -48,7 +48,7 @@ class Versification:
         identifier is unknown.
         Args:
             identifier: Standard versification identifier (e.g., "org", "eng",
-            "LXX", "Vul")
+            "LXX", "Vulgata")
                 This is converted to lowercase to find the file to load.
 
         Standard versifications are loaded from JSON files in the package's data
