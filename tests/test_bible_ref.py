@@ -31,6 +31,51 @@ def test_verse_range_initialization():
     assert vr.original_text == "1:2a-3:4b"
 
 
+def test_verse_range_is_valid():
+    """Test the is_valid method of VerseRange."""
+    # Valid ranges
+    assert (
+        VerseRange(1, 1, "", 1, 5, "").is_valid() is True
+    )  # Simple range in same chapter
+    assert VerseRange(1, -1, "", 1, -1, "").is_valid() is True  # Whole chapter
+    assert VerseRange(1, -1, "", 3, -1, "").is_valid() is True  # Multiple chapters
+    assert VerseRange(1, 1, "", 2, 3, "").is_valid() is True  # Cross-chapter range
+    assert (
+        VerseRange(1, 5, "", 1, -1, "").is_valid() is True
+    )  # "ff" notation in same chapter
+
+    # Invalid ranges
+    assert (
+        VerseRange(1, 5, "", 2, -1, "").is_valid() is False
+    )  # "ff" notation across chapters
+    assert (
+        VerseRange(1, -1, "", 1, 5, "").is_valid() is False
+    )  # Unspecified start, specified end
+    assert VerseRange(1, 5, "", 1, 3, "").is_valid() is False  # Start verse > end verse
+    assert (
+        VerseRange(2, 1, "", 1, 5, "").is_valid() is False
+    )  # Start chapter > end chapter
+
+
+def test_verse_range_is_valid_with_subverses():
+    """Test the is_valid method with subverses."""
+    # Subverses don't affect validity checks
+    assert (
+        VerseRange(1, 1, "a", 1, 1, "b").is_valid() is True
+    )  # Same verse, different subverses
+    assert (
+        VerseRange(1, 5, "c", 1, -1, "").is_valid() is True
+    )  # "ff" notation with subverse
+
+    # Invalid ranges with subverses
+    assert (
+        VerseRange(2, 1, "a", 1, 5, "b").is_valid() is False
+    )  # Start chapter > end chapter
+    assert (
+        VerseRange(1, 5, "a", 1, 3, "b").is_valid() is False
+    )  # Start verse > end verse
+
+
 def test_simple_bible_ref():
     """Test that SimpleBibleRef initializes correctly."""
     # Reference to entire book
@@ -64,6 +109,148 @@ def test_simple_bible_ref():
     assert ref.book_id == "ROM"
     assert len(ref.ranges) == 3
     assert ref.original_text == "Rom."
+
+
+def test_simple_bible_ref_for_range():
+    """Test the for_range class method of SimpleBibleRef."""
+    # Basic usage with just book, chapter, and verse
+    ref1 = SimpleBibleRef.for_range("JHN", 3, 16)
+    assert ref1.book_id == "JHN"
+    assert len(ref1.ranges) == 1
+    assert ref1.ranges[0].start_chapter == 3
+    assert ref1.ranges[0].start_verse == 16
+    assert ref1.ranges[0].end_chapter == 3
+    assert ref1.ranges[0].end_verse == 16
+    assert ref1.ranges[0].start_subverse == ""
+    assert ref1.ranges[0].end_subverse == ""
+
+    # With end verse specified
+    ref2 = SimpleBibleRef.for_range("ROM", 8, 28, end_verse=39)
+    assert ref2.book_id == "ROM"
+    assert len(ref2.ranges) == 1
+    assert ref2.ranges[0].start_chapter == 8
+    assert ref2.ranges[0].start_verse == 28
+    assert ref2.ranges[0].end_chapter == 8
+    assert ref2.ranges[0].end_verse == 39
+
+    # Cross-chapter reference
+    ref3 = SimpleBibleRef.for_range("JHN", 7, 53, end_chapter=8, end_verse=11)
+    assert ref3.book_id == "JHN"
+    assert len(ref3.ranges) == 1
+    assert ref3.ranges[0].start_chapter == 7
+    assert ref3.ranges[0].start_verse == 53
+    assert ref3.ranges[0].end_chapter == 8
+    assert ref3.ranges[0].end_verse == 11
+
+    # With subverses
+    ref4 = SimpleBibleRef.for_range(
+        "MRK", 5, 3, end_verse=5, start_subverse="b", end_subverse="a"
+    )
+    assert ref4.book_id == "MRK"
+    assert len(ref4.ranges) == 1
+    assert ref4.ranges[0].start_chapter == 5
+    assert ref4.ranges[0].start_verse == 3
+    assert ref4.ranges[0].start_subverse == "b"
+    assert ref4.ranges[0].end_chapter == 5
+    assert ref4.ranges[0].end_verse == 5
+    assert ref4.ranges[0].end_subverse == "a"
+
+    # With original text
+    ref5 = SimpleBibleRef.for_range("PSA", 23, 1, original_text="Psalm 23:1")
+    assert ref5.book_id == "PSA"
+    assert ref5.original_text == "Psalm 23:1"
+    assert ref5.ranges[0].original_text == "Psalm 23:1"
+
+
+def test_simple_bible_ref_is_valid():
+    """Test the is_valid method of SimpleBibleRef."""
+    # Create a versification
+    versification = Versification.standard_versification("eng")
+
+    # Valid whole book reference
+    ref = SimpleBibleRef("GEN")
+    assert ref.is_valid(versification) == True
+
+    # Invalid book
+    ref = SimpleBibleRef("XYZ")
+    assert ref.is_valid(versification) == False
+
+    # Valid single verse
+    ref = SimpleBibleRef("JHN", [VerseRange(3, 16, "", 3, 16, "")])
+    assert ref.is_valid(versification) == True
+
+    # Valid verse range
+    ref = SimpleBibleRef("PSA", [VerseRange(119, 1, "", 119, 176, "")])
+    assert ref.is_valid(versification) == True
+
+    # Valid with plural form of PSA
+    ref = SimpleBibleRef(
+        "PSAS", [VerseRange(18, 7, "", 18, 7, ""), VerseRange(77, 18, "", 77, 18, "")]
+    )
+    assert ref.is_valid(versification) == True
+
+    # Valid chapter range
+    ref = SimpleBibleRef("ISA", [VerseRange(1, -1, "", 66, -1, "")])
+    assert ref.is_valid(versification) == True
+
+    # Valid "ff" notation
+    ref = SimpleBibleRef("ROM", [VerseRange(8, 28, "", 8, -1, "")])
+    assert ref.is_valid(versification) == True
+
+    # Invalid chapter
+    ref = SimpleBibleRef("JHN", [VerseRange(30, 1, "", 30, 10, "")])
+    assert ref.is_valid(versification) == False
+
+    # Invalid verse (exceeds chapter limit)
+    ref = SimpleBibleRef("JHN", [VerseRange(3, 40, "", 3, 50, "")])
+    assert ref.is_valid(versification) == False
+
+    # Invalid verse range (start verse exceeds chapter limit)
+    ref = SimpleBibleRef("JHN", [VerseRange(3, 40, "", 3, -1, "")])
+    assert ref.is_valid(versification) == False
+
+    # Invalid verse range structure
+    ref = SimpleBibleRef(
+        "JHN", [VerseRange(3, 20, "", 3, 10, "")]  # End verse before start verse
+    )
+    assert ref.is_valid(versification) == False
+
+
+def test_simple_bible_ref_is_whole_chapters():
+    """Test the is_whole_chapters method of SimpleBibleRef."""
+    # Whole book reference should be considered whole chapters
+    ref1 = SimpleBibleRef("JHN")
+    assert ref1.is_whole_chapters() is True
+
+    # Chapter reference without verse specification should be whole chapters
+    ref2 = SimpleBibleRef("JHN", [VerseRange(6, -1, "", 6, -1, "")])
+    assert ref2.is_whole_chapters() is True
+
+    # Chapter range without verse specification should be whole chapters
+    ref3 = SimpleBibleRef("ISA", [VerseRange(1, -1, "", 39, -1, "")])
+    assert ref3.is_whole_chapters() is True
+
+    # Reference with verse specification should not be whole chapters
+    ref4 = SimpleBibleRef("JHN", [VerseRange(3, 16, "", 3, 16, "")])
+    assert ref4.is_whole_chapters() is False
+
+    # Reference with verse range should not be whole chapters
+    ref5 = SimpleBibleRef("ROM", [VerseRange(8, 28, "", 8, 39, "")])
+    assert ref5.is_whole_chapters() is False
+
+    # Reference with chapter range but specific verses should not be whole chapters
+    ref6 = SimpleBibleRef("PSA", [VerseRange(1, 1, "", 2, 12, "")])
+    assert ref6.is_whole_chapters() is False
+
+    # Mixed reference with both whole chapter and specific verses should not be whole chapters
+    ref7 = SimpleBibleRef(
+        "MAT",
+        [
+            VerseRange(5, -1, "", 5, -1, ""),  # Whole chapter
+            VerseRange(6, 9, "", 6, 13, ""),  # Specific verses
+        ],
+    )
+    assert ref7.is_whole_chapters() is False
 
 
 def test_format_simple_reference():
@@ -286,60 +473,6 @@ def test_format_with_custom_style():
     assert formatted == "Genesi 1, 1-5.8b-10a"
 
 
-def test_simple_bible_ref_is_valid():
-    """Test the is_valid method of SimpleBibleRef."""
-    # Create a versification
-    versification = Versification.standard_versification("eng")
-
-    # Valid whole book reference
-    ref = SimpleBibleRef("GEN")
-    assert ref.is_valid(versification) == True
-
-    # Invalid book
-    ref = SimpleBibleRef("XYZ")
-    assert ref.is_valid(versification) == False
-
-    # Valid single verse
-    ref = SimpleBibleRef("JHN", [VerseRange(3, 16, "", 3, 16, "")])
-    assert ref.is_valid(versification) == True
-
-    # Valid verse range
-    ref = SimpleBibleRef("PSA", [VerseRange(119, 1, "", 119, 176, "")])
-    assert ref.is_valid(versification) == True
-
-    # Valid with plural form of PSA
-    ref = SimpleBibleRef(
-        "PSAS", [VerseRange(18, 7, "", 18, 7, ""), VerseRange(77, 18, "", 77, 18, "")]
-    )
-    assert ref.is_valid(versification) == True
-
-    # Valid chapter range
-    ref = SimpleBibleRef("ISA", [VerseRange(1, -1, "", 66, -1, "")])
-    assert ref.is_valid(versification) == True
-
-    # Valid "ff" notation
-    ref = SimpleBibleRef("ROM", [VerseRange(8, 28, "", 8, -1, "")])
-    assert ref.is_valid(versification) == True
-
-    # Invalid chapter
-    ref = SimpleBibleRef("JHN", [VerseRange(30, 1, "", 30, 10, "")])
-    assert ref.is_valid(versification) == False
-
-    # Invalid verse (exceeds chapter limit)
-    ref = SimpleBibleRef("JHN", [VerseRange(3, 40, "", 3, 50, "")])
-    assert ref.is_valid(versification) == False
-
-    # Invalid verse range (start verse exceeds chapter limit)
-    ref = SimpleBibleRef("JHN", [VerseRange(3, 40, "", 3, -1, "")])
-    assert ref.is_valid(versification) == False
-
-    # Invalid verse range structure
-    ref = SimpleBibleRef(
-        "JHN", [VerseRange(3, 20, "", 3, 10, "")]  # End verse before start verse
-    )
-    assert ref.is_valid(versification) == False
-
-
 def test_format_unknown_book():
     """Test formatting with an unknown book ID."""
     # Create a style
@@ -406,136 +539,3 @@ def test_format_single_chapter_book_verse_range():
     # Format with versification
     formatted = ref.format(style, versification)
     assert formatted == "Jude 3–5"
-
-
-def test_verse_range_is_valid():
-    """Test the is_valid method of VerseRange."""
-    # Valid ranges
-    assert (
-        VerseRange(1, 1, "", 1, 5, "").is_valid() is True
-    )  # Simple range in same chapter
-    assert VerseRange(1, -1, "", 1, -1, "").is_valid() is True  # Whole chapter
-    assert VerseRange(1, -1, "", 3, -1, "").is_valid() is True  # Multiple chapters
-    assert VerseRange(1, 1, "", 2, 3, "").is_valid() is True  # Cross-chapter range
-    assert (
-        VerseRange(1, 5, "", 1, -1, "").is_valid() is True
-    )  # "ff" notation in same chapter
-
-    # Invalid ranges
-    assert (
-        VerseRange(1, 5, "", 2, -1, "").is_valid() is False
-    )  # "ff" notation across chapters
-    assert (
-        VerseRange(1, -1, "", 1, 5, "").is_valid() is False
-    )  # Unspecified start, specified end
-    assert VerseRange(1, 5, "", 1, 3, "").is_valid() is False  # Start verse > end verse
-    assert (
-        VerseRange(2, 1, "", 1, 5, "").is_valid() is False
-    )  # Start chapter > end chapter
-
-
-def test_verse_range_is_valid_with_subverses():
-    """Test the is_valid method with subverses."""
-    # Subverses don't affect validity checks
-    assert (
-        VerseRange(1, 1, "a", 1, 1, "b").is_valid() is True
-    )  # Same verse, different subverses
-    assert (
-        VerseRange(1, 5, "c", 1, -1, "").is_valid() is True
-    )  # "ff" notation with subverse
-
-    # Invalid ranges with subverses
-    assert (
-        VerseRange(2, 1, "a", 1, 5, "b").is_valid() is False
-    )  # Start chapter > end chapter
-    assert (
-        VerseRange(1, 5, "a", 1, 3, "b").is_valid() is False
-    )  # Start verse > end verse
-
-
-def test_simple_bible_ref_is_whole_chapters():
-    """Test the is_whole_chapters method of SimpleBibleRef."""
-    # Whole book reference should be considered whole chapters
-    ref1 = SimpleBibleRef("JHN")
-    assert ref1.is_whole_chapters() is True
-
-    # Chapter reference without verse specification should be whole chapters
-    ref2 = SimpleBibleRef("JHN", [VerseRange(6, -1, "", 6, -1, "")])
-    assert ref2.is_whole_chapters() is True
-
-    # Chapter range without verse specification should be whole chapters
-    ref3 = SimpleBibleRef("ISA", [VerseRange(1, -1, "", 39, -1, "")])
-    assert ref3.is_whole_chapters() is True
-
-    # Reference with verse specification should not be whole chapters
-    ref4 = SimpleBibleRef("JHN", [VerseRange(3, 16, "", 3, 16, "")])
-    assert ref4.is_whole_chapters() is False
-
-    # Reference with verse range should not be whole chapters
-    ref5 = SimpleBibleRef("ROM", [VerseRange(8, 28, "", 8, 39, "")])
-    assert ref5.is_whole_chapters() is False
-
-    # Reference with chapter range but specific verses should not be whole chapters
-    ref6 = SimpleBibleRef("PSA", [VerseRange(1, 1, "", 2, 12, "")])
-    assert ref6.is_whole_chapters() is False
-
-    # Mixed reference with both whole chapter and specific verses should not be whole chapters
-    ref7 = SimpleBibleRef(
-        "MAT",
-        [
-            VerseRange(5, -1, "", 5, -1, ""),  # Whole chapter
-            VerseRange(6, 9, "", 6, 13, ""),  # Specific verses
-        ],
-    )
-    assert ref7.is_whole_chapters() is False
-
-
-def test_simple_bible_ref_for_range():
-    """Test the for_range class method of SimpleBibleRef."""
-    # Basic usage with just book, chapter, and verse
-    ref1 = SimpleBibleRef.for_range("JHN", 3, 16)
-    assert ref1.book_id == "JHN"
-    assert len(ref1.ranges) == 1
-    assert ref1.ranges[0].start_chapter == 3
-    assert ref1.ranges[0].start_verse == 16
-    assert ref1.ranges[0].end_chapter == 3
-    assert ref1.ranges[0].end_verse == 16
-    assert ref1.ranges[0].start_subverse == ""
-    assert ref1.ranges[0].end_subverse == ""
-
-    # With end verse specified
-    ref2 = SimpleBibleRef.for_range("ROM", 8, 28, end_verse=39)
-    assert ref2.book_id == "ROM"
-    assert len(ref2.ranges) == 1
-    assert ref2.ranges[0].start_chapter == 8
-    assert ref2.ranges[0].start_verse == 28
-    assert ref2.ranges[0].end_chapter == 8
-    assert ref2.ranges[0].end_verse == 39
-
-    # Cross-chapter reference
-    ref3 = SimpleBibleRef.for_range("JHN", 7, 53, end_chapter=8, end_verse=11)
-    assert ref3.book_id == "JHN"
-    assert len(ref3.ranges) == 1
-    assert ref3.ranges[0].start_chapter == 7
-    assert ref3.ranges[0].start_verse == 53
-    assert ref3.ranges[0].end_chapter == 8
-    assert ref3.ranges[0].end_verse == 11
-
-    # With subverses
-    ref4 = SimpleBibleRef.for_range(
-        "MRK", 5, 3, end_verse=5, start_subverse="b", end_subverse="a"
-    )
-    assert ref4.book_id == "MRK"
-    assert len(ref4.ranges) == 1
-    assert ref4.ranges[0].start_chapter == 5
-    assert ref4.ranges[0].start_verse == 3
-    assert ref4.ranges[0].start_subverse == "b"
-    assert ref4.ranges[0].end_chapter == 5
-    assert ref4.ranges[0].end_verse == 5
-    assert ref4.ranges[0].end_subverse == "a"
-
-    # With original text
-    ref5 = SimpleBibleRef.for_range("PSA", 23, 1, original_text="Psalm 23:1")
-    assert ref5.book_id == "PSA"
-    assert ref5.original_text == "Psalm 23:1"
-    assert ref5.ranges[0].original_text == "Psalm 23:1"
