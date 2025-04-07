@@ -101,6 +101,54 @@ class SimpleBibleRef:
     ranges: List[VerseRange] = field(default_factory=list)
     original_text: Optional[str] = None
 
+    @classmethod
+    def for_range(
+        cls,
+        book_id: str,
+        chapter: int,
+        start_verse: int,
+        end_chapter: Optional[int] = None,
+        end_verse: Optional[int] = None,
+        start_subverse: str = "",
+        end_subverse: str = "",
+        original_text: Optional[str] = None,
+    ) -> "SimpleBibleRef":
+        """
+        Create a SimpleBibleRef with a single VerseRange.
+
+        Args:
+            book_id: The book ID (e.g., "JHN" for John)
+            chapter: The chapter number
+            start_verse: The starting verse number
+            end_chapter: The ending chapter number (defaults to start chapter if None)
+            end_verse: The ending verse number (defaults to start verse if None)
+            start_subverse: The starting subverse (defaults to "")
+            end_subverse: The ending subverse (defaults to "")
+            original_text: The original text from which this reference was parsed (defaults to None)
+
+        Returns:
+            A SimpleBibleRef instance with a single VerseRange
+        """
+        # If end_chapter is not specified, use the start chapter
+        if end_chapter is None:
+            end_chapter = chapter
+
+        # If end_verse is not specified, use the start verse
+        if end_verse is None:
+            end_verse = start_verse
+
+        verse_range = VerseRange(
+            start_chapter=chapter,
+            start_verse=start_verse,
+            start_subverse=start_subverse,
+            end_chapter=end_chapter,
+            end_verse=end_verse,
+            end_subverse=end_subverse,
+            original_text=original_text,
+        )
+
+        return cls(book_id=book_id, ranges=[verse_range], original_text=original_text)
+
     def is_whole_book(self) -> bool:
         """
         Return True if this reference refers to the entire book.

@@ -488,3 +488,54 @@ def test_simple_bible_ref_is_whole_chapters():
         ],
     )
     assert ref7.is_whole_chapters() is False
+
+
+def test_simple_bible_ref_for_range():
+    """Test the for_range class method of SimpleBibleRef."""
+    # Basic usage with just book, chapter, and verse
+    ref1 = SimpleBibleRef.for_range("JHN", 3, 16)
+    assert ref1.book_id == "JHN"
+    assert len(ref1.ranges) == 1
+    assert ref1.ranges[0].start_chapter == 3
+    assert ref1.ranges[0].start_verse == 16
+    assert ref1.ranges[0].end_chapter == 3
+    assert ref1.ranges[0].end_verse == 16
+    assert ref1.ranges[0].start_subverse == ""
+    assert ref1.ranges[0].end_subverse == ""
+
+    # With end verse specified
+    ref2 = SimpleBibleRef.for_range("ROM", 8, 28, end_verse=39)
+    assert ref2.book_id == "ROM"
+    assert len(ref2.ranges) == 1
+    assert ref2.ranges[0].start_chapter == 8
+    assert ref2.ranges[0].start_verse == 28
+    assert ref2.ranges[0].end_chapter == 8
+    assert ref2.ranges[0].end_verse == 39
+
+    # Cross-chapter reference
+    ref3 = SimpleBibleRef.for_range("JHN", 7, 53, end_chapter=8, end_verse=11)
+    assert ref3.book_id == "JHN"
+    assert len(ref3.ranges) == 1
+    assert ref3.ranges[0].start_chapter == 7
+    assert ref3.ranges[0].start_verse == 53
+    assert ref3.ranges[0].end_chapter == 8
+    assert ref3.ranges[0].end_verse == 11
+
+    # With subverses
+    ref4 = SimpleBibleRef.for_range(
+        "MRK", 5, 3, end_verse=5, start_subverse="b", end_subverse="a"
+    )
+    assert ref4.book_id == "MRK"
+    assert len(ref4.ranges) == 1
+    assert ref4.ranges[0].start_chapter == 5
+    assert ref4.ranges[0].start_verse == 3
+    assert ref4.ranges[0].start_subverse == "b"
+    assert ref4.ranges[0].end_chapter == 5
+    assert ref4.ranges[0].end_verse == 5
+    assert ref4.ranges[0].end_subverse == "a"
+
+    # With original text
+    ref5 = SimpleBibleRef.for_range("PSA", 23, 1, original_text="Psalm 23:1")
+    assert ref5.book_id == "PSA"
+    assert ref5.original_text == "Psalm 23:1"
+    assert ref5.ranges[0].original_text == "Psalm 23:1"
