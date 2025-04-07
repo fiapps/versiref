@@ -1,5 +1,5 @@
 import pytest
-from versiref import SimpleBibleRef, RefParser, Style, Versification
+from versiref import RefParser, Style, Versification
 
 
 @pytest.mark.parametrize(

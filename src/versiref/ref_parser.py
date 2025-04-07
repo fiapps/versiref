@@ -69,7 +69,7 @@ class RefParser:
                 range_separators.append(self.style.range_separator)
             range_separator = pp.Suppress(pp.one_of(range_separators))
         # Empty marker to record location
-        location_marker = pp.Empty().set_parse_action(lambda s, l, t: l)
+        location_marker = pp.Empty().set_parse_action(lambda s, loc, t: loc)
 
         # For now, we only parse ranges of a single verse.
         verse_range = (

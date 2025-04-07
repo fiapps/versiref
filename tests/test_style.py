@@ -2,7 +2,7 @@
 Tests for the Style class.
 """
 
-import pytest
+import pytest  # noqa: F401
 from versiref.style import Style
 
 

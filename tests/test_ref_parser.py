@@ -2,7 +2,7 @@
 Tests for the ref_parser module.
 """
 
-import pytest
+import pytest  # noqa: F401
 from versiref.ref_parser import RefParser
 from versiref.style import Style
 from versiref.versification import Versification

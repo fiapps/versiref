@@ -169,49 +169,49 @@ def test_simple_bible_ref_is_valid():
 
     # Valid whole book reference
     ref = SimpleBibleRef("GEN")
-    assert ref.is_valid(versification) == True
+    assert ref.is_valid(versification) is True
 
     # Invalid book
     ref = SimpleBibleRef("XYZ")
-    assert ref.is_valid(versification) == False
+    assert ref.is_valid(versification) is False
 
     # Valid single verse
     ref = SimpleBibleRef.for_range("JHN", 3, 16)
-    assert ref.is_valid(versification) == True
+    assert ref.is_valid(versification) is True
 
     # Valid verse range
     ref = SimpleBibleRef.for_range("PSA", 119, 1, end_verse=176)
-    assert ref.is_valid(versification) == True
+    assert ref.is_valid(versification) is True
 
     # Valid with plural form of PSA
     ref = SimpleBibleRef(
         "PSAS", [VerseRange(18, 7, "", 18, 7, ""), VerseRange(77, 18, "", 77, 18, "")]
     )
-    assert ref.is_valid(versification) == True
+    assert ref.is_valid(versification) is True
 
     # Valid chapter range
     ref = SimpleBibleRef.for_range("ISA", 1, -1, end_chapter=66)
-    assert ref.is_valid(versification) == True
+    assert ref.is_valid(versification) is True
 
     # Valid "ff" notation
     ref = SimpleBibleRef.for_range("ROM", 8, 28, end_chapter=8, end_verse=-1)
-    assert ref.is_valid(versification) == True
+    assert ref.is_valid(versification) is True
 
     # Invalid chapter
     ref = SimpleBibleRef.for_range("JHN", 30, 1, end_verse=10)
-    assert ref.is_valid(versification) == False
+    assert ref.is_valid(versification) is False
 
     # Invalid verse (exceeds chapter limit)
     ref = SimpleBibleRef.for_range("JHN", 3, 40, end_verse=50)
-    assert ref.is_valid(versification) == False
+    assert ref.is_valid(versification) is False
 
     # Invalid verse range (start verse exceeds chapter limit)
     ref = SimpleBibleRef.for_range("JHN", 3, 40, end_chapter=3, end_verse=-1)
-    assert ref.is_valid(versification) == False
+    assert ref.is_valid(versification) is False
 
     # Invalid verse range structure (end verse before start verse)
     ref = SimpleBibleRef.for_range("JHN", 3, 40, end_verse=10)
-    assert ref.is_valid(versification) == False
+    assert ref.is_valid(versification) is False
 
 
 def test_simple_bible_ref_is_whole_chapters():
