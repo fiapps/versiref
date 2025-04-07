@@ -176,11 +176,11 @@ def test_simple_bible_ref_is_valid():
     assert ref.is_valid(versification) == False
 
     # Valid single verse
-    ref = SimpleBibleRef("JHN", [VerseRange(3, 16, "", 3, 16, "")])
+    ref = SimpleBibleRef.for_range("JHN", 3, 16)
     assert ref.is_valid(versification) == True
 
     # Valid verse range
-    ref = SimpleBibleRef("PSA", [VerseRange(119, 1, "", 119, 176, "")])
+    ref = SimpleBibleRef.for_range("PSA", 119, 1, end_verse=176)
     assert ref.is_valid(versification) == True
 
     # Valid with plural form of PSA
@@ -190,29 +190,27 @@ def test_simple_bible_ref_is_valid():
     assert ref.is_valid(versification) == True
 
     # Valid chapter range
-    ref = SimpleBibleRef("ISA", [VerseRange(1, -1, "", 66, -1, "")])
+    ref = SimpleBibleRef.for_range("ISA", 1, -1, end_chapter=66)
     assert ref.is_valid(versification) == True
 
     # Valid "ff" notation
-    ref = SimpleBibleRef("ROM", [VerseRange(8, 28, "", 8, -1, "")])
+    ref = SimpleBibleRef.for_range("ROM", 8, 28, end_chapter=8, end_verse=-1)
     assert ref.is_valid(versification) == True
 
     # Invalid chapter
-    ref = SimpleBibleRef("JHN", [VerseRange(30, 1, "", 30, 10, "")])
+    ref = SimpleBibleRef.for_range("JHN", 30, 1, end_verse=10)
     assert ref.is_valid(versification) == False
 
     # Invalid verse (exceeds chapter limit)
-    ref = SimpleBibleRef("JHN", [VerseRange(3, 40, "", 3, 50, "")])
+    ref = SimpleBibleRef.for_range("JHN", 3, 40, end_verse=50)
     assert ref.is_valid(versification) == False
 
     # Invalid verse range (start verse exceeds chapter limit)
-    ref = SimpleBibleRef("JHN", [VerseRange(3, 40, "", 3, -1, "")])
+    ref = SimpleBibleRef.for_range("JHN", 3, 40, end_chapter=3, end_verse=-1)
     assert ref.is_valid(versification) == False
 
-    # Invalid verse range structure
-    ref = SimpleBibleRef(
-        "JHN", [VerseRange(3, 20, "", 3, 10, "")]  # End verse before start verse
-    )
+    # Invalid verse range structure (end verse before start verse)
+    ref = SimpleBibleRef.for_range("JHN", 3, 40, end_verse=10)
     assert ref.is_valid(versification) == False
 
 
@@ -223,23 +221,23 @@ def test_simple_bible_ref_is_whole_chapters():
     assert ref1.is_whole_chapters() is True
 
     # Chapter reference without verse specification should be whole chapters
-    ref2 = SimpleBibleRef("JHN", [VerseRange(6, -1, "", 6, -1, "")])
+    ref2 = SimpleBibleRef.for_range("JHN", 6, -1)
     assert ref2.is_whole_chapters() is True
 
     # Chapter range without verse specification should be whole chapters
-    ref3 = SimpleBibleRef("ISA", [VerseRange(1, -1, "", 39, -1, "")])
+    ref3 = SimpleBibleRef.for_range("ISA", 1, -1, end_chapter=39)
     assert ref3.is_whole_chapters() is True
 
     # Reference with verse specification should not be whole chapters
-    ref4 = SimpleBibleRef("JHN", [VerseRange(3, 16, "", 3, 16, "")])
+    ref4 = SimpleBibleRef.for_range("JHN", 3, 16)
     assert ref4.is_whole_chapters() is False
 
     # Reference with verse range should not be whole chapters
-    ref5 = SimpleBibleRef("ROM", [VerseRange(8, 28, "", 8, 39, "")])
+    ref5 = SimpleBibleRef.for_range("ROM", 8, 28, end_verse=39)
     assert ref5.is_whole_chapters() is False
 
     # Reference with chapter range but specific verses should not be whole chapters
-    ref6 = SimpleBibleRef("PSA", [VerseRange(1, 1, "", 2, 12, "")])
+    ref6 = SimpleBibleRef.for_range("PSA", 1, 1, end_chapter=2, end_verse=12)
     assert ref6.is_whole_chapters() is False
 
     # Mixed reference with both whole chapter and specific verses should not be whole chapters
@@ -260,15 +258,7 @@ def test_format_simple_reference():
     style = Style(names=names)
 
     # Create a reference for Genesis 1:1-5
-    vr = VerseRange(
-        start_chapter=1,
-        start_verse=1,
-        start_subverse="",
-        end_chapter=1,
-        end_verse=5,
-        end_subverse="",
-    )
-    ref = SimpleBibleRef(book_id="GEN", ranges=[vr])
+    ref = SimpleBibleRef.for_range("GEN", 1, 1, end_verse=5)
 
     # Format the reference
     formatted = ref.format(style)
@@ -356,15 +346,9 @@ def test_format_with_subverses():
     style = Style(names=names)
 
     # Create a reference for Mark 5:3b-5a
-    vr = VerseRange(
-        start_chapter=5,
-        start_verse=3,
-        start_subverse="b",
-        end_chapter=5,
-        end_verse=5,
-        end_subverse="a",
+    ref = SimpleBibleRef.for_range(
+        "MRK", 5, 3, start_subverse="b", end_verse=5, end_subverse="a"
     )
-    ref = SimpleBibleRef(book_id="MRK", ranges=[vr])
 
     # Format the reference
     formatted = ref.format(style)
@@ -378,15 +362,7 @@ def test_format_cross_chapter_range():
     style = Style(names=names)
 
     # Create a reference for John 7:53-8:11 (the pericope adulterae)
-    vr = VerseRange(
-        start_chapter=7,
-        start_verse=53,
-        start_subverse="",
-        end_chapter=8,
-        end_verse=11,
-        end_subverse="",
-    )
-    ref = SimpleBibleRef(book_id="JHN", ranges=[vr])
+    ref = SimpleBibleRef.for_range("JHN", 7, 53, end_chapter=8, end_verse=11)
 
     # Format the reference
     formatted = ref.format(style)
@@ -400,15 +376,7 @@ def test_format_whole_chapter_range():
     style = Style(names=names)
 
     # Create a reference for Isaiah 1-39
-    vr = VerseRange(
-        start_chapter=1,
-        start_verse=-1,  # Unspecified verse number
-        start_subverse="",
-        end_chapter=39,
-        end_verse=-1,  # Unspecified verse number
-        end_subverse="",
-    )
-    ref = SimpleBibleRef(book_id="ISA", ranges=[vr])
+    ref = SimpleBibleRef.for_range("ISA", 1, -1, end_chapter=39)
 
     # Format the reference
     formatted = ref.format(style)
@@ -422,15 +390,8 @@ def test_format_ff_reference():
     style = Style(names=names)
 
     # Create a reference for Philippians 2:5ff
-    vr = VerseRange(
-        start_chapter=2,
-        start_verse=5,
-        start_subverse="",
-        end_chapter=2,
-        end_verse=-1,  # Unspecified end verse means "ff"
-        end_subverse="",
-    )
-    ref = SimpleBibleRef(book_id="PHP", ranges=[vr])
+    # Unspecified end verse means "ff"
+    ref = SimpleBibleRef.for_range("PHP", 2, 5, end_chapter=2, end_verse=-1)
 
     # Format the reference
     formatted = ref.format(style)
@@ -497,15 +458,7 @@ def test_format_single_chapter_book_with_versification():
     versification = Versification.standard_versification("eng")
 
     # Create a reference for Philemon 6
-    vr = VerseRange(
-        start_chapter=1,
-        start_verse=6,
-        start_subverse="",
-        end_chapter=1,
-        end_verse=6,
-        end_subverse="",
-    )
-    ref = SimpleBibleRef(book_id="PHM", ranges=[vr])
+    ref = SimpleBibleRef.for_range("PHM", 1, 6)
 
     # Format with versification - should omit chapter number
     formatted = ref.format(style, versification)
@@ -526,15 +479,7 @@ def test_format_single_chapter_book_verse_range():
     versification = Versification.standard_versification("eng")
 
     # Create a reference for Jude 3-5
-    vr = VerseRange(
-        start_chapter=1,
-        start_verse=3,
-        start_subverse="",
-        end_chapter=1,
-        end_verse=5,
-        end_subverse="",
-    )
-    ref = SimpleBibleRef(book_id="JUD", ranges=[vr])
+    ref = SimpleBibleRef.for_range("JUD", 1, 3, end_verse=5)
 
     # Format with versification
     formatted = ref.format(style, versification)
