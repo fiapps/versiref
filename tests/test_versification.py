@@ -61,7 +61,7 @@ def test_multiple_versifications():
     """Test loading and comparing multiple versifications."""
     eng = Versification.standard_versification("eng")
     lxx = Versification.standard_versification("lxx")
-    vul = Versification.standard_versification("vul")
+    vul = Versification.standard_versification("vulgata")
 
     assert eng is not None
     assert lxx is not None
