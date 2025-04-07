@@ -40,6 +40,10 @@ class VerseRange:
     end_subverse: str
     original_text: Optional[str] = None
 
+    def is_whole_chapters(self) -> bool:
+        """Return True if this range does not specify verse limits."""
+        return self.start_verse >= 0 or self.end_verse >= 0
+
     def is_valid(self) -> bool:
         """
         Check if this verse range has valid values.
@@ -98,8 +102,26 @@ class SimpleBibleRef:
     original_text: Optional[str] = None
 
     def is_whole_book(self) -> bool:
-        """Return True if this reference refers to the entire book."""
+        """
+        Return True if this reference refers to the entire book.
+
+        Note that this regards the form of the reference rather than its
+        content. So it returns True for John but False for John 1–21.
+        """
         return len(self.ranges) == 0
+
+    def is_whole_chapters(self) -> bool:
+        """
+        Return True if this reference does not specify verse limits.
+
+        Note that this regards the form of the reference rather than its
+        content. So it returns true for John and John 6 but False for John
+        1:1–51.
+        """
+        for range in self.ranges:
+            if not range.is_whole_chapters():
+                return False
+        return True
 
     def is_valid(self, versification: Versification) -> bool:
         """
