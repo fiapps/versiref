@@ -256,6 +256,12 @@ class SimpleBibleRef:
             return book_name
 
         # Format each verse range
+
+        # The implementation, written by an LLM, seems unnecessarily complex: we
+        # could just build up the formatted reference as we go, choosing the
+        # separator based on this.start_chapter == last.end_chapter (or a space
+        # after the book name if last is None). However, that cleanup can be
+        # left for the future.
         formatted_ranges = []
         current_chapter = None
         is_single_chapter_book = versification and versification.is_single_chapter(
