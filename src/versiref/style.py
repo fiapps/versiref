@@ -74,13 +74,14 @@ class Style:
         try:
             # Use importlib.resources to find the file
             with resources.open_text(
-            "versiref.data.book_names", f"{identifier}.json"
+                "versiref.data.book_names", f"{identifier}.json"
             ) as f:
                 data = json.load(f)
             if not isinstance(data, dict):
                 return None
-            if not all(isinstance(k, str) and isinstance(v, str) 
-                  for k, v in data.items()):
+            if not all(
+                isinstance(k, str) and isinstance(v, str) for k, v in data.items()
+            ):
                 return None
             return data
         except (FileNotFoundError, ModuleNotFoundError, json.JSONDecodeError):

@@ -19,7 +19,9 @@ class Versification:
     identifier: Optional[str] = None
 
     @classmethod
-    def from_file(cls, file_path: str, identifier: Optional[str] = None) -> "Versification":
+    def from_file(
+        cls, file_path: str, identifier: Optional[str] = None
+    ) -> "Versification":
         """Create an instance from a JSON file.
 
         Args:
