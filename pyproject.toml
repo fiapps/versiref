@@ -21,6 +21,9 @@ packages = ["src/versiref"]
 [tool.hatch.build.targets.wheel.sources]
 "data" = "src/versiref/data"
 
+[tool.mypy]
+strict = true
+
 [dependency-groups]
 dev = [
     "mypy>=1.15.0",
