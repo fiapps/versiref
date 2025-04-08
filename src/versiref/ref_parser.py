@@ -6,7 +6,7 @@ This module provides the RefParser class for parsing Bible references from strin
 We don't call pp.ParserElement.enablePackrat() because it made parsing slower.
 """
 
-from typing import List, Optional
+from typing import Generator, Optional, Tuple
 
 import pyparsing as pp
 from pyparsing import common
@@ -387,3 +387,34 @@ class RefParser:
                 return None
             else:
                 raise e
+
+    def scan_string_simple(
+        self, text: str, as_ranges: bool = False
+    ) -> Generator[Tuple["SimpleBibleRef", int, int], None, None]:
+        """
+        Scan a string for SimpleBibleRefs.
+
+        This method scans the entire string for references to a single book of the Bible.
+
+        Args:
+            text: The string to scan
+            as_ranges: If True, yield a SimpleBibleRef for each verse range
+
+        Yields:
+            A reference and the start and end of its location in text.
+            (ref: SimpleBibleRef, start: int, end: int)
+        """
+        for tokens, start, end in self.simple_ref_parser.scan_string(text):
+            ref = tokens[0]
+            assert isinstance(ref, SimpleBibleRef)
+            if as_ranges:
+                next_start = start
+                for range_ref in ref.ranges_iter():
+                    # Use the original text to find the start and end.
+                    assert range_ref.original_text is not None
+                    range_start = text.find(range_ref.original_text, next_start)
+                    assert range_start >= 0
+                    next_start = range_start + len(range_ref.original_text)
+                    yield (range_ref, range_start, next_start)
+            else:
+                yield (ref, start, end)
