@@ -16,28 +16,33 @@ class Versification:
     """
 
     max_verses: Dict[str, List[int]] = field(default_factory=dict)
-    identifier: str = None
+    identifier: Optional[str] = None
 
     @classmethod
-    def from_file(cls, file_path: str, identifier: str = None) -> "Versification":
+    def from_file(cls, file_path: str, identifier: Optional[str] = None) -> "Versification":
         """Create an instance from a JSON file.
 
         Args:
             file_path: path to a JSON file containing an object with maxVerses
             identifier: identifier to store in the constructed Versififaction
-        This can throw FileNotFoundError, json.JSONDecodeError, ValueError
+        Throws:
+            FileNotFoundError: file_path does not exist
+            json.JSONDecodeError: file_path is not well-formed JSON
+            ValueError: file_path does not match schema
+        Returns:
+            Newly constructed Versification
         """
         with open(file_path, "r", encoding="utf-8") as f:
             data = json.load(f)
-            if "maxVerses" in data:
-                # Convert string verse counts to integers
-                max_verses = {}
-                for book, verses in data["maxVerses"].items():
-                    max_verses[book] = [int(v) for v in verses]
-                return cls(max_verses, identifier)
-            else:
-                # Is there a better way to report a malformed JSON file?
-                raise ValueError()
+        if "maxVerses" in data:
+            # Convert string verse counts to integers
+            max_verses = {}
+            for book, verses in data["maxVerses"].items():
+                max_verses[book] = [int(v) for v in verses]
+            return cls(max_verses, identifier)
+        else:
+            # Is there a better way to report a malformed JSON file?
+            raise ValueError()
 
     @classmethod
     def standard_versification(cls, identifier: str) -> Optional["Versification"]:
@@ -57,8 +62,8 @@ class Versification:
         filename = f"{identifier.lower()}.json"
 
         path = resources.files("versiref").joinpath("data", "versifications", filename)
-        if os.path.exists(path):
-            return cls.from_file(path, identifier)
+        if path.is_file():
+            return cls.from_file(str(path), identifier)
         else:
             return None
 
