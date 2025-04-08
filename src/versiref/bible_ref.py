@@ -240,7 +240,8 @@ class SimpleBibleRef:
         Args:
             style: The Style to use for formatting
             versification: Optional Versification to use for determining book structure.
-                           If provided, chapter numbers will be omitted for one-chapter books.
+                           If provided, chapter numbers will be omitted for
+                           one-chapter books.
 
         Returns:
             A formatted string representation of this Bible reference
@@ -249,128 +250,46 @@ class SimpleBibleRef:
         if self.book_id not in style.names:
             raise ValueError(f"Unknown book ID: {self.book_id}")
 
-        book_name = style.names[self.book_id]
-
-        # If this is a whole book reference, just return the book name
-        if self.is_whole_book():
-            return book_name
-
-        # Format each verse range
-
-        # The implementation, written by an LLM, seems unnecessarily complex: we
-        # could just build up the formatted reference as we go, choosing the
-        # separator based on this.start_chapter == last.end_chapter (or a space
-        # after the book name if last is None). However, that cleanup can be
-        # left for the future.
-        formatted_ranges = []
-        current_chapter = None
-        is_single_chapter_book = versification and versification.is_single_chapter(
-            self.book_id
-        )
-
-        for verse_range in self.ranges:
-            # If we're in a new chapter, include the chapter number (unless it's a one-chapter book)
-            if current_chapter != verse_range.start_chapter:
-                current_chapter = verse_range.start_chapter
-
-                # Format the start of the range
-                if verse_range.start_verse < 0:
-                    # This is a whole chapter reference (e.g., "Gen 1")
-                    # For one-chapter books, we don't need to include the chapter number
-                    if is_single_chapter_book:
-                        continue
-
-                    range_text = f"{current_chapter}"
-
-                    # If end_chapter is different, this is a chapter range (e.g., "Isa 1-39")
-                    if (
-                        verse_range.end_chapter != verse_range.start_chapter
-                        and verse_range.end_verse < 0
-                    ):
-                        range_text += (
-                            f"{style.range_separator}{verse_range.end_chapter}"
-                        )
-
-                    formatted_ranges.append(range_text)
-                else:
-                    # This is a verse or verse range within a chapter
-                    if is_single_chapter_book:
-                        # For one-chapter books, omit the chapter number
-                        range_text = f"{verse_range.start_verse}"
-                    else:
-                        range_text = f"{current_chapter}{style.chapter_verse_separator}{verse_range.start_verse}"
-
-                    range_text += str(verse_range.start_subverse)
-
-                    # Add end verse if different from start verse
-                    if verse_range.end_verse < 0:
-                        # This is a "ff" reference (e.g., "Phil 2:5ff")
-                        range_text += style.following_verses
-                    elif (
-                        verse_range.end_chapter != verse_range.start_chapter
-                        or verse_range.end_verse != verse_range.start_verse
-                        or verse_range.end_subverse != verse_range.start_subverse
-                    ):
-                        # If the end chapter is different, include it
-                        if verse_range.end_chapter != verse_range.start_chapter:
-                            if is_single_chapter_book:
-                                # This shouldn't happen for single-chapter books, but handle it anyway
-                                range_text += (
-                                    f"{style.range_separator}{verse_range.end_verse}"
-                                )
-                            else:
-                                range_text += f"{style.range_separator}{verse_range.end_chapter}{style.chapter_verse_separator}{verse_range.end_verse}"
-                        else:
-                            range_text += style.range_separator
-                            if verse_range.start_verse != verse_range.end_verse:
-                                range_text += str(verse_range.end_verse)
-
-                        range_text += verse_range.end_subverse
-
-                    formatted_ranges.append(range_text)
-            else:
-                # We're in the same chapter as the previous range
-                range_text = f"{verse_range.start_verse}{verse_range.start_subverse}"
-
-                # Add end verse if different from start verse
-                if (
-                    verse_range.end_chapter != verse_range.start_chapter
-                    or verse_range.end_verse != verse_range.start_verse
-                    or verse_range.end_subverse != verse_range.start_subverse
+        # We start with the book name and then add ranges incrementally.
+        result = style.names[self.book_id]
+        last_range = None
+        for range in self.ranges:
+            if last_range is None:
+                result += " "
+                if versification is not None and versification.is_single_chapter(
+                    self.book_id
                 ):
-                    # If the end chapter is different, include it
-                    if verse_range.end_chapter != verse_range.start_chapter:
-                        range_text += f"{style.range_separator}{verse_range.end_chapter}{style.chapter_verse_separator}{verse_range.end_verse}"
-                    else:
-                        range_text += f"{style.range_separator}{verse_range.end_verse}"
-
-                    range_text += verse_range.end_subverse
-
-                formatted_ranges.append(range_text)
-
-        # Join the formatted ranges with the appropriate separators
-        result = book_name + " "
-
-        # Group ranges by chapter
-        chapter_groups = []
-        current_chapter = None
-        current_group = []
-
-        for i, verse_range in enumerate(self.ranges):
-            if current_chapter != verse_range.start_chapter:
-                if current_group:
-                    chapter_groups.append(
-                        style.verse_range_separator.join(current_group)
-                    )
-                current_chapter = verse_range.start_chapter
-                current_group = [formatted_ranges[i]]
+                    states_chapter = False
+                else:
+                    result += str(range.start_chapter)
+                    states_chapter = True
+            elif last_range.end_chapter != range.start_chapter:
+                result += f"{style.chapter_separator}{range.start_chapter}"
+                states_chapter = True
             else:
-                current_group.append(formatted_ranges[i])
-
-        # Add the last group
-        if current_group:
-            chapter_groups.append(style.verse_range_separator.join(current_group))
-
-        result += style.chapter_separator.join(chapter_groups)
-
+                result += style.verse_range_separator
+                states_chapter = False
+            # Add start verse if specified
+            if range.start_verse >= 0:
+                if states_chapter:
+                    result += style.chapter_verse_separator
+                result += f"{range.start_verse}{range.start_subverse}"
+            # Add range end if different
+            if range.end_verse < 0 and range.start_verse >= 0:
+                result += style.following_verses
+            elif (
+                range.end_chapter != range.start_chapter
+                or range.end_verse != range.start_verse
+                or range.end_subverse != range.start_subverse
+            ):
+                result += style.range_separator
+                if range.end_chapter != range.start_chapter:
+                    result += str(range.end_chapter)
+                    if range.end_verse >= 0:
+                        result += f"{style.chapter_verse_separator}{range.end_verse}"
+                elif range.end_verse != range.start_verse:
+                    result += f"{range.end_verse}"
+                if range.end_verse >= 0:
+                    result += range.end_subverse
+            last_range = range
         return result
