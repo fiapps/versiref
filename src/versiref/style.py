@@ -40,7 +40,7 @@ class Style:
     chapter_separator: str = "; "
     recognized_names: Dict[str, str] = field(default_factory=dict)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """
         Initialize recognized_names if not provided.
 

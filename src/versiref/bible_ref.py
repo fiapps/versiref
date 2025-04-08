@@ -5,7 +5,7 @@ This module provides classes for representing and manipulating Bible references.
 """
 
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import Generator, List, Optional
 
 from versiref.style import Style
 from versiref.versification import Versification
@@ -213,7 +213,7 @@ class SimpleBibleRef:
 
         return True
 
-    def ranges_iter(self):
+    def ranges_iter(self) -> Generator["SimpleBibleRef", None, None]:
         """
         Generator that yields a new SimpleBibleRef for each verse range.
 

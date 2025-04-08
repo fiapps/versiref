@@ -46,7 +46,7 @@ class RefParser:
         # Build the parser
         self._build_parser()
 
-    def _build_parser(self):
+    def _build_parser(self) -> None:
         """Build the pyparsing parser based on the style and versification."""
         # Define basic elements
         book = pp.one_of(list(self.style.recognized_names.keys()))
