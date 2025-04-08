@@ -12,7 +12,7 @@ import pyparsing as pp
 from pyparsing import common
 
 from versiref.bible_ref import SimpleBibleRef, VerseRange
-from versiref.style import Style
+from versiref.ref_style import RefStyle
 from versiref.versification import Versification
 
 
@@ -42,13 +42,13 @@ class RefParser:
     """
 
     def __init__(
-        self, style: Style, versification: Versification, strict: bool = False
+        self, style: RefStyle, versification: Versification, strict: bool = False
     ):
         """
         Initialize a RefParser with a style and versification.
 
         Args:
-            style: The Style to use for parsing
+            style: The RefStyle to use for parsing
             versification: The Versification to use for determining single-chapter books
             strict: If True, follow the style more closely.
 
@@ -115,7 +115,7 @@ class RefParser:
         ).set_parse_action(self._make_verse_range)
 
         verse_ranges = pp.DelimitedList(
-            verse_range, delim=pp.Suppress(Style.verse_range_separator.strip())
+            verse_range, delim=pp.Suppress(RefStyle.verse_range_separator.strip())
         ).set_results_name("verse_ranges")
 
         chapter_range = (
@@ -166,7 +166,7 @@ class RefParser:
         ).set_parse_action(self._make_sc_verse_range)
 
         sc_verse_ranges = pp.DelimitedList(
-            sc_verse_range, delim=pp.Suppress(Style.verse_range_separator.strip())
+            sc_verse_range, delim=pp.Suppress(RefStyle.verse_range_separator.strip())
         ).set_results_name("chapter_ranges")
 
         sc_book_verse_ranges = (

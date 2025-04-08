@@ -4,15 +4,15 @@ Tests for the ref_parser module.
 
 import pytest  # noqa: F401
 from versiref.ref_parser import RefParser
-from versiref.style import Style
+from versiref.ref_style import RefStyle
 from versiref.versification import Versification
 
 
 def test_parse_simple_verse():
     """Test parsing a simple verse reference."""
     # Create a style
-    names = Style.standard_names("en-sbl_abbreviations")
-    style = Style(names=names)
+    names = RefStyle.standard_names("en-sbl_abbreviations")
+    style = RefStyle(names=names)
 
     # Create a versification
     versification = Versification.standard_versification("eng")
@@ -38,8 +38,8 @@ def test_parse_simple_verse():
 def test_parse_verse_with_subverse():
     """Test parsing a verse reference with a subverse."""
     # Create a style
-    names = Style.standard_names("en-sbl_abbreviations")
-    style = Style(names=names)
+    names = RefStyle.standard_names("en-sbl_abbreviations")
+    style = RefStyle(names=names)
 
     # Create a versification
     versification = Versification.standard_versification("eng")
@@ -65,8 +65,8 @@ def test_parse_verse_with_subverse():
 def test_parse_single_chapter_book():
     """Test parsing a reference to a verse in a single-chapter book."""
     # Create a style
-    names = Style.standard_names("en-sbl_abbreviations")
-    style = Style(names=names)
+    names = RefStyle.standard_names("en-sbl_abbreviations")
+    style = RefStyle(names=names)
 
     # Create a versification with Jude as a single-chapter book
     versification = Versification.standard_versification("eng")
@@ -90,8 +90,8 @@ def test_parse_single_chapter_book():
 def test_parse_nonexistent_reference():
     """Test parsing a string that is not a Bible reference."""
     # Create a style
-    names = Style.standard_names("en-sbl_abbreviations")
-    style = Style(names=names)
+    names = RefStyle.standard_names("en-sbl_abbreviations")
+    style = RefStyle(names=names)
 
     # Create a versification
     versification = Versification.standard_versification("eng")
@@ -108,8 +108,8 @@ def test_parse_nonexistent_reference():
 def test_parse_book_with_space():
     """Test parsing a book name that contains a space."""
     # Create a style
-    names = Style.standard_names("en-sbl_abbreviations")
-    style = Style(names=names)
+    names = RefStyle.standard_names("en-sbl_abbreviations")
+    style = RefStyle(names=names)
 
     # Create a versification
     versification = Versification.standard_versification("eng")
@@ -131,8 +131,8 @@ def test_parse_book_with_space():
 def test_parse_multi_chapter_book_with_space():
     """Test parsing a multi-chapter book name that contains a space."""
     # Create a style
-    names = Style.standard_names("en-sbl_abbreviations")
-    style = Style(names=names)
+    names = RefStyle.standard_names("en-sbl_abbreviations")
+    style = RefStyle(names=names)
 
     # Create a versification
     versification = Versification.standard_versification("eng")

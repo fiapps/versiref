@@ -1,5 +1,5 @@
 import pytest
-from versiref import RefParser, Style, Versification
+from versiref import RefParser, RefStyle, Versification
 
 
 @pytest.mark.parametrize(
@@ -45,13 +45,13 @@ from versiref import RefParser, Style, Versification
 def test_parse_sbl_and_format_cei(sbl_ref, expected_cei_ref):
     """Test parsing references in SBL style and formatting them in CEI style."""
     # Setup
-    sbl_abbrevs = Style.standard_names("en-sbl_abbreviations")
-    sbl_style = Style(
+    sbl_abbrevs = RefStyle.standard_names("en-sbl_abbreviations")
+    sbl_style = RefStyle(
         names=sbl_abbrevs, chapter_verse_separator=":", verse_range_separator=","
     )
 
-    cei_abbrevs = Style.standard_names("it-cei_abbreviazioni")
-    cei_style = Style(
+    cei_abbrevs = RefStyle.standard_names("it-cei_abbreviazioni")
+    cei_style = RefStyle(
         names=cei_abbrevs,
         chapter_verse_separator=",",
         following_verse="s",

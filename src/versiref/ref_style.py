@@ -1,7 +1,7 @@
 """
-Style definitions for Bible reference formatting and parsing.
+RefStyle definitions for Bible reference formatting and parsing.
 
-This module provides the Style class which defines how Bible references
+This module provides the RefStyle class which defines how Bible references
 are converted to and from strings.
 """
 
@@ -12,13 +12,13 @@ from typing import Dict, Optional
 
 
 @dataclass
-class Style:
+class RefStyle:
     """
     Defines how a SimpleBibleRef is converted to and from strings.
 
-    A Style primarily holds data that specifies the formatting conventions
+    A RefStyle primarily holds data that specifies the formatting conventions
     for Bible references. Formatting and parsing is done by other classes
-    that use a Style as a specification.
+    that use a RefStyle as a specification.
 
     Attributes:
         names: Maps Bible book IDs to string abbreviations or full names
@@ -58,7 +58,7 @@ class Style:
         """
         Load and return a standard set of book names.
 
-        These can be passed to Style(). Since the return value has been created
+        These can be passed to RefStyle(). Since the return value has been created
         by loading a JSON file, it can be modified to customize the
         abbreviations (e.g, names["SNG"] = "Cant") without fear of changing the
         set of names for other callers.

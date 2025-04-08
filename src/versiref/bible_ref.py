@@ -7,7 +7,7 @@ This module provides classes for representing and manipulating Bible references.
 from dataclasses import dataclass, field
 from typing import Generator, List, Optional
 
-from versiref.style import Style
+from versiref.ref_style import RefStyle
 from versiref.versification import Versification
 
 
@@ -232,13 +232,13 @@ class SimpleBibleRef:
             )
 
     def format(
-        self, style: Style, versification: Optional[Versification] = None
+        self, style: RefStyle, versification: Optional[Versification] = None
     ) -> str:
         """
         Format this Bible reference as a string according to the given style.
 
         Args:
-            style: The Style to use for formatting
+            style: The RefStyle to use for formatting
             versification: Optional Versification to use for determining book structure.
                            If provided, chapter numbers will be omitted for
                            one-chapter books.
