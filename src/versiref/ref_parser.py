@@ -16,6 +16,22 @@ from versiref.style import Style
 from versiref.versification import Versification
 
 
+def _get_int(tokens: pp.ParseResults, name: str, default: int) -> int:
+    """Get an integer from the parsed tokens in a type-safe manner."""
+    if name in tokens:
+        return int(tokens[name])
+    else:
+        return default
+
+
+def _get_str(tokens: pp.ParseResults, name: str, default: str) -> str:
+    """Get an integer from the parsed tokens in a type-safe manner."""
+    if name in tokens:
+        return str(tokens[name])
+    else:
+        return default
+
+
 class RefParser:
     """
     Parser for Bible references.
@@ -175,7 +191,7 @@ class RefParser:
         Returns:
             A VerseRange instance based on the parsed tokens
         """
-        start_chapter = tokens.get("start_chapter", -1)
+        start_chapter = _get_int(tokens, "start_chapter", -1)
         start_verse = tokens.start_verse
         start_subverse = tokens.start_subverse
         # Handle following_verse(s) mis-parsed as subverse.
@@ -204,10 +220,10 @@ class RefParser:
                 end_verse = -1
             end_subverse = ""
         else:
-            end_chapter = tokens.get("end_chapter", start_chapter)
-            end_verse = tokens.get("end_verse", start_verse)
-            end_subverse = tokens.get("end_subverse", start_subverse)
-        end_location = tokens.get("end_location", -1)
+            end_chapter = _get_int(tokens, "end_chapter", start_chapter)
+            end_verse = _get_int(tokens, "end_verse", start_verse)
+            end_subverse = _get_str(tokens, "end_subverse", start_subverse)
+        end_location = _get_int(tokens, "end_location", -1)
         range_original_text = original_text[loc:end_location].strip()
         return VerseRange(
             start_chapter=start_chapter,
@@ -222,7 +238,7 @@ class RefParser:
     @staticmethod
     def _make_chapter_range(
         original_text: str, loc: int, tokens: pp.ParseResults
-    ) -> List[VerseRange]:
+    ) -> pp.ParseResults:
         """
         Set the chapter for the verse ranges.
 
@@ -242,13 +258,14 @@ class RefParser:
             # Expand the original text for the first verse range to include the
             # chapter number. Why do we need to use find()? Because there could
             # be whitespace after verse_ranges_location.
-            verse_ranges_location = tokens.get("verse_ranges_location", loc)
+            verse_ranges_location = _get_int(tokens, "verse_ranges_location", loc)
             range_0_start = original_text.find(
                 verse_ranges[0].original_text, verse_ranges_location
             )
             verse_ranges[0].original_text = original_text[
                 loc : range_0_start + len(verse_ranges[0].original_text)
             ]
+        assert isinstance(verse_ranges, pp.ParseResults)
         return verse_ranges
 
     def _make_sc_verse_range(
@@ -292,9 +309,9 @@ class RefParser:
                 end_verse = -1
             end_subverse = ""
         else:
-            end_verse = tokens.get("end_verse", start_verse)
-            end_subverse = tokens.get("end_subverse", start_subverse)
-        end_location = tokens.get("end_location", -1)
+            end_verse = _get_int(tokens, "end_verse", start_verse)
+            end_subverse = _get_str(tokens, "end_subverse", start_subverse)
+        end_location = _get_int(tokens, "end_location", -1)
         range_original_text = original_text[loc:end_location].strip()
         return VerseRange(
             start_chapter=start_chapter,
@@ -320,19 +337,22 @@ class RefParser:
         """
         # Extract the book ID and verse ranges
         book_name = tokens.book
-        verse_ranges = tokens.get("chapter_ranges", tokens.verse_ranges)
+        if "chapter_ranges" in tokens:
+            verse_ranges = tokens.chapter_ranges
+        else:
+            verse_ranges = tokens.verse_ranges
         if verse_ranges:
             # Expand the original text for the first verse range to include the
             # book name. Why do we need to use find()? Because there could
             # be whitespace after verse_ranges_location.
-            chapter_ranges_location = tokens.get("chapter_ranges_location", loc)
+            chapter_ranges_location = _get_int(tokens, "chapter_ranges_location", loc)
             range_0_start = original_text.find(
                 verse_ranges[0].original_text, chapter_ranges_location
             )
             verse_ranges[0].original_text = original_text[
                 loc : range_0_start + len(verse_ranges[0].original_text)
             ]
-        end_location = tokens.get("end_location", -1)
+        end_location = _get_int(tokens, "end_location", -1)
         ref_original_text = original_text[loc:end_location].strip()
 
         # Create a SimpleBibleRef with the parsed data
@@ -358,7 +378,9 @@ class RefParser:
         try:
             # Try to parse the text
             result = self.simple_ref_parser.parse_string(text, parse_all=True)
-            return result[0]
+            ref = result[0]
+            assert isinstance(ref, SimpleBibleRef)
+            return ref
 
         except pp.ParseException as e:
             if silent:

@@ -69,13 +69,19 @@ class Style:
 
         Returns:
             A dictionary mapping book IDs to names or abbreviations, or None if
-            the file doesn't exist
+            the file doesn't exist or has an invalid format.
         """
         try:
             # Use importlib.resources to find the file
             with resources.open_text(
-                "versiref.data.book_names", f"{identifier}.json"
+            "versiref.data.book_names", f"{identifier}.json"
             ) as f:
-                return json.load(f)
-        except (FileNotFoundError, ModuleNotFoundError):
+                data = json.load(f)
+            if not isinstance(data, dict):
+                return None
+            if not all(isinstance(k, str) and isinstance(v, str) 
+                  for k, v in data.items()):
+                return None
+            return data
+        except (FileNotFoundError, ModuleNotFoundError, json.JSONDecodeError):
             return None
