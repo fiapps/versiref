@@ -417,4 +417,5 @@ class RefParser:
                     next_start = range_start + len(range_ref.original_text)
                     yield (range_ref, range_start, next_start)
             else:
-                yield (ref, start, end)
+                assert ref.original_text is not None
+                yield (ref, start, start + len(ref.original_text))
