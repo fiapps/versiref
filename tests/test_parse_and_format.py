@@ -76,3 +76,98 @@ def test_parse_sbl_and_format_cei(sbl_ref, expected_cei_ref):
 
     # Assert the formatted reference matches the expected CEI style
     assert formatted_ref == expected_cei_ref
+
+
+def test_scan_string_simple():
+    """Test scanning text for Bible references."""
+    # Setup
+    sbl_style = RefStyle(
+        names=RefStyle.standard_names("en-sbl_abbreviations"),
+        chapter_verse_separator=":",
+        verse_range_separator=",",
+    )
+    eng_versification = Versification.standard_versification("eng")
+    parser = RefParser(sbl_style, eng_versification)
+
+    # Test text with multiple references
+    text = "Look at John 3:16 and Rom 8:28-30 for encouragement. Also Matt 5:3-12."
+
+    # Test scanning for complete references
+    refs = list(parser.scan_string_simple(text))
+    assert len(refs) == 3
+
+    ref1, start1, end1 = refs[0]
+    assert ref1.format(sbl_style) == "John 3:16"
+    assert text[start1:end1] == ref1.original_text
+
+    ref2, start2, end2 = refs[1]
+    assert ref2.format(sbl_style) == "Rom 8:28–30"
+    assert text[start2:end2] == ref2.original_text
+
+    ref3, start3, end3 = refs[2]
+    assert ref3.format(sbl_style) == "Matt 5:3–12"
+    assert text[start3:end3] == ref3.original_text
+
+
+def test_scan_string_simple_as_ranges():
+    """Test scanning text for Bible references split into verse ranges."""
+    # Setup
+    sbl_style = RefStyle(
+        names=RefStyle.standard_names("en-sbl_abbreviations"),
+        chapter_verse_separator=":",
+        verse_range_separator=",",
+    )
+    eng_versification = Versification.standard_versification("eng")
+    parser = RefParser(sbl_style, eng_versification)
+
+    # Test text with references containing multiple ranges
+    text = "See Mark 4:3–9,13–20 and Acts 1:8–11; 2:1–4"
+
+    # Test scanning with as_ranges=True
+    range_refs = list(parser.scan_string_simple(text, as_ranges=True))
+    assert len(range_refs) == 4
+
+    ref1, start1, end1 = range_refs[0]
+    assert ref1.format(sbl_style) == "Mark 4:3–9"
+    assert text[start1:end1] == ref1.original_text
+
+    ref2, start2, end2 = range_refs[1]
+    assert ref2.format(sbl_style) == "Mark 4:13–20"
+    assert text[start2:end2] == ref2.original_text
+
+    ref3, start3, end3 = range_refs[2]
+    assert ref3.format(sbl_style) == "Acts 1:8–11"
+    assert text[start3:end3] == ref3.original_text
+
+    ref4, start4, end4 = range_refs[3]
+    assert ref4.format(sbl_style) == "Acts 2:1–4"
+    assert text[start4:end4] == ref4.original_text
+
+
+def test_scan_string_simple_with_noise():
+    """Test scanning text with non-reference content."""
+    # Setup
+    sbl_names = RefStyle(names=RefStyle.standard_names("en-sbl_names"))
+    sbl_abbrevs = RefStyle(names=RefStyle.standard_names("en-sbl_abbreviations"))
+    eng_versification = Versification.standard_versification("eng")
+    parser = RefParser(sbl_names, eng_versification)
+
+    # Test text with references mixed with other content
+    text = """
+    Chapter 1
+    As we read in John 3:16, God loved the world.
+    The price was $3:16 at the store.
+    Romans 8:28 teaches us about God's purpose.
+    """
+
+    # Should only find the valid references
+    refs = list(parser.scan_string_simple(text))
+    assert len(refs) == 2
+
+    ref1, start1, end1 = refs[0]
+    assert ref1.format(sbl_abbrevs) == "John 3:16"
+    assert text[start1:end1] == ref1.original_text
+
+    ref2, start2, end2 = refs[1]
+    assert ref2.format(sbl_abbrevs) == "Rom 8:28"
+    assert text[start2:end2] == ref2.original_text
