@@ -1,5 +1,5 @@
 import pytest
-from versiref import RefParser, RefStyle, Versification
+from versiref import RefParser, RefStyle, Versification, standard_names
 
 
 @pytest.mark.parametrize(
@@ -45,12 +45,12 @@ from versiref import RefParser, RefStyle, Versification
 def test_parse_sbl_and_format_cei(sbl_ref, expected_cei_ref):
     """Test parsing references in SBL style and formatting them in CEI style."""
     # Setup
-    sbl_abbrevs = RefStyle.standard_names("en-sbl_abbreviations")
+    sbl_abbrevs = standard_names("en-sbl_abbreviations")
     sbl_style = RefStyle(
         names=sbl_abbrevs, chapter_verse_separator=":", verse_range_separator=","
     )
 
-    cei_abbrevs = RefStyle.standard_names("it-cei_abbreviazioni")
+    cei_abbrevs = standard_names("it-cei_abbreviazioni")
     cei_style = RefStyle(
         names=cei_abbrevs,
         chapter_verse_separator=",",
@@ -82,7 +82,7 @@ def test_scan_string_simple():
     """Test scanning text for Bible references."""
     # Setup
     sbl_style = RefStyle(
-        names=RefStyle.standard_names("en-sbl_abbreviations"),
+        names=standard_names("en-sbl_abbreviations"),
         chapter_verse_separator=":",
         verse_range_separator=",",
     )
@@ -113,7 +113,7 @@ def test_scan_string_simple_as_ranges():
     """Test scanning text for Bible references split into verse ranges."""
     # Setup
     sbl_style = RefStyle(
-        names=RefStyle.standard_names("en-sbl_abbreviations"),
+        names=standard_names("en-sbl_abbreviations"),
         chapter_verse_separator=":",
         verse_range_separator=",",
     )
@@ -147,8 +147,8 @@ def test_scan_string_simple_as_ranges():
 def test_scan_string_simple_with_noise():
     """Test scanning text with non-reference content."""
     # Setup
-    sbl_names = RefStyle(names=RefStyle.standard_names("en-sbl_names"))
-    sbl_abbrevs = RefStyle(names=RefStyle.standard_names("en-sbl_abbreviations"))
+    sbl_names = RefStyle(names=standard_names("en-sbl_names"))
+    sbl_abbrevs = RefStyle(names=standard_names("en-sbl_abbreviations"))
     eng_versification = Versification.standard_versification("eng")
     parser = RefParser(sbl_names, eng_versification)
 

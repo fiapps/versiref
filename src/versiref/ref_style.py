@@ -82,7 +82,7 @@ class RefStyle:
             "en-sbl_abbreviations".
         """
         if isinstance(names, str):
-            names = _invert(self.standard_names(names) or {})
+            names = _invert(standard_names(names))
         self.recognized_names.update(
             {
                 name: id
@@ -91,36 +91,37 @@ class RefStyle:
             }
         )
 
-    @staticmethod
-    def standard_names(identifier: str) -> Optional[Dict[str, str]]:
-        """
-        Load and return a standard set of book names.
+def standard_names(identifier: str) -> Dict[str, str]:
+    """
+    Load and return a standard set of book names.
 
-        These can be passed to RefStyle(). Since the return value has been created
-        by loading a JSON file, it can be modified to customize the
-        abbreviations (e.g, names["SNG"] = "Cant") without fear of changing the
-        set of names for other callers.
+    These can be passed to RefStyle(). Since the return value is freshly
+    created, it can be modified to customize the abbreviations (e.g,
+    names["SNG"] = "Cant") without fear of changing the set of names for other
+    callers.
 
-        Args:
-            identifier: The identifier for the names file, e.g.,
-            "en-sbl_abbreviations"
+    Args:
+        identifier: The identifier for the names file, e.g.,
+        "en-sbl_abbreviations"
 
-        Returns:
-            A dictionary mapping book IDs to names or abbreviations, or None if
-            the file doesn't exist or has an invalid format.
-        """
-        try:
-            # Use importlib.resources to find the file
-            with resources.open_text(
-                "versiref.data.book_names", f"{identifier}.json"
-            ) as f:
-                data = json.load(f)
-            if not isinstance(data, dict):
-                return None
-            if not all(
-                isinstance(k, str) and isinstance(v, str) for k, v in data.items()
-            ):
-                return None
-            return data
-        except (FileNotFoundError, ModuleNotFoundError, json.JSONDecodeError):
-            return None
+    Returns:
+        A dictionary mapping book IDs to names or abbreviations.
+
+    Raises:
+        FileNotFoundError: If the names file doesn't exist
+        json.JSONDecodeError: if the file contains invalid JSON
+        ValueError: If the JSON is not in the expected format
+        The latter two represent internal errors in the package.
+    """
+    # Use importlib.resources to find the file
+    with resources.open_text(
+        "versiref.data.book_names", f"{identifier}.json"
+    ) as f:
+        data = json.load(f)
+    if not isinstance(data, dict):
+        raise ValueError(f"Invalid format in {identifier}.json: not a dictionary")
+    if not all(
+        isinstance(k, str) and isinstance(v, str) for k, v in data.items()
+    ):
+        raise ValueError(f"Invalid format in {identifier}.json: all keys and values must be strings")
+    return data

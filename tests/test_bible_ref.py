@@ -4,7 +4,7 @@ Tests for the bible_ref module.
 
 import pytest
 from versiref.bible_ref import SimpleBibleRef, VerseRange
-from versiref.ref_style import RefStyle
+from versiref.ref_style import RefStyle, standard_names
 from versiref.versification import Versification
 
 
@@ -254,7 +254,7 @@ def test_simple_bible_ref_is_whole_chapters():
 def test_format_simple_reference():
     """Test formatting a simple Bible reference."""
     # Create a style
-    names = RefStyle.standard_names("en-sbl_abbreviations")
+    names = standard_names("en-sbl_abbreviations")
     style = RefStyle(names=names)
 
     # Create a reference for Genesis 1:1-5
@@ -268,7 +268,7 @@ def test_format_simple_reference():
 def test_format_whole_book():
     """Test formatting a whole book reference."""
     # Create a style
-    names = RefStyle.standard_names("en-sbl_abbreviations")
+    names = standard_names("en-sbl_abbreviations")
     style = RefStyle(names=names)
 
     # Create a whole book reference
@@ -282,7 +282,7 @@ def test_format_whole_book():
 def test_format_multiple_ranges():
     """Test formatting a reference with multiple verse ranges."""
     # Create a style
-    names = RefStyle.standard_names("en-sbl_abbreviations")
+    names = standard_names("en-sbl_abbreviations")
     style = RefStyle(names=names)
 
     # Create a reference for John 3:16, 18-20
@@ -312,7 +312,7 @@ def test_format_multiple_ranges():
 def test_format_multiple_chapters():
     """Test formatting a reference spanning multiple chapters."""
     # Create a style
-    names = RefStyle.standard_names("en-sbl_abbreviations")
+    names = standard_names("en-sbl_abbreviations")
     style = RefStyle(names=names)
 
     # Create a reference for Romans 1:18-32; 2:1-5
@@ -342,7 +342,7 @@ def test_format_multiple_chapters():
 def test_format_with_subverses():
     """Test formatting a reference with subverses."""
     # Create a style
-    names = RefStyle.standard_names("en-sbl_abbreviations")
+    names = standard_names("en-sbl_abbreviations")
     style = RefStyle(names=names)
 
     # Create a reference for Mark 5:3b-5a
@@ -358,7 +358,7 @@ def test_format_with_subverses():
 def test_format_cross_chapter_range():
     """Test formatting a reference that spans across chapters."""
     # Create a style
-    names = RefStyle.standard_names("en-sbl_abbreviations")
+    names = standard_names("en-sbl_abbreviations")
     style = RefStyle(names=names)
 
     # Create a reference for John 7:53-8:11 (the pericope adulterae)
@@ -372,7 +372,7 @@ def test_format_cross_chapter_range():
 def test_format_whole_chapter_range():
     """Test formatting a reference that spans multiple whole chapters."""
     # Create a style
-    names = RefStyle.standard_names("en-sbl_abbreviations")
+    names = standard_names("en-sbl_abbreviations")
     style = RefStyle(names=names)
 
     # Create a reference for Isaiah 1-39
@@ -386,7 +386,7 @@ def test_format_whole_chapter_range():
 def test_format_ff_reference():
     """Test formatting a reference with 'ff' notation."""
     # Create a style
-    names = RefStyle.standard_names("en-sbl_abbreviations")
+    names = standard_names("en-sbl_abbreviations")
     style = RefStyle(names=names)
 
     # Create a reference for Philippians 2:5ff
@@ -437,7 +437,7 @@ def test_format_with_custom_style():
 def test_format_unknown_book():
     """Test formatting with an unknown book ID."""
     # Create a style
-    names = RefStyle.standard_names("en-sbl_abbreviations")
+    names = standard_names("en-sbl_abbreviations")
     style = RefStyle(names=names)
 
     # Create a reference with an unknown book ID
@@ -451,7 +451,7 @@ def test_format_unknown_book():
 def test_format_single_chapter_book_with_versification():
     """Test formatting a reference to a single-chapter book with versification."""
     # Create a style
-    names = RefStyle.standard_names("en-sbl_abbreviations")
+    names = standard_names("en-sbl_abbreviations")
     style = RefStyle(names=names)
 
     # Create a versification where Philemon (PHM) is a single-chapter book
@@ -472,7 +472,7 @@ def test_format_single_chapter_book_with_versification():
 def test_format_single_chapter_book_verse_range():
     """Test formatting a verse range in a single-chapter book."""
     # Create a style
-    names = RefStyle.standard_names("en-sbl_abbreviations")
+    names = standard_names("en-sbl_abbreviations")
     style = RefStyle(names=names)
 
     # Create a versification
