@@ -23,6 +23,10 @@ packages = ["src/versiref"]
 
 [tool.mypy]
 strict = true
+exclude = [
+    'test_.*\.py',
+    'build',
+]
 
 [dependency-groups]
 dev = [
