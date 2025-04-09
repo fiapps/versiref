@@ -8,7 +8,7 @@ are converted to and from strings.
 import json
 from dataclasses import dataclass, field
 from importlib import resources
-from typing import Dict, Optional
+from typing import Dict, Optional, Union
 
 
 def _invert(d: Dict[str, str]) -> Dict[str, str]:
@@ -69,6 +69,27 @@ class RefStyle:
         """
         if not self.recognized_names:
             self.recognized_names = _invert(self.names)
+
+    def also_recognize(self, names: Union[Dict[str, str], str]) -> None:
+        """
+        Add a set of book names to the recognized_names mapping.
+
+        In the event of a conflict, the existing name will be preferred.
+
+        Args:
+            names: Either dictionary mapping names or abbreviations to book IDs
+            or a string that names a standard set of names, e.g.,
+            "en-sbl_abbreviations".
+        """
+        if isinstance(names, str):
+            names = _invert(self.standard_names(names) or {})
+        self.recognized_names.update(
+            {
+                name: id
+                for name, id in names.items()
+                if name not in self.recognized_names
+            }
+        )
 
     @staticmethod
     def standard_names(identifier: str) -> Optional[Dict[str, str]]:
