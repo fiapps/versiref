@@ -11,6 +11,26 @@ from importlib import resources
 from typing import Dict, Optional
 
 
+def _invert(d: Dict[str, str]) -> Dict[str, str]:
+    """Invert an ID->name dictionary, resolving conflicts if possible.
+
+    In the event of a PSA/PSAS conflict or a EST/ESG conflict, the former of the
+    pair is preferred. Any other conflict will raise a ValueError.
+    """
+    inverted: Dict[str, str] = {}
+    for k, v in d.items():
+        if v in inverted:
+            if inverted[v] == "PSA" or inverted[v] == "PSAS":
+                inverted[v] = "PSA"
+            elif inverted[v] == "EST" or inverted[v] == "ESG":
+                inverted[v] = "EST"
+            else:
+                raise ValueError(f"Both {inverted[v]} and {k} are abbreviated as {v}.")
+        else:
+            inverted[v] = k
+    return inverted
+
+
 @dataclass
 class RefStyle:
     """
@@ -48,10 +68,7 @@ class RefStyle:
         parsing of the same abbreviations used for formatting.
         """
         if not self.recognized_names:
-            # Create inverse mapping of names by default
-            self.recognized_names = {
-                name: book_id for book_id, name in self.names.items()
-            }
+            self.recognized_names = _invert(self.names)
 
     @staticmethod
     def standard_names(identifier: str) -> Optional[Dict[str, str]]:
