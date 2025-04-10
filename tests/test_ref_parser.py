@@ -15,7 +15,7 @@ def test_parse_simple_verse():
     style = RefStyle(names=names)
 
     # Create a versification
-    versification = Versification.standard_versification("eng")
+    versification = Versification.standard("eng")
 
     # Create a parser
     parser = RefParser(style, versification)
@@ -42,7 +42,7 @@ def test_parse_verse_with_subverse():
     style = RefStyle(names=names)
 
     # Create a versification
-    versification = Versification.standard_versification("eng")
+    versification = Versification.standard("eng")
 
     # Create a parser
     parser = RefParser(style, versification)
@@ -69,7 +69,7 @@ def test_parse_single_chapter_book():
     style = RefStyle(names=names)
 
     # Create a versification with Jude as a single-chapter book
-    versification = Versification.standard_versification("eng")
+    versification = Versification.standard("eng")
 
     # Create a parser
     parser = RefParser(style, versification)
@@ -94,7 +94,7 @@ def test_parse_nonexistent_reference():
     style = RefStyle(names=names)
 
     # Create a versification
-    versification = Versification.standard_versification("eng")
+    versification = Versification.standard("eng")
 
     # Create a parser
     parser = RefParser(style, versification)
@@ -112,7 +112,7 @@ def test_parse_book_with_space():
     style = RefStyle(names=names)
 
     # Create a versification
-    versification = Versification.standard_versification("eng")
+    versification = Versification.standard("eng")
 
     # Create a parser
     parser = RefParser(style, versification)
@@ -135,7 +135,7 @@ def test_parse_multi_chapter_book_with_space():
     style = RefStyle(names=names)
 
     # Create a versification
-    versification = Versification.standard_versification("eng")
+    versification = Versification.standard("eng")
 
     # Create a parser
     parser = RefParser(style, versification)

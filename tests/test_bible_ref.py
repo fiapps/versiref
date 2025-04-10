@@ -165,7 +165,7 @@ def test_simple_bible_ref_for_range():
 def test_simple_bible_ref_is_valid():
     """Test the is_valid method of SimpleBibleRef."""
     # Create a versification
-    versification = Versification.standard_versification("eng")
+    versification = Versification.standard("eng")
 
     # Valid whole book reference
     ref = SimpleBibleRef("GEN")
@@ -455,7 +455,7 @@ def test_format_single_chapter_book_with_versification():
     style = RefStyle(names=names)
 
     # Create a versification where Philemon (PHM) is a single-chapter book
-    versification = Versification.standard_versification("eng")
+    versification = Versification.standard("eng")
 
     # Create a reference for Philemon 6
     ref = SimpleBibleRef.for_range("PHM", 1, 6)
@@ -476,7 +476,7 @@ def test_format_single_chapter_book_verse_range():
     style = RefStyle(names=names)
 
     # Create a versification
-    versification = Versification.standard_versification("eng")
+    versification = Versification.standard("eng")
 
     # Create a reference for Jude 3-5
     ref = SimpleBibleRef.for_range("JUD", 1, 3, end_verse=5)

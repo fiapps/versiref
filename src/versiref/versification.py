@@ -27,7 +27,7 @@ class Versification:
         Args:
             file_path: path to a JSON file containing an object with maxVerses
             identifier: identifier to store in the constructed Versififaction
-        Throws:
+        Raises:
             FileNotFoundError: file_path does not exist
             json.JSONDecodeError: file_path is not well-formed JSON
             ValueError: file_path does not match schema
@@ -43,23 +43,27 @@ class Versification:
                 max_verses[book] = [int(v) for v in verses]
             return cls(max_verses, identifier)
         else:
-            # Is there a better way to report a malformed JSON file?
-            raise ValueError()
+            raise ValueError("Versification file does not match schema")
 
     @classmethod
-    def standard_versification(cls, identifier: str) -> Optional["Versification"]:
+    def standard(cls, identifier: str) -> "Versification":
         """
         Create an instance of a standard versification.
 
-        Constructs an instance by loading JSON data or returns None if the
-        identifier is unknown.
+        Constructs an instance by loading JSON data from the package's data
+        directory.
+
         Args:
             identifier: Standard versification identifier (e.g., "org", "eng",
             "LXX", "Vulgata")
                 This is converted to lowercase to find the file to load.
-
-        Standard versifications are loaded from JSON files in the package's data
-        directory.
+        Raises:
+            FileNotFoundError: If the names file doesn't exist
+            json.JSONDecodeError: if the file contains invalid JSON ValueError:
+            If the JSON is not in the expected format The latter two represent
+            internal errors in the package.
+        Returns:
+            A newly constructed Versification
         """
         filename = f"{identifier.lower()}.json"
 
@@ -67,7 +71,7 @@ class Versification:
         if path.is_file():
             return cls.from_file(str(path), identifier)
         else:
-            return None
+            raise FileNotFoundError(f"Unknown versification identifier: {identifier}")
 
     def includes(self, book_id: str) -> bool:
         """

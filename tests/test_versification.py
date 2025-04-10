@@ -12,7 +12,7 @@ def test_empty_versification():
 
 def test_standard_versification_eng():
     """Test loading the English standard versification."""
-    v = Versification.standard_versification("eng")
+    v = Versification.standard("eng")
     assert v is not None
     assert v.identifier == "eng"
 
@@ -25,20 +25,20 @@ def test_standard_versification_eng():
 
 
 def test_nonexistent_standard_versification():
-    """Test that requesting a nonexistent versification returns None."""
-    v = Versification.standard_versification("nonexistent")
-    assert v is None
+    """Test that requesting a nonexistent versification raises FileNotFoundError."""
+    with pytest.raises(FileNotFoundError):
+        Versification.standard("nonexistent")
 
 
 def test_last_verse_nonexistent_book():
     """Test that requesting a nonexistent book returns -1."""
-    v = Versification.standard_versification("eng")
+    v = Versification.standard("eng")
     assert v.last_verse("XYZ", 1) == -1
 
 
 def test_last_verse_nonexistent_chapter():
     """Test that requesting a nonexistent chapter returns -1."""
-    v = Versification.standard_versification("eng")
+    v = Versification.standard("eng")
     assert v.last_verse("GEN", 100) == -1
     assert v.last_verse("GEN", -1) == -1
 
@@ -58,9 +58,9 @@ def test_from_file():
 
 def test_multiple_versifications():
     """Test loading and comparing multiple versifications."""
-    eng = Versification.standard_versification("eng")
-    lxx = Versification.standard_versification("lxx")
-    vul = Versification.standard_versification("vulgata")
+    eng = Versification.standard("eng")
+    lxx = Versification.standard("lxx")
+    vul = Versification.standard("vulgata")
 
     assert eng is not None
     assert lxx is not None
@@ -78,7 +78,7 @@ def test_multiple_versifications():
 
 def test_is_single_chapter():
     """Test ."""
-    v = Versification.standard_versification("eng")
+    v = Versification.standard("eng")
     assert v.is_single_chapter("GEN") is False
     assert v.is_single_chapter("PSAS") is False
     assert v.is_single_chapter("2JN") is True
@@ -86,7 +86,7 @@ def test_is_single_chapter():
 
 def test_includes():
     """Test checking if a book is included in the versification."""
-    v = Versification.standard_versification("eng")
+    v = Versification.standard("eng")
     assert v.includes("GEN") is True
     assert v.includes("PSA") is True
     assert v.includes("PSAS") is True

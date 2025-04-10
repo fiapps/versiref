@@ -60,7 +60,7 @@ def test_parse_sbl_and_format_cei(sbl_ref, expected_cei_ref):
         verse_range_separator=".",
     )
 
-    eng_versification = Versification.standard_versification("eng")
+    eng_versification = Versification.standard("eng")
 
     # Create parser with SBL style
     parser = RefParser(sbl_style, eng_versification)
@@ -86,7 +86,7 @@ def test_scan_string_simple():
         chapter_verse_separator=":",
         verse_range_separator=",",
     )
-    eng_versification = Versification.standard_versification("eng")
+    eng_versification = Versification.standard("eng")
     parser = RefParser(sbl_style, eng_versification)
 
     # Test text with multiple references
@@ -117,7 +117,7 @@ def test_scan_string_simple_as_ranges():
         chapter_verse_separator=":",
         verse_range_separator=",",
     )
-    eng_versification = Versification.standard_versification("eng")
+    eng_versification = Versification.standard("eng")
     parser = RefParser(sbl_style, eng_versification)
 
     # Test text with references containing multiple ranges
@@ -149,7 +149,7 @@ def test_scan_string_simple_with_noise():
     # Setup
     sbl_names = RefStyle(names=standard_names("en-sbl_names"))
     sbl_abbrevs = RefStyle(names=standard_names("en-sbl_abbreviations"))
-    eng_versification = Versification.standard_versification("eng")
+    eng_versification = Versification.standard("eng")
     parser = RefParser(sbl_names, eng_versification)
 
     # Test text with references mixed with other content
