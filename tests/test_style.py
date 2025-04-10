@@ -1,6 +1,4 @@
-"""
-Tests for the RefStyle class.
-"""
+"""Tests for the RefStyle class."""
 
 import pytest  # noqa: F401
 from versiref.ref_style import RefStyle, standard_names

@@ -27,6 +27,10 @@ exclude = [
     'build',
 ]
 
+[tool.ruff.lint]
+select = ["D"]
+ignore = ["D203", "D213"]
+
 [dependency-groups]
 dev = [
     "mypy>=1.15.0",

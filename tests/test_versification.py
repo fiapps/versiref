@@ -1,3 +1,5 @@
+"""Tests for the Versification class."""
+
 import pytest  # noqa: F401
 from versiref.versification import Versification
 

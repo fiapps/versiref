@@ -1,5 +1,4 @@
-"""
-Bible reference handling for versiref.
+"""Bible reference handling for versiref.
 
 This module provides classes for representing and manipulating Bible references.
 """
@@ -13,8 +12,7 @@ from versiref.versification import Versification
 
 @dataclass
 class VerseRange:
-    """
-    Represents a range of verses within a single book of the Bible.
+    """Represents a range of verses within a single book of the Bible.
 
     A verse range has a start and end point, each defined by chapter, verse, and
     subverse. The original text from which this range was parsed can be stored.
@@ -45,8 +43,7 @@ class VerseRange:
         return self.start_verse < 0 and self.end_verse < 0
 
     def is_valid(self) -> bool:
-        """
-        Check if this verse range has valid values.
+        """Check if this verse range has valid values.
 
         Returns False if any of these conditions are met:
         - start_verse >= 0 and end_verse < 0 (ff notation) but start_chapter != end_chapter
@@ -56,6 +53,7 @@ class VerseRange:
 
         Returns:
             bool: True if the verse range has valid values, False otherwise
+
         """
         # Check for invalid "ff" notation (must be in same chapter)
         if (
@@ -86,8 +84,7 @@ class VerseRange:
 
 @dataclass
 class SimpleBibleRef:
-    """
-    Represents a sequence of verse ranges within a single book of the Bible.
+    """Represents a sequence of verse ranges within a single book of the Bible.
 
     A SimpleBibleRef consists of a book ID (using Paratext three-letter codes)
     and a list of verse ranges. The ranges are not necessarily in numeric order.
@@ -113,8 +110,7 @@ class SimpleBibleRef:
         end_subverse: str = "",
         original_text: Optional[str] = None,
     ) -> "SimpleBibleRef":
-        """
-        Create a SimpleBibleRef with a single VerseRange.
+        """Create a SimpleBibleRef with a single VerseRange.
 
         Args:
             book_id: The book ID (e.g., "JHN" for John)
@@ -128,6 +124,7 @@ class SimpleBibleRef:
 
         Returns:
             A SimpleBibleRef instance with a single VerseRange
+
         """
         # If end_chapter is not specified, use the start chapter
         if end_chapter is None:
@@ -150,8 +147,7 @@ class SimpleBibleRef:
         return cls(book_id=book_id, ranges=[verse_range], original_text=original_text)
 
     def is_whole_book(self) -> bool:
-        """
-        Return True if this reference refers to the entire book.
+        """Return True if this reference refers to the entire book.
 
         Note that this regards the form of the reference rather than its
         content. So it returns True for John but False for John 1–21.
@@ -159,8 +155,7 @@ class SimpleBibleRef:
         return len(self.ranges) == 0
 
     def is_whole_chapters(self) -> bool:
-        """
-        Return True if this reference does not specify verse limits.
+        """Return True if this reference does not specify verse limits.
 
         Note that this regards the form of the reference rather than its
         content. So it returns true for John and John 6 but False for John
@@ -172,14 +167,14 @@ class SimpleBibleRef:
         return True
 
     def is_valid(self, versification: Versification) -> bool:
-        """
-        Check if this Bible reference is valid according to the given versification.
+        """Check if this Bible reference is valid according to the given versification.
 
         Args:
             versification: The Versification to check against
 
         Returns:
             bool: True if the reference is valid, False otherwise
+
         """
         # Check if the book ID is included in the versification
         if not versification.includes(self.book_id):
@@ -214,8 +209,7 @@ class SimpleBibleRef:
         return True
 
     def ranges_iter(self) -> Generator["SimpleBibleRef", None, None]:
-        """
-        Generator that yields a new SimpleBibleRef for each verse range.
+        """Yield a new SimpleBibleRef for each verse range.
 
         Each yielded SimpleBibleRef contains only one verse range from this reference.
         The book ID is preserved, and the original text for each new instance comes
@@ -223,6 +217,7 @@ class SimpleBibleRef:
 
         Yields:
             SimpleBibleRef: A new reference containing a single verse range
+
         """
         for verse_range in self.ranges:
             yield SimpleBibleRef(
@@ -234,8 +229,7 @@ class SimpleBibleRef:
     def format(
         self, style: RefStyle, versification: Optional[Versification] = None
     ) -> str:
-        """
-        Format this Bible reference as a string according to the given style.
+        """Format this Bible reference as a string according to the given style.
 
         Args:
             style: The RefStyle to use for formatting
@@ -245,6 +239,7 @@ class SimpleBibleRef:
 
         Returns:
             A formatted string representation of this Bible reference
+
         """
         # Get the book name according to the style
         if self.book_id not in style.names:

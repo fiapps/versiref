@@ -1,3 +1,5 @@
+"""Versification class for handling Bible chapter and verse divisions."""
+
 import json
 from dataclasses import dataclass, field
 from importlib import resources
@@ -6,8 +8,7 @@ from typing import Dict, List, Optional
 
 @dataclass
 class Versification:
-    """
-    Represents a way of dividing the text of the Bible into chapters and verses.
+    """Represents a way of dividing the text of the Bible into chapters and verses.
 
     Versifications are defined by JSON data that is loaded from a file when an instance is created.
     The class provides methods to query information about the versification, such as the last verse
@@ -32,6 +33,7 @@ class Versification:
             ValueError: file_path does not match schema
         Returns:
             Newly constructed Versification
+
         """
         with open(file_path, "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -46,8 +48,7 @@ class Versification:
 
     @classmethod
     def standard(cls, identifier: str) -> "Versification":
-        """
-        Create an instance of a standard versification.
+        """Create an instance of a standard versification.
 
         Constructs an instance by loading JSON data from the package's data
         directory.
@@ -56,13 +57,15 @@ class Versification:
             identifier: Standard versification identifier (e.g., "org", "eng",
             "LXX", "Vulgata")
                 This is converted to lowercase to find the file to load.
+
         Raises:
             FileNotFoundError: If the names file doesn't exist
-            json.JSONDecodeError: if the file contains invalid JSON ValueError:
-            If the JSON is not in the expected format The latter two represent
-            internal errors in the package.
+            json.JSONDecodeError: if the file contains invalid JSON ValueError: If the JSON is not in the expected format
+            The latter two represent internal errors in the package.
+
         Returns:
             A newly constructed Versification
+
         """
         filename = f"{identifier.lower()}.json"
 
@@ -73,28 +76,28 @@ class Versification:
             raise FileNotFoundError(f"Unknown versification identifier: {identifier}")
 
     def includes(self, book_id: str) -> bool:
-        """
-        Check if the given book ID is included in this versification.
+        """Check if the given book ID is included in this versification.
 
         Args:
             book_id: The book ID (using Paratext three-letter codes)
 
         Returns:
             True if the book is included in this versification, False otherwise.
+
         """
         if book_id == "PSAS":  # Plural form of PSA
             book_id = "PSA"
         return book_id in self.max_verses
 
     def is_single_chapter(self, book: str) -> bool:
-        """
-        Check if the given book is a single-chapter book.
+        """Check if the given book is a single-chapter book.
 
         Args:
             book: The book ID (using Paratext three-letter codes)
 
         Returns:
             True if the book has only one chapter, False otherwise.
+
         """
         if book not in self.max_verses:
             return False
@@ -104,8 +107,7 @@ class Versification:
         return len(self.max_verses[book]) == 1
 
     def last_verse(self, book: str, chapter: int) -> int:
-        """
-        Return the number of the last verse of the given chapter of the given book.
+        """Return the number of the last verse of the given chapter of the given book.
 
         Args:
             book: The book ID (using Paratext three-letter codes)
@@ -113,6 +115,7 @@ class Versification:
 
         Returns:
             The number of the last verse, or -1 if the book or chapter doesn't exist
+
         """
         # Trivial implementation returns 99 for any book and chapter
         if not self.max_verses:

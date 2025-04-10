@@ -1,5 +1,4 @@
-"""
-Bible reference parsing for versiref.
+"""Bible reference parsing for versiref.
 
 This module provides the RefParser class for parsing Bible references from strings.
 
@@ -33,8 +32,7 @@ def _get_str(tokens: pp.ParseResults, name: str, default: str) -> str:
 
 
 class RefParser:
-    """
-    Parser for Bible references.
+    """Parser for Bible references.
 
     RefParser uses pyparsing to build a parser that recognizes Bible references
     according to a given style. It can parse a string to produce a SimpleBibleRef
@@ -44,8 +42,7 @@ class RefParser:
     def __init__(
         self, style: RefStyle, versification: Versification, strict: bool = False
     ):
-        """
-        Initialize a RefParser with a style and versification.
+        """Initialize a RefParser with a style and versification.
 
         Args:
             style: The RefStyle to use for parsing
@@ -54,6 +51,7 @@ class RefParser:
 
         Non-strict parsers currently recognize as range separators hyphens, en
         dashes, and the style's range separator if it differs from these.
+
         """
         self.style = style
         self.versification = versification
@@ -182,14 +180,14 @@ class RefParser:
     def _make_verse_range(
         self, original_text: str, loc: int, tokens: pp.ParseResults
     ) -> VerseRange:
-        """
-        Create a VerseRange from parsed tokens.
+        """Create a VerseRange from parsed tokens.
 
         Chapter numbers that cannot be determined locally are set to -1.
         This is a parse action for use with pyparsing.
 
         Returns:
             A VerseRange instance based on the parsed tokens
+
         """
         start_chapter = _get_int(tokens, "start_chapter", -1)
         start_verse = tokens.start_verse
@@ -239,8 +237,7 @@ class RefParser:
     def _make_chapter_range(
         original_text: str, loc: int, tokens: pp.ParseResults
     ) -> pp.ParseResults:
-        """
-        Set the chapter for the verse ranges.
+        """Set the chapter for the verse ranges.
 
         Here we supply chapter numbers that cannot be determined locally.
         This is a parse action for use with pyparsing.
@@ -271,14 +268,14 @@ class RefParser:
     def _make_sc_verse_range(
         self, original_text: str, loc: int, tokens: pp.ParseResults
     ) -> VerseRange:
-        """
-        Create a VerseRange from parsed tokens.
+        """Create a VerseRange from parsed tokens.
 
         This is for a single-chapter book.
         This is a parse action for use with pyparsing.
 
         Returns:
             A VerseRange instance based on the parsed tokens
+
         """
         start_chapter = 1
         start_verse = tokens.start_verse
@@ -327,13 +324,13 @@ class RefParser:
     def _make_simple_ref(
         original_text: str, loc: int, tokens: pp.ParseResults
     ) -> SimpleBibleRef:
-        """
-        Create a SimpleBibleRef from parsed tokens.
+        """Create a SimpleBibleRef from parsed tokens.
 
         This is a parse action for use with pyparsing.
 
         Returns:
             A SimpleBibleRef instance based on the parsed tokens
+
         """
         # Extract the book ID and verse ranges
         book_name = tokens.book
@@ -363,8 +360,7 @@ class RefParser:
         )
 
     def parse_simple(self, text: str, silent: bool = True) -> Optional[SimpleBibleRef]:
-        """
-        Parse a string to produce a SimpleBibleRef.
+        """Parse a string to produce a SimpleBibleRef.
 
         This method attempts to parse the entire string as a reference to a single book of the Bible.
 
@@ -374,6 +370,7 @@ class RefParser:
 
         Returns:
             A SimpleBibleRef instance, or None if parsing fails
+
         """
         try:
             # Try to parse the text
@@ -391,8 +388,7 @@ class RefParser:
     def scan_string_simple(
         self, text: str, as_ranges: bool = False
     ) -> Generator[Tuple["SimpleBibleRef", int, int], None, None]:
-        """
-        Scan a string for SimpleBibleRefs.
+        """Scan a string for SimpleBibleRefs.
 
         This method scans the entire string for references to a single book of the Bible.
 
@@ -403,6 +399,7 @@ class RefParser:
         Yields:
             A reference and the start and end of its location in text.
             (ref: SimpleBibleRef, start: int, end: int)
+
         """
         for tokens, start, end in self.simple_ref_parser.scan_string(text):
             ref = tokens[0]

@@ -1,5 +1,4 @@
-"""
-RefStyle definitions for Bible reference formatting and parsing.
+"""RefStyle definitions for Bible reference formatting and parsing.
 
 This module provides the RefStyle class which defines how Bible references
 are converted to and from strings.
@@ -33,8 +32,7 @@ def _invert(d: Dict[str, str]) -> Dict[str, str]:
 
 @dataclass
 class RefStyle:
-    """
-    Defines how a SimpleBibleRef is converted to and from strings.
+    """Defines how a SimpleBibleRef is converted to and from strings.
 
     A RefStyle primarily holds data that specifies the formatting conventions
     for Bible references. Formatting and parsing is done by other classes
@@ -49,6 +47,7 @@ class RefStyle:
         verse_range_separator: Separates ranges of verses in a single chapter
         chapter_separator: Separates ranges of verses in different chapters
         recognized_names: Maps abbreviations/names to Bible book IDs for parsing
+
     """
 
     names: Dict[str, str]
@@ -61,8 +60,7 @@ class RefStyle:
     recognized_names: Dict[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        """
-        Initialize recognized_names if not provided.
+        """Initialize recognized_names if not provided.
 
         By default, recognized_names is the inverse of names, allowing
         parsing of the same abbreviations used for formatting.
@@ -71,8 +69,7 @@ class RefStyle:
             self.recognized_names = _invert(self.names)
 
     def also_recognize(self, names: Union[Dict[str, str], str]) -> None:
-        """
-        Add a set of book names to the recognized_names mapping.
+        """Add a set of book names to the recognized_names mapping.
 
         In the event of a conflict, the existing name will be preferred.
 
@@ -80,6 +77,7 @@ class RefStyle:
             names: Either dictionary mapping names or abbreviations to book IDs
             or a string that names a standard set of names, e.g.,
             "en-sbl_abbreviations".
+
         """
         if isinstance(names, str):
             names = _invert(standard_names(names))
@@ -93,8 +91,7 @@ class RefStyle:
 
 
 def standard_names(identifier: str) -> Dict[str, str]:
-    """
-    Load and return a standard set of book names.
+    """Load and return a standard set of book names.
 
     These can be passed to RefStyle(). Since the return value is freshly
     created, it can be modified to customize the abbreviations (e.g,
@@ -113,6 +110,7 @@ def standard_names(identifier: str) -> Dict[str, str]:
         json.JSONDecodeError: if the file contains invalid JSON
         ValueError: If the JSON is not in the expected format
         The latter two represent internal errors in the package.
+
     """
     # Use importlib.resources to find the file
     with resources.open_text("versiref.data.book_names", f"{identifier}.json") as f:

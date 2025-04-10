@@ -1,6 +1,4 @@
-"""
-Tests for the bible_ref module.
-"""
+"""Tests for the bible_ref module."""
 
 import pytest
 from versiref.bible_ref import SimpleBibleRef, VerseRange

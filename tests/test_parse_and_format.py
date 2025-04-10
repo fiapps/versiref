@@ -1,3 +1,5 @@
+"""Test parsing and formatting Bible references."""
+
 import pytest
 from versiref import RefParser, RefStyle, Versification, standard_names
 
