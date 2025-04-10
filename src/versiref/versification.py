@@ -1,5 +1,4 @@
 import json
-import os
 from dataclasses import dataclass, field
 from importlib import resources
 from typing import Dict, List, Optional

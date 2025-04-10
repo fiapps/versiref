@@ -8,7 +8,7 @@ are converted to and from strings.
 import json
 from dataclasses import dataclass, field
 from importlib import resources
-from typing import Dict, Optional, Union
+from typing import Dict, Union
 
 
 def _invert(d: Dict[str, str]) -> Dict[str, str]:
@@ -91,6 +91,7 @@ class RefStyle:
             }
         )
 
+
 def standard_names(identifier: str) -> Dict[str, str]:
     """
     Load and return a standard set of book names.
@@ -114,14 +115,12 @@ def standard_names(identifier: str) -> Dict[str, str]:
         The latter two represent internal errors in the package.
     """
     # Use importlib.resources to find the file
-    with resources.open_text(
-        "versiref.data.book_names", f"{identifier}.json"
-    ) as f:
+    with resources.open_text("versiref.data.book_names", f"{identifier}.json") as f:
         data = json.load(f)
     if not isinstance(data, dict):
         raise ValueError(f"Invalid format in {identifier}.json: not a dictionary")
-    if not all(
-        isinstance(k, str) and isinstance(v, str) for k, v in data.items()
-    ):
-        raise ValueError(f"Invalid format in {identifier}.json: all keys and values must be strings")
+    if not all(isinstance(k, str) and isinstance(v, str) for k, v in data.items()):
+        raise ValueError(
+            f"Invalid format in {identifier}.json: all keys and values must be strings"
+        )
     return data
