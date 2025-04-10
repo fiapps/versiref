@@ -42,7 +42,7 @@ from versiref import RefParser, RefStyle, Versification, standard_names
         ("Eph 2:8ff", "Ef 2,8ss"),
     ],
 )
-def test_parse_sbl_and_format_cei(sbl_ref, expected_cei_ref):
+def test_parse_sbl_and_format_cei(sbl_ref: str, expected_cei_ref: str) -> None:
     """Test parsing references in SBL style and formatting them in CEI style."""
     # Setup
     sbl_abbrevs = standard_names("en-sbl_abbreviations")
@@ -78,7 +78,7 @@ def test_parse_sbl_and_format_cei(sbl_ref, expected_cei_ref):
     assert formatted_ref == expected_cei_ref
 
 
-def test_scan_string_simple():
+def test_scan_string_simple() -> None:
     """Test scanning text for Bible references."""
     # Setup
     sbl_style = RefStyle(
@@ -109,7 +109,7 @@ def test_scan_string_simple():
     assert text[start3:end3] == ref3.original_text
 
 
-def test_scan_string_simple_as_ranges():
+def test_scan_string_simple_as_ranges() -> None:
     """Test scanning text for Bible references split into verse ranges."""
     # Setup
     sbl_style = RefStyle(
@@ -144,7 +144,7 @@ def test_scan_string_simple_as_ranges():
     assert text[start4:end4] == ref4.original_text
 
 
-def test_scan_string_simple_with_noise():
+def test_scan_string_simple_with_noise() -> None:
     """Test scanning text with non-reference content."""
     # Setup
     sbl_names = RefStyle(names=standard_names("en-sbl_names"))

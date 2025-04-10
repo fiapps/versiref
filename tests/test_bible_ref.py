@@ -8,7 +8,7 @@ from versiref.ref_style import RefStyle, standard_names
 from versiref.versification import Versification
 
 
-def test_verse_range_initialization():
+def test_verse_range_initialization() -> None:
     """Test that VerseRange initializes correctly."""
     # Simple case: just a single verse
     vr = VerseRange(3, 16, "", 3, 16, "")
@@ -31,7 +31,7 @@ def test_verse_range_initialization():
     assert vr.original_text == "1:2a-3:4b"
 
 
-def test_verse_range_is_valid():
+def test_verse_range_is_valid() -> None:
     """Test the is_valid method of VerseRange."""
     # Valid ranges
     assert (
@@ -57,7 +57,7 @@ def test_verse_range_is_valid():
     )  # Start chapter > end chapter
 
 
-def test_verse_range_is_valid_with_subverses():
+def test_verse_range_is_valid_with_subverses() -> None:
     """Test the is_valid method with subverses."""
     # Subverses don't affect validity checks
     assert (
@@ -76,7 +76,7 @@ def test_verse_range_is_valid_with_subverses():
     )  # Start verse > end verse
 
 
-def test_simple_bible_ref():
+def test_simple_bible_ref() -> None:
     """Test that SimpleBibleRef initializes correctly."""
     # Reference to entire book
     ref = SimpleBibleRef("JHN")
@@ -111,7 +111,7 @@ def test_simple_bible_ref():
     assert ref.original_text == "Rom."
 
 
-def test_simple_bible_ref_for_range():
+def test_simple_bible_ref_for_range() -> None:
     """Test the for_range class method of SimpleBibleRef."""
     # Basic usage with just book, chapter, and verse
     ref1 = SimpleBibleRef.for_range("JHN", 3, 16)
@@ -162,7 +162,7 @@ def test_simple_bible_ref_for_range():
     assert ref5.ranges[0].original_text == "Psalm 23:1"
 
 
-def test_simple_bible_ref_is_valid():
+def test_simple_bible_ref_is_valid() -> None:
     """Test the is_valid method of SimpleBibleRef."""
     # Create a versification
     versification = Versification.standard("eng")
@@ -214,7 +214,7 @@ def test_simple_bible_ref_is_valid():
     assert ref.is_valid(versification) is False
 
 
-def test_simple_bible_ref_is_whole_chapters():
+def test_simple_bible_ref_is_whole_chapters() -> None:
     """Test the is_whole_chapters method of SimpleBibleRef."""
     # Whole book reference should be considered whole chapters
     ref1 = SimpleBibleRef("JHN")
@@ -251,7 +251,7 @@ def test_simple_bible_ref_is_whole_chapters():
     assert ref7.is_whole_chapters() is False
 
 
-def test_format_simple_reference():
+def test_format_simple_reference() -> None:
     """Test formatting a simple Bible reference."""
     # Create a style
     names = standard_names("en-sbl_abbreviations")
@@ -265,7 +265,7 @@ def test_format_simple_reference():
     assert formatted == "Gen 1:1–5"
 
 
-def test_format_whole_book():
+def test_format_whole_book() -> None:
     """Test formatting a whole book reference."""
     # Create a style
     names = standard_names("en-sbl_abbreviations")
@@ -279,7 +279,7 @@ def test_format_whole_book():
     assert formatted == "Gen"
 
 
-def test_format_multiple_ranges():
+def test_format_multiple_ranges() -> None:
     """Test formatting a reference with multiple verse ranges."""
     # Create a style
     names = standard_names("en-sbl_abbreviations")
@@ -309,7 +309,7 @@ def test_format_multiple_ranges():
     assert formatted == "John 3:16, 18–20"
 
 
-def test_format_multiple_chapters():
+def test_format_multiple_chapters() -> None:
     """Test formatting a reference spanning multiple chapters."""
     # Create a style
     names = standard_names("en-sbl_abbreviations")
@@ -339,7 +339,7 @@ def test_format_multiple_chapters():
     assert formatted == "Rom 1:18–32; 2:1–5"
 
 
-def test_format_with_subverses():
+def test_format_with_subverses() -> None:
     """Test formatting a reference with subverses."""
     # Create a style
     names = standard_names("en-sbl_abbreviations")
@@ -355,7 +355,7 @@ def test_format_with_subverses():
     assert formatted == "Mark 5:3b–5a"
 
 
-def test_format_cross_chapter_range():
+def test_format_cross_chapter_range() -> None:
     """Test formatting a reference that spans across chapters."""
     # Create a style
     names = standard_names("en-sbl_abbreviations")
@@ -369,7 +369,7 @@ def test_format_cross_chapter_range():
     assert formatted == "John 7:53–8:11"
 
 
-def test_format_whole_chapter_range():
+def test_format_whole_chapter_range() -> None:
     """Test formatting a reference that spans multiple whole chapters."""
     # Create a style
     names = standard_names("en-sbl_abbreviations")
@@ -383,7 +383,7 @@ def test_format_whole_chapter_range():
     assert formatted == "Isa 1–39"
 
 
-def test_format_ff_reference():
+def test_format_ff_reference() -> None:
     """Test formatting a reference with 'ff' notation."""
     # Create a style
     names = standard_names("en-sbl_abbreviations")
@@ -398,7 +398,7 @@ def test_format_ff_reference():
     assert formatted == "Phil 2:5ff"
 
 
-def test_format_with_custom_style():
+def test_format_with_custom_style() -> None:
     """Test formatting with a custom style."""
     # Create a custom style
     names = {"GEN": "Genesi", "EXO": "Esodo"}
@@ -434,7 +434,7 @@ def test_format_with_custom_style():
     assert formatted == "Genesi 1, 1-5.8b-10a"
 
 
-def test_format_unknown_book():
+def test_format_unknown_book() -> None:
     """Test formatting with an unknown book ID."""
     # Create a style
     names = standard_names("en-sbl_abbreviations")
@@ -448,7 +448,7 @@ def test_format_unknown_book():
         ref.format(style)
 
 
-def test_format_single_chapter_book_with_versification():
+def test_format_single_chapter_book_with_versification() -> None:
     """Test formatting a reference to a single-chapter book with versification."""
     # Create a style
     names = standard_names("en-sbl_abbreviations")
@@ -469,7 +469,7 @@ def test_format_single_chapter_book_with_versification():
     assert formatted_without_versification == "Phlm 1:6"
 
 
-def test_format_single_chapter_book_verse_range():
+def test_format_single_chapter_book_verse_range() -> None:
     """Test formatting a verse range in a single-chapter book."""
     # Create a style
     names = standard_names("en-sbl_abbreviations")

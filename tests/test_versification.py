@@ -2,7 +2,7 @@ import pytest  # noqa: F401
 from versiref.versification import Versification
 
 
-def test_empty_versification():
+def test_empty_versification() -> None:
     """Test that an empty Versification returns 99 for any book and chapter."""
     v = Versification()
     assert v.last_verse("XYZ", 1) == 99
@@ -10,7 +10,7 @@ def test_empty_versification():
     assert v.last_verse("REV", 0) == 99
 
 
-def test_standard_versification_eng():
+def test_standard_versification_eng() -> None:
     """Test loading the English standard versification."""
     v = Versification.standard("eng")
     assert v is not None
@@ -24,26 +24,26 @@ def test_standard_versification_eng():
     assert v.last_verse("REV", 22) == 21  # Revelation 22 has 21 verses
 
 
-def test_nonexistent_standard_versification():
+def test_nonexistent_standard_versification() -> None:
     """Test that requesting a nonexistent versification raises FileNotFoundError."""
     with pytest.raises(FileNotFoundError):
         Versification.standard("nonexistent")
 
 
-def test_last_verse_nonexistent_book():
+def test_last_verse_nonexistent_book() -> None:
     """Test that requesting a nonexistent book returns -1."""
     v = Versification.standard("eng")
     assert v.last_verse("XYZ", 1) == -1
 
 
-def test_last_verse_nonexistent_chapter():
+def test_last_verse_nonexistent_chapter() -> None:
     """Test that requesting a nonexistent chapter returns -1."""
     v = Versification.standard("eng")
     assert v.last_verse("GEN", 100) == -1
     assert v.last_verse("GEN", -1) == -1
 
 
-def test_from_file():
+def test_from_file() -> None:
     """Test loading a versification from a file."""
     # Get the path to one of the standard versification files
     from importlib import resources
@@ -56,7 +56,7 @@ def test_from_file():
     assert v.last_verse("GEN", 1) == 31
 
 
-def test_multiple_versifications():
+def test_multiple_versifications() -> None:
     """Test loading and comparing multiple versifications."""
     eng = Versification.standard("eng")
     lxx = Versification.standard("lxx")
@@ -76,7 +76,7 @@ def test_multiple_versifications():
     assert isinstance(lxx_psa_9, int)
 
 
-def test_is_single_chapter():
+def test_is_single_chapter() -> None:
     """Test ."""
     v = Versification.standard("eng")
     assert v.is_single_chapter("GEN") is False
@@ -84,7 +84,7 @@ def test_is_single_chapter():
     assert v.is_single_chapter("2JN") is True
 
 
-def test_includes():
+def test_includes() -> None:
     """Test checking if a book is included in the versification."""
     v = Versification.standard("eng")
     assert v.includes("GEN") is True

@@ -8,7 +8,7 @@ from versiref.ref_style import RefStyle, standard_names
 from versiref.versification import Versification
 
 
-def test_parse_simple_verse():
+def test_parse_simple_verse() -> None:
     """Test parsing a simple verse reference."""
     # Create a style
     names = standard_names("en-sbl_abbreviations")
@@ -35,7 +35,7 @@ def test_parse_simple_verse():
     assert ref.ranges[0].original_text == "Gen 1:1"
 
 
-def test_parse_verse_with_subverse():
+def test_parse_verse_with_subverse() -> None:
     """Test parsing a verse reference with a subverse."""
     # Create a style
     names = standard_names("en-sbl_abbreviations")
@@ -62,7 +62,7 @@ def test_parse_verse_with_subverse():
     assert ref.ranges[0].original_text == "John 3:16b"
 
 
-def test_parse_single_chapter_book():
+def test_parse_single_chapter_book() -> None:
     """Test parsing a reference to a verse in a single-chapter book."""
     # Create a style
     names = standard_names("en-sbl_abbreviations")
@@ -87,7 +87,7 @@ def test_parse_single_chapter_book():
     assert ref.ranges[0].original_text == "Jude 5"
 
 
-def test_parse_nonexistent_reference():
+def test_parse_nonexistent_reference() -> None:
     """Test parsing a string that is not a Bible reference."""
     # Create a style
     names = standard_names("en-sbl_abbreviations")
@@ -105,7 +105,7 @@ def test_parse_nonexistent_reference():
     assert ref is None
 
 
-def test_parse_book_with_space():
+def test_parse_book_with_space() -> None:
     """Test parsing a book name that contains a space."""
     # Create a style
     names = standard_names("en-sbl_abbreviations")
@@ -128,7 +128,7 @@ def test_parse_book_with_space():
     assert ref.ranges[0].original_text == "2 John 5"
 
 
-def test_parse_multi_chapter_book_with_space():
+def test_parse_multi_chapter_book_with_space() -> None:
     """Test parsing a multi-chapter book name that contains a space."""
     # Create a style
     names = standard_names("en-sbl_abbreviations")

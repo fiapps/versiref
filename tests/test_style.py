@@ -6,7 +6,7 @@ import pytest  # noqa: F401
 from versiref.ref_style import RefStyle, standard_names
 
 
-def test_standard_names_abbreviations():
+def test_standard_names_abbreviations() -> None:
     """Test loading standard abbreviations."""
     names = standard_names("en-sbl_abbreviations")
     assert names is not None
@@ -15,7 +15,7 @@ def test_standard_names_abbreviations():
     assert names["2MA"] == "2 Macc"
 
 
-def test_standard_names_full_names():
+def test_standard_names_full_names() -> None:
     """Test loading standard full names."""
     names = standard_names("en-sbl_names")
     assert names is not None
@@ -24,13 +24,13 @@ def test_standard_names_full_names():
     assert names["2TI"] == "2 Timothy"
 
 
-def test_standard_names_nonexistent():
+def test_standard_names_nonexistent() -> None:
     """Test that loading a nonexistent names file raises ValueError."""
     with pytest.raises(FileNotFoundError):
         standard_names("nonexistent-file")
 
 
-def test_style_initialization():
+def test_style_initialization() -> None:
     """Test that a RefStyle can be initialized with standard names."""
     names = standard_names("en-sbl_abbreviations")
     style = RefStyle(names=names)
