@@ -208,7 +208,7 @@ class SimpleBibleRef:
 
         return True
 
-    def ranges_iter(self) -> Generator["SimpleBibleRef", None, None]:
+    def range_refs(self) -> Generator["SimpleBibleRef", None, None]:
         """Yield a new SimpleBibleRef for each verse range.
 
         Each yielded SimpleBibleRef contains only one verse range from this reference.

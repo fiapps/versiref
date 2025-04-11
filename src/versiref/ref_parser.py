@@ -406,7 +406,7 @@ class RefParser:
             assert isinstance(ref, SimpleBibleRef)
             if as_ranges:
                 next_start = start
-                for range_ref in ref.ranges_iter():
+                for range_ref in ref.range_refs():
                     # Use the original text to find the start and end.
                     assert range_ref.original_text is not None
                     range_start = text.find(range_ref.original_text, next_start)
