@@ -288,3 +288,20 @@ class SimpleBibleRef:
                     result += range.end_subverse
             last_range = range
         return result
+
+    def resolve_following_verses(self, versification: Versification) -> None:
+        """Resolve following verses in the verse ranges.
+
+        This gives a definite end to ranges that use "ff" notation, namely, the
+        last verse of the chapter.
+
+        Args:
+            versification: The Versification to use for resolving following
+            verses
+
+        """
+        for range in self.ranges:
+            if range.start_verse >= 0 and range.end_verse < 0:
+                range.end_verse = versification.last_verse(
+                    self.book_id, range.end_chapter
+                )

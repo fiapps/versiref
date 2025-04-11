@@ -482,3 +482,35 @@ def test_format_single_chapter_book_verse_range() -> None:
     # Format with versification
     formatted = ref.format(style, versification)
     assert formatted == "Jude 3–5"
+
+
+def test_resolve_following_verses() -> None:
+    """Test resolving ff ranges to definite references."""
+    # Create a style and versification.
+    names = standard_names("en-sbl_abbreviations")
+    style = RefStyle(names=names)
+    versification = Versification.standard("eng")
+
+    ref1 = SimpleBibleRef.for_range("MAT", 12, 46, end_verse=-1)
+    ref1.resolve_following_verses(versification)
+    assert ref1.format(style, versification) == "Matt 12:46–50"
+
+    vr1 = VerseRange(
+        start_chapter=8,
+        start_verse=48,
+        start_subverse="",
+        end_chapter=8,
+        end_verse=-1,
+        end_subverse="",
+    )
+    vr2 = VerseRange(
+        start_chapter=10,
+        start_verse=22,
+        start_subverse="",
+        end_chapter=10,
+        end_verse=-1,
+        end_subverse="",
+    )
+    ref2 = SimpleBibleRef("JHN", [vr1, vr2])
+    ref2.resolve_following_verses(versification)
+    assert ref2.format(style, versification) == "John 8:48–59; 10:22–42"
