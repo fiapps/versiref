@@ -115,36 +115,40 @@ def test_scan_string_simple() -> None:
 def test_scan_string_simple_as_ranges() -> None:
     """Test scanning text for Bible references split into verse ranges."""
     # Setup
-    sbl_style = RefStyle(
-        names=standard_names("en-sbl_abbreviations"),
-        chapter_verse_separator=":",
-        verse_range_separator=",",
-    )
+    sbl_style = RefStyle(names=standard_names("en-sbl_abbreviations"))
     eng_versification = Versification.standard("eng")
     parser = RefParser(sbl_style, eng_versification)
 
     # Test text with references containing multiple ranges
-    text = "See Mark 4:3–9,13–20 and Acts 1:8–11; 2:1–4"
+    text = "See Luke 1:53,79 and Pss 2:1–3, 7–9; 110:1, 5–7"
 
     # Test scanning with as_ranges=True
     range_refs = list(parser.scan_string_simple(text, as_ranges=True))
-    assert len(range_refs) == 4
+    assert len(range_refs) == 6
 
     ref1, start1, end1 = range_refs[0]
-    assert ref1.format(sbl_style) == "Mark 4:3–9"
+    assert ref1.format(sbl_style) == "Luke 1:53"
     assert text[start1:end1] == ref1.original_text
 
     ref2, start2, end2 = range_refs[1]
-    assert ref2.format(sbl_style) == "Mark 4:13–20"
+    assert ref2.format(sbl_style) == "Luke 1:79"
     assert text[start2:end2] == ref2.original_text
 
     ref3, start3, end3 = range_refs[2]
-    assert ref3.format(sbl_style) == "Acts 1:8–11"
+    assert ref3.format(sbl_style) == "Ps 2:1–3"
     assert text[start3:end3] == ref3.original_text
 
     ref4, start4, end4 = range_refs[3]
-    assert ref4.format(sbl_style) == "Acts 2:1–4"
+    assert ref4.format(sbl_style) == "Ps 2:7–9"
     assert text[start4:end4] == ref4.original_text
+
+    ref5, start5, end5 = range_refs[4]
+    assert ref5.format(sbl_style) == "Ps 110:1"
+    assert text[start5:end5] == ref5.original_text
+
+    ref6, start6, end6 = range_refs[5]
+    assert ref6.format(sbl_style) == "Ps 110:5–7"
+    assert text[start6:end6] == ref6.original_text
 
 
 def test_scan_string_simple_with_noise() -> None:

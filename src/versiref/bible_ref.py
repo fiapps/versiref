@@ -221,7 +221,7 @@ class SimpleBibleRef:
         """
         for verse_range in self.ranges:
             yield SimpleBibleRef(
-                book_id=self.book_id,
+                book_id=self.book_id if self.book_id != "PSAS" else "PSA",
                 ranges=[verse_range],
                 original_text=verse_range.original_text,
             )
