@@ -1,7 +1,8 @@
 """Test parsing and formatting Bible references."""
 
 import pytest
-from versiref import RefParser, RefStyle, Versification, standard_names
+from typing import Optional
+from versiref import RefParser, RefStyle, SimpleBibleRef, Versification, standard_names
 
 
 @pytest.mark.parametrize(
@@ -173,3 +174,49 @@ def test_scan_string_simple_with_noise() -> None:
     ref2, start2, end2 = refs[1]
     assert ref2.format(sbl_abbrevs) == "Rom 8:28"
     assert text[start2:end2] == ref2.original_text
+
+
+def test_sub_refs_simple_normalize() -> None:
+    """Test using sub_refs_simple to normalize references to SBL style."""
+    # Setup - create a style that recognizes multiple formats
+    sbl_style = RefStyle(names=standard_names("en-sbl_abbreviations"))
+    # Add alternative names
+    sbl_style.also_recognize("en-cmos_short")
+    sbl_style.also_recognize("en-cmos_long")
+
+    eng_versification = Versification.standard("eng")
+    parser = RefParser(sbl_style, eng_versification)
+
+    # Test text with inconsistently formatted references
+    text = (
+        "Let us strive to embody Christ’s teaching on loving our neighbors "
+        "(Jn 15:12), recognizing His boundless mercy as described in Ps "
+        "103:8.  May we find solace knowing that “God so loved the world” "
+        "(Jn 3:16) and trust in His providence, echoing the words of "
+        "Jeremiah (Jer. 29:11). Remembering St. Paul’s exhortation to live "
+        "worthy of our calling (Eph 4:1), let us embrace faith as a shield "
+        "(1 Pet 5:7) and seek wisdom from Proverbs (Prv 3:5-6). Finally, "
+        "may we always remember the promise found in Revelation (Rev 21:4): "
+        '"He will wipe away every tear."'
+    )
+
+    # Function to format references consistently
+    def normalize_ref(ref: SimpleBibleRef) -> Optional[str]:
+        return ref.format(sbl_style)
+
+    # Normalize all references
+    result = parser.sub_refs_simple(text, normalize_ref)
+
+    expected = (
+        "Let us strive to embody Christ’s teaching on loving our neighbors "
+        "(John 15:12), recognizing His boundless mercy as described in Ps "
+        "103:8.  May we find solace knowing that “God so loved the world” "
+        "(John 3:16) and trust in His providence, echoing the words of "
+        "Jeremiah (Jer 29:11). Remembering St. Paul’s exhortation to live "
+        "worthy of our calling (Eph 4:1), let us embrace faith as a shield "
+        "(1 Pet 5:7) and seek wisdom from Proverbs (Prov 3:5–6). Finally, "
+        "may we always remember the promise found in Revelation (Rev 21:4): "
+        '"He will wipe away every tear."'
+    )
+
+    assert result == expected

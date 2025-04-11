@@ -5,7 +5,7 @@ This module provides the RefParser class for parsing Bible references from strin
 We don't call pp.ParserElement.enablePackrat() because it made parsing slower.
 """
 
-from typing import Generator, Optional, Tuple
+from typing import Callable, Generator, Optional, Tuple
 
 import pyparsing as pp
 from pyparsing import common
@@ -416,3 +416,31 @@ class RefParser:
             else:
                 assert ref.original_text is not None
                 yield (ref, start, start + len(ref.original_text))
+
+    def sub_refs_simple(
+        self, text: str, callback: Callable[[SimpleBibleRef], Optional[str]]
+    ) -> str:
+        """Substitute SimpleBibleRefs in a string.
+
+        This method scans the entire string for references to a single book of the Bible and
+        applies a callback function to each reference.
+
+        Args:
+            text: The string to scan
+            callback: A function that takes a SimpleBibleRef and returns a string or None
+                If None is returned, the reference is not replaced.
+
+        Returns:
+            The modified string
+
+        """
+        result = []
+        last_end = 0
+        for ref, start, end in self.scan_string_simple(text):
+            result.append(text[last_end:start])
+            replacement = callback(ref)
+            if replacement is not None:
+                result.append(replacement)
+                last_end = end
+        result.append(text[last_end:])
+        return "".join(result)
