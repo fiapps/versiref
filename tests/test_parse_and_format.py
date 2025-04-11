@@ -224,3 +224,32 @@ def test_sub_refs_simple_normalize() -> None:
     )
 
     assert result == expected
+
+
+def test_sub_refs_simple_no_change() -> None:
+    """Test using sub_refs_simple callback returning None."""
+    # Setup - create a style that recognizes multiple formats
+    sbl_style = RefStyle(names=standard_names("en-sbl_abbreviations"))
+    # Add alternative names
+    sbl_style.also_recognize("en-cmos_short")
+    sbl_style.also_recognize("en-cmos_long")
+
+    eng_versification = Versification.standard("eng")
+    parser = RefParser(sbl_style, eng_versification)
+
+    # Test text with non-SBL references to convert.
+    text = "See Jn 13:16 and Mk 28:1–15."
+
+    # Function to format references consistently
+    def normalize_ref(ref: SimpleBibleRef) -> Optional[str]:
+        if ref.is_valid(eng_versification):
+            return ref.format(sbl_style)
+        else:
+            return None
+
+    # Normalize all references
+    result = parser.sub_refs_simple(text, normalize_ref)
+
+    expected = "See John 13:16 and Mk 28:1–15."
+
+    assert result == expected
