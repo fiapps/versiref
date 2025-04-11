@@ -418,7 +418,7 @@ class RefParser:
                 yield (ref, start, start + len(ref.original_text))
 
     def sub_refs_simple(
-        self, text: str, callback: Callable[[SimpleBibleRef], Optional[str]]
+        self, text: str, callback: Callable[[SimpleBibleRef], Optional[str]], as_ranges: bool = False
     ) -> str:
         """Substitute SimpleBibleRefs in a string.
 
@@ -436,7 +436,7 @@ class RefParser:
         """
         result = []
         last_end = 0
-        for ref, start, end in self.scan_string_simple(text):
+        for ref, start, end in self.scan_string_simple(text, as_ranges):
             result.append(text[last_end:start])
             replacement = callback(ref)
             if replacement is not None:
