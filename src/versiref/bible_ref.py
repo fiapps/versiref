@@ -313,10 +313,12 @@ class BibleRef:
 
     A BibleRef consists of a list of SimpleBibleRef objects and the Versification
     they use. The versification can be None, though this will not usually be the case.
+    It optionally stores the original text from which this reference was parsed.
     """
 
     simple_refs: List[SimpleBibleRef] = field(default_factory=list)
     versification: Optional[Versification] = None
+    original_text: Optional[str] = None
 
     @classmethod
     def for_range(
@@ -359,7 +361,11 @@ class BibleRef:
             original_text=original_text,
         )
 
-        return cls(simple_refs=[simple_ref], versification=versification)
+        return cls(
+            simple_refs=[simple_ref],
+            versification=versification,
+            original_text=original_text,
+        )
 
     def is_whole_books(self) -> bool:
         """Return True if this reference refers to entire books only.
@@ -401,7 +407,9 @@ class BibleRef:
         for simple_ref in self.simple_refs:
             for range_ref in simple_ref.range_refs():
                 yield BibleRef(
-                    simple_refs=[range_ref], versification=self.versification
+                    simple_refs=[range_ref],
+                    versification=self.versification,
+                    original_text=range_ref.original_text,
                 )
 
     def format(self, style: RefStyle) -> str:
