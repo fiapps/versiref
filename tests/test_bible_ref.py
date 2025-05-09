@@ -603,8 +603,7 @@ def test_bible_ref_is_whole_books() -> None:
     assert ref.is_whole_books() is False
 
     # Only verse references
-    simple_ref = SimpleBibleRef.for_range("JHN", 3, 16)
-    ref = BibleRef(simple_refs=[simple_ref], versification=versification)
+    ref = BibleRef.for_range("JHN", 3, 16, versification=versification)
     assert ref.is_whole_books() is False
 
 
@@ -622,13 +621,11 @@ def test_bible_ref_is_whole_chapters() -> None:
     assert ref.is_whole_chapters() is True
 
     # Chapter reference is whole chapters
-    simple_ref = SimpleBibleRef.for_range("JHN", 6, -1)
-    ref = BibleRef(simple_refs=[simple_ref], versification=versification)
+    ref = BibleRef.for_range("JHN", 6, -1, versification=versification)
     assert ref.is_whole_chapters() is True
 
     # Chapter range is whole chapters
-    simple_ref = SimpleBibleRef.for_range("ISA", 1, -1, end_chapter=39)
-    ref = BibleRef(simple_refs=[simple_ref], versification=versification)
+    ref = BibleRef.for_range("ISA", 1, -1, end_chapter=39, versification=versification)
     assert ref.is_whole_chapters() is True
 
     # Multiple whole chapter references
@@ -644,8 +641,7 @@ def test_bible_ref_is_whole_chapters() -> None:
     assert ref.is_whole_chapters() is False
 
     # Only verse references
-    simple_ref = SimpleBibleRef.for_range("JHN", 3, 16)
-    ref = BibleRef(simple_refs=[simple_ref], versification=versification)
+    ref = BibleRef.for_range("JHN", 3, 16, versification=versification)
     assert ref.is_whole_chapters() is False
 
 
@@ -658,13 +654,13 @@ def test_bible_ref_is_valid() -> None:
     assert ref.is_valid() is True
 
     # Valid reference with versification
-    simple_ref = SimpleBibleRef.for_range("JHN", 3, 16)
-    ref = BibleRef(simple_refs=[simple_ref], versification=versification)
+    ref = BibleRef.for_range("JHN", 3, 16, versification=versification)
     assert ref.is_valid() is True
 
     # Invalid reference with versification
-    simple_ref = SimpleBibleRef.for_range("JHN", 30, 1)  # Chapter 30 doesn't exist
-    ref = BibleRef(simple_refs=[simple_ref], versification=versification)
+    ref = BibleRef.for_range(
+        "JHN", 30, 1, versification=versification
+    )  # Chapter 30 doesn't exist
     assert ref.is_valid() is False
 
     # Multiple valid references
@@ -680,8 +676,7 @@ def test_bible_ref_is_valid() -> None:
     assert ref.is_valid() is False
 
     # Reference without versification
-    simple_ref = SimpleBibleRef.for_range("JHN", 3, 16)
-    ref = BibleRef(simple_refs=[simple_ref], versification=None)
+    ref = BibleRef.for_range("JHN", 3, 16, versification=None)
     assert ref.is_valid() is False
 
 
@@ -694,8 +689,7 @@ def test_bible_ref_range_refs() -> None:
     assert list(ref.range_refs()) == []
 
     # Single reference with single range
-    simple_ref = SimpleBibleRef.for_range("JHN", 3, 16)
-    ref = BibleRef(simple_refs=[simple_ref], versification=versification)
+    ref = BibleRef.for_range("JHN", 3, 16, versification=versification)
     range_refs = list(ref.range_refs())
     assert len(range_refs) == 1
     assert isinstance(range_refs[0], BibleRef)
@@ -746,8 +740,7 @@ def test_bible_ref_format() -> None:
     assert ref.format(style) == ""
 
     # Single reference
-    simple_ref = SimpleBibleRef.for_range("JHN", 3, 16)
-    ref = BibleRef(simple_refs=[simple_ref], versification=versification)
+    ref = BibleRef.for_range("JHN", 3, 16, versification=versification)
     assert ref.format(style) == "John 3:16"
 
     # Multiple references
@@ -757,8 +750,7 @@ def test_bible_ref_format() -> None:
     assert ref.format(style) == "John 3:16; Rom 8:28–39"
 
     # Reference with single-chapter book
-    simple_ref = SimpleBibleRef.for_range("PHM", 1, 6)
-    ref = BibleRef(simple_refs=[simple_ref], versification=versification)
+    ref = BibleRef.for_range("PHM", 1, 6, versification=versification)
     assert ref.format(style) == "Phlm 6"
 
     # Complex reference with multiple ranges
