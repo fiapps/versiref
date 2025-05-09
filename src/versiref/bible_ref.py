@@ -346,6 +346,7 @@ class BibleRef:
 
         Returns:
             A BibleRef instance with a single SimpleBibleRef containing a single VerseRange
+
         """
         simple_ref = SimpleBibleRef.for_range(
             book_id=book_id,
@@ -373,3 +374,46 @@ class BibleRef:
         Returns True iff all contained SimpleBibleRef instances refer to whole chapters.
         """
         return all(ref.is_whole_chapters() for ref in self.simple_refs)
+
+    def is_valid(self) -> bool:
+        """Check if this Bible reference is valid according to its versification.
+
+        An empty BibleRef is vacuously valid.
+
+        Returns:
+            bool: True if the reference is valid, False otherwise
+
+        """
+        if self.versification is None:
+            return False
+        return all(ref.is_valid(self.versification) for ref in self.simple_refs)
+
+    def range_refs(self) -> Generator["BibleRef", None, None]:
+        """Yield a new BibleRef for each verse range across all simple refs.
+
+        Each yielded BibleRef contains a single SimpleBibleRef with a single verse range.
+        The versification is preserved.
+
+        Yields:
+            BibleRef: A new reference containing a single verse range
+
+        """
+        for simple_ref in self.simple_refs:
+            for range_ref in simple_ref.range_refs():
+                yield BibleRef(
+                    simple_refs=[range_ref], versification=self.versification
+                )
+
+    def format(self, style: RefStyle) -> str:
+        """Format this Bible reference as a string according to the given style.
+
+        Args:
+            style: The RefStyle to use for formatting
+
+        Returns:
+            A formatted string representation of this Bible reference
+
+        """
+        return style.chapter_separator.join(
+            [r.format(style, self.versification) for r in self.simple_refs]
+        )

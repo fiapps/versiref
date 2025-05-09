@@ -647,3 +647,135 @@ def test_bible_ref_is_whole_chapters() -> None:
     simple_ref = SimpleBibleRef.for_range("JHN", 3, 16)
     ref = BibleRef(simple_refs=[simple_ref], versification=versification)
     assert ref.is_whole_chapters() is False
+
+
+def test_bible_ref_is_valid() -> None:
+    """Test the is_valid method of BibleRef."""
+    versification = Versification.standard("eng")
+
+    # Empty BibleRef is vacuously valid
+    ref = BibleRef(versification=versification)
+    assert ref.is_valid() is True
+
+    # Valid reference with versification
+    simple_ref = SimpleBibleRef.for_range("JHN", 3, 16)
+    ref = BibleRef(simple_refs=[simple_ref], versification=versification)
+    assert ref.is_valid() is True
+
+    # Invalid reference with versification
+    simple_ref = SimpleBibleRef.for_range("JHN", 30, 1)  # Chapter 30 doesn't exist
+    ref = BibleRef(simple_refs=[simple_ref], versification=versification)
+    assert ref.is_valid() is False
+
+    # Multiple valid references
+    simple_ref1 = SimpleBibleRef.for_range("JHN", 3, 16)
+    simple_ref2 = SimpleBibleRef.for_range("ROM", 8, 28)
+    ref = BibleRef(simple_refs=[simple_ref1, simple_ref2], versification=versification)
+    assert ref.is_valid() is True
+
+    # Mixed valid and invalid references
+    simple_ref1 = SimpleBibleRef.for_range("JHN", 3, 16)
+    simple_ref2 = SimpleBibleRef.for_range("JHN", 30, 1)  # Invalid chapter
+    ref = BibleRef(simple_refs=[simple_ref1, simple_ref2], versification=versification)
+    assert ref.is_valid() is False
+
+    # Reference without versification
+    simple_ref = SimpleBibleRef.for_range("JHN", 3, 16)
+    ref = BibleRef(simple_refs=[simple_ref], versification=None)
+    assert ref.is_valid() is False
+
+
+def test_bible_ref_range_refs() -> None:
+    """Test the range_refs method of BibleRef."""
+    versification = Versification.standard("eng")
+
+    # Empty BibleRef yields nothing
+    ref = BibleRef(versification=versification)
+    assert list(ref.range_refs()) == []
+
+    # Single reference with single range
+    simple_ref = SimpleBibleRef.for_range("JHN", 3, 16)
+    ref = BibleRef(simple_refs=[simple_ref], versification=versification)
+    range_refs = list(ref.range_refs())
+    assert len(range_refs) == 1
+    assert isinstance(range_refs[0], BibleRef)
+    assert range_refs[0].simple_refs[0].book_id == "JHN"
+    assert range_refs[0].simple_refs[0].ranges[0].start_chapter == 3
+    assert range_refs[0].simple_refs[0].ranges[0].start_verse == 16
+    assert range_refs[0].versification is versification
+
+    # Single reference with multiple ranges
+    vr1 = VerseRange(3, 16, "", 3, 16, "")
+    vr2 = VerseRange(3, 18, "", 3, 20, "")
+    simple_ref = SimpleBibleRef("JHN", [vr1, vr2])
+    ref = BibleRef(simple_refs=[simple_ref], versification=versification)
+    range_refs = list(ref.range_refs())
+    assert len(range_refs) == 2
+    assert all(isinstance(r, BibleRef) for r in range_refs)
+    assert range_refs[0].simple_refs[0].book_id == "JHN"
+    assert range_refs[0].simple_refs[0].ranges[0].start_verse == 16
+    assert range_refs[1].simple_refs[0].book_id == "JHN"
+    assert range_refs[1].simple_refs[0].ranges[0].start_verse == 18
+
+    # Multiple references with multiple ranges
+    vr1 = VerseRange(3, 16, "", 3, 16, "")
+    vr2 = VerseRange(3, 18, "", 3, 20, "")
+    simple_ref1 = SimpleBibleRef("JHN", [vr1, vr2])
+    vr3 = VerseRange(8, 28, "", 8, 39, "")
+    simple_ref2 = SimpleBibleRef("ROM", [vr3])
+    ref = BibleRef(simple_refs=[simple_ref1, simple_ref2], versification=versification)
+    range_refs = list(ref.range_refs())
+    assert len(range_refs) == 3
+    assert all(isinstance(r, BibleRef) for r in range_refs)
+    assert range_refs[0].simple_refs[0].book_id == "JHN"
+    assert range_refs[0].simple_refs[0].ranges[0].start_verse == 16
+    assert range_refs[1].simple_refs[0].book_id == "JHN"
+    assert range_refs[1].simple_refs[0].ranges[0].start_verse == 18
+    assert range_refs[2].simple_refs[0].book_id == "ROM"
+    assert range_refs[2].simple_refs[0].ranges[0].start_verse == 28
+
+
+def test_bible_ref_format() -> None:
+    """Test the format method of BibleRef."""
+    versification = Versification.standard("eng")
+    names = standard_names("en-sbl_abbreviations")
+    style = RefStyle(names=names)
+
+    # Empty BibleRef formats to empty string
+    ref = BibleRef(versification=versification)
+    assert ref.format(style) == ""
+
+    # Single reference
+    simple_ref = SimpleBibleRef.for_range("JHN", 3, 16)
+    ref = BibleRef(simple_refs=[simple_ref], versification=versification)
+    assert ref.format(style) == "John 3:16"
+
+    # Multiple references
+    simple_ref1 = SimpleBibleRef.for_range("JHN", 3, 16)
+    simple_ref2 = SimpleBibleRef.for_range("ROM", 8, 28, end_verse=39)
+    ref = BibleRef(simple_refs=[simple_ref1, simple_ref2], versification=versification)
+    assert ref.format(style) == "John 3:16; Rom 8:28–39"
+
+    # Reference with single-chapter book
+    simple_ref = SimpleBibleRef.for_range("PHM", 1, 6)
+    ref = BibleRef(simple_refs=[simple_ref], versification=versification)
+    assert ref.format(style) == "Phlm 6"
+
+    # Complex reference with multiple ranges
+    vr1 = VerseRange(3, 16, "", 3, 16, "")
+    vr2 = VerseRange(3, 18, "", 3, 20, "")
+    simple_ref1 = SimpleBibleRef("JHN", [vr1, vr2])
+    vr3 = VerseRange(8, 28, "", 8, 39, "")
+    simple_ref2 = SimpleBibleRef("ROM", [vr3])
+    ref = BibleRef(simple_refs=[simple_ref1, simple_ref2], versification=versification)
+    assert ref.format(style) == "John 3:16, 18–20; Rom 8:28–39"
+
+    # Custom style
+    custom_style = RefStyle(
+        names={"JHN": "Giovanni", "ROM": "Romani"},
+        chapter_verse_separator=",",
+        range_separator="-",
+        verse_range_separator="; ",
+        chapter_separator=" e ",
+    )
+    assert ref.format(custom_style) == "Giovanni 3,16; 18-20 e Romani 8,28-39"
