@@ -305,3 +305,71 @@ class SimpleBibleRef:
                 range.end_verse = versification.last_verse(
                     self.book_id, range.end_chapter
                 )
+
+
+@dataclass
+class BibleRef:
+    """Represents a sequence of verse ranges within one or more books of the Bible.
+
+    A BibleRef consists of a list of SimpleBibleRef objects and the Versification
+    they use. The versification can be None, though this will not usually be the case.
+    """
+
+    simple_refs: List[SimpleBibleRef] = field(default_factory=list)
+    versification: Optional[Versification] = None
+
+    @classmethod
+    def for_range(
+        cls,
+        book_id: str,
+        chapter: int,
+        start_verse: int,
+        end_chapter: Optional[int] = None,
+        end_verse: Optional[int] = None,
+        start_subverse: str = "",
+        end_subverse: str = "",
+        original_text: Optional[str] = None,
+        versification: Optional[Versification] = None,
+    ) -> "BibleRef":
+        """Create a BibleRef with a single SimpleBibleRef containing a single VerseRange.
+
+        Args:
+            book_id: The book ID (e.g., "JHN" for John)
+            chapter: The chapter number
+            start_verse: The starting verse number
+            end_chapter: The ending chapter number (defaults to start chapter if None)
+            end_verse: The ending verse number (defaults to start verse if None)
+            start_subverse: The starting subverse (defaults to "")
+            end_subverse: The ending subverse (defaults to "")
+            original_text: The original text from which this reference was parsed (defaults to None)
+            versification: The Versification to use (defaults to None)
+
+        Returns:
+            A BibleRef instance with a single SimpleBibleRef containing a single VerseRange
+        """
+        simple_ref = SimpleBibleRef.for_range(
+            book_id=book_id,
+            chapter=chapter,
+            start_verse=start_verse,
+            end_chapter=end_chapter,
+            end_verse=end_verse,
+            start_subverse=start_subverse,
+            end_subverse=end_subverse,
+            original_text=original_text,
+        )
+
+        return cls(simple_refs=[simple_ref], versification=versification)
+
+    def is_whole_books(self) -> bool:
+        """Return True if this reference refers to entire books only.
+
+        Returns True iff all contained SimpleBibleRef instances refer to entire books.
+        """
+        return all(ref.is_whole_book() for ref in self.simple_refs)
+
+    def is_whole_chapters(self) -> bool:
+        """Return True if this reference does not specify verse limits.
+
+        Returns True iff all contained SimpleBibleRef instances refer to whole chapters.
+        """
+        return all(ref.is_whole_chapters() for ref in self.simple_refs)

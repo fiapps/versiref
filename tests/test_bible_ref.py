@@ -1,7 +1,7 @@
 """Tests for the bible_ref module."""
 
 import pytest
-from versiref.bible_ref import SimpleBibleRef, VerseRange
+from versiref.bible_ref import BibleRef, SimpleBibleRef, VerseRange
 from versiref.ref_style import RefStyle, standard_names
 from versiref.versification import Versification
 
@@ -514,3 +514,136 @@ def test_resolve_following_verses() -> None:
     ref2 = SimpleBibleRef("JHN", [vr1, vr2])
     ref2.resolve_following_verses(versification)
     assert ref2.format(style, versification) == "John 8:48–59; 10:22–42"
+
+
+def test_bible_ref_initialization() -> None:
+    """Test that BibleRef initializes correctly."""
+    # Empty initialization
+    ref = BibleRef()
+    assert ref.simple_refs == []
+    assert ref.versification is None
+
+    # With versification
+    versification = Versification.standard("eng")
+    ref = BibleRef(versification=versification)
+    assert ref.simple_refs == []
+    assert ref.versification is versification
+
+    # With simple refs
+    simple_ref = SimpleBibleRef.for_range("JHN", 3, 16)
+    ref = BibleRef(simple_refs=[simple_ref], versification=versification)
+    assert len(ref.simple_refs) == 1
+    assert ref.simple_refs[0] == simple_ref
+    assert ref.versification is versification
+
+
+def test_bible_ref_for_range() -> None:
+    """Test the for_range class method of BibleRef."""
+    versification = Versification.standard("eng")
+
+    # Basic usage
+    ref = BibleRef.for_range("JHN", 3, 16, versification=versification)
+    assert len(ref.simple_refs) == 1
+    assert ref.simple_refs[0].book_id == "JHN"
+    assert len(ref.simple_refs[0].ranges) == 1
+    assert ref.simple_refs[0].ranges[0].start_chapter == 3
+    assert ref.simple_refs[0].ranges[0].start_verse == 16
+    assert ref.simple_refs[0].ranges[0].end_chapter == 3
+    assert ref.simple_refs[0].ranges[0].end_verse == 16
+    assert ref.versification is versification
+
+    # With range
+    ref = BibleRef.for_range("ROM", 8, 28, end_verse=39, versification=versification)
+    assert len(ref.simple_refs) == 1
+    assert ref.simple_refs[0].book_id == "ROM"
+    assert len(ref.simple_refs[0].ranges) == 1
+    assert ref.simple_refs[0].ranges[0].start_chapter == 8
+    assert ref.simple_refs[0].ranges[0].start_verse == 28
+    assert ref.simple_refs[0].ranges[0].end_chapter == 8
+    assert ref.simple_refs[0].ranges[0].end_verse == 39
+    assert ref.versification is versification
+
+    # Cross-chapter reference
+    ref = BibleRef.for_range(
+        "JHN", 7, 53, end_chapter=8, end_verse=11, versification=versification
+    )
+    assert len(ref.simple_refs) == 1
+    assert ref.simple_refs[0].book_id == "JHN"
+    assert len(ref.simple_refs[0].ranges) == 1
+    assert ref.simple_refs[0].ranges[0].start_chapter == 7
+    assert ref.simple_refs[0].ranges[0].start_verse == 53
+    assert ref.simple_refs[0].ranges[0].end_chapter == 8
+    assert ref.simple_refs[0].ranges[0].end_verse == 11
+    assert ref.versification is versification
+
+
+def test_bible_ref_is_whole_books() -> None:
+    """Test the is_whole_books method of BibleRef."""
+    versification = Versification.standard("eng")
+
+    # Empty BibleRef is vacuously whole books
+    ref = BibleRef(versification=versification)
+    assert ref.is_whole_books() is True
+
+    # Single whole book reference
+    simple_ref = SimpleBibleRef("GEN")
+    ref = BibleRef(simple_refs=[simple_ref], versification=versification)
+    assert ref.is_whole_books() is True
+
+    # Multiple whole book references
+    simple_ref1 = SimpleBibleRef("GEN")
+    simple_ref2 = SimpleBibleRef("EXO")
+    ref = BibleRef(simple_refs=[simple_ref1, simple_ref2], versification=versification)
+    assert ref.is_whole_books() is True
+
+    # Mixed whole book and verse references
+    simple_ref1 = SimpleBibleRef("GEN")
+    simple_ref2 = SimpleBibleRef.for_range("JHN", 3, 16)
+    ref = BibleRef(simple_refs=[simple_ref1, simple_ref2], versification=versification)
+    assert ref.is_whole_books() is False
+
+    # Only verse references
+    simple_ref = SimpleBibleRef.for_range("JHN", 3, 16)
+    ref = BibleRef(simple_refs=[simple_ref], versification=versification)
+    assert ref.is_whole_books() is False
+
+
+def test_bible_ref_is_whole_chapters() -> None:
+    """Test the is_whole_chapters method of BibleRef."""
+    versification = Versification.standard("eng")
+
+    # Empty BibleRef is vacuously whole chapters
+    ref = BibleRef(versification=versification)
+    assert ref.is_whole_chapters() is True
+
+    # Whole book reference is whole chapters
+    simple_ref = SimpleBibleRef("GEN")
+    ref = BibleRef(simple_refs=[simple_ref], versification=versification)
+    assert ref.is_whole_chapters() is True
+
+    # Chapter reference is whole chapters
+    simple_ref = SimpleBibleRef.for_range("JHN", 6, -1)
+    ref = BibleRef(simple_refs=[simple_ref], versification=versification)
+    assert ref.is_whole_chapters() is True
+
+    # Chapter range is whole chapters
+    simple_ref = SimpleBibleRef.for_range("ISA", 1, -1, end_chapter=39)
+    ref = BibleRef(simple_refs=[simple_ref], versification=versification)
+    assert ref.is_whole_chapters() is True
+
+    # Multiple whole chapter references
+    simple_ref1 = SimpleBibleRef("GEN")
+    simple_ref2 = SimpleBibleRef.for_range("ISA", 1, -1, end_chapter=39)
+    ref = BibleRef(simple_refs=[simple_ref1, simple_ref2], versification=versification)
+    assert ref.is_whole_chapters() is True
+
+    # Mixed whole chapter and verse references
+    simple_ref1 = SimpleBibleRef.for_range("ISA", 1, -1, end_chapter=39)
+    simple_ref2 = SimpleBibleRef.for_range("JHN", 3, 16)
+    ref = BibleRef(simple_refs=[simple_ref1, simple_ref2], versification=versification)
+    assert ref.is_whole_chapters() is False
+
+    # Only verse references
+    simple_ref = SimpleBibleRef.for_range("JHN", 3, 16)
+    ref = BibleRef(simple_refs=[simple_ref], versification=versification)
+    assert ref.is_whole_chapters() is False
