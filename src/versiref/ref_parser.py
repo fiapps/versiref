@@ -10,7 +10,7 @@ from typing import Callable, Generator, Optional, Tuple
 import pyparsing as pp
 from pyparsing import common
 
-from versiref.bible_ref import SimpleBibleRef, VerseRange
+from versiref.bible_ref import BibleRef, SimpleBibleRef, VerseRange
 from versiref.ref_style import RefStyle
 from versiref.versification import Versification
 
@@ -176,6 +176,12 @@ class RefParser:
 
         # Try the parser with longer matches first, lest Jude 1:5 parse as Jude 1.
         self.simple_ref_parser = book_chapter_verse_ranges | sc_book_verse_ranges
+
+        # Now it's simple to build a parser for BibleRef.
+        self.bible_ref_parser = (
+            pp.DelimitedList(self.simple_ref_parser, self.style.chapter_separator)
+            + location_marker.copy().set_results_name("end_location")
+        ).set_parse_action(self._make_bible_ref)
 
     def _make_verse_range(
         self, original_text: str, loc: int, tokens: pp.ParseResults
@@ -359,6 +365,29 @@ class RefParser:
             original_text=ref_original_text,
         )
 
+    def _make_bible_ref(
+        self, original_text: str, loc: int, tokens: pp.ParseResults
+    ) -> BibleRef:
+        """Create a BibleRef from parsed tokens.
+
+        This is a parse action for use with pyparsing.
+
+        Returns:
+            A BibleRef instance based on the parsed tokens
+
+        """
+        end_location = _get_int(tokens, "end_location", -1)
+        # One token (end_location) is not a SimpleBibleRef
+        simple_refs = [r for r in tokens if isinstance(r, SimpleBibleRef)]
+        ref_original_text = original_text[loc:end_location].strip()
+
+        # Create a BibleRef with the parsed data
+        return BibleRef(
+            versification=self.versification,
+            simple_refs=simple_refs,
+            original_text=ref_original_text,
+        )
+
     def parse_simple(self, text: str, silent: bool = True) -> Optional[SimpleBibleRef]:
         """Parse a string to produce a SimpleBibleRef.
 
@@ -377,6 +406,32 @@ class RefParser:
             result = self.simple_ref_parser.parse_string(text, parse_all=True)
             ref = result[0]
             assert isinstance(ref, SimpleBibleRef)
+            return ref
+
+        except pp.ParseException as e:
+            if silent:
+                return None
+            else:
+                raise e
+
+    def parse(self, text: str, silent: bool = True) -> Optional[BibleRef]:
+        """Parse a string to produce a BibleRef.
+
+        This method attempts to parse the entire string as a reference to one or more books of the Bible.
+
+        Args:
+            text: The string to parse
+            silent: If True, return None on failure instead of raising a pyparsing.ParseException
+
+        Returns:
+            A BibleRef instance, or None if parsing fails
+
+        """
+        try:
+            # Try to parse the text
+            result = self.bible_ref_parser.parse_string(text, parse_all=True)
+            ref = result[0]
+            assert isinstance(ref, BibleRef)
             return ref
 
         except pp.ParseException as e:
