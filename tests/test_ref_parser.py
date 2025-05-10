@@ -1,6 +1,8 @@
 """Tests for the ref_parser module."""
 
 import pytest  # noqa: F401
+from typing import Optional
+from versiref.bible_ref import BibleRef
 from versiref.ref_parser import RefParser
 from versiref.ref_style import RefStyle, standard_names
 from versiref.versification import Versification
@@ -241,3 +243,111 @@ def test_parse_nonexistent_multi_book_reference() -> None:
     ref = parser.parse("This is not a Bible reference")
 
     assert ref is None
+
+
+def test_scan_string() -> None:
+    """Test scanning a string for Bible references."""
+    # Create a style
+    names = standard_names("en-sbl_abbreviations")
+    style = RefStyle(names=names)
+
+    # Create a versification
+    versification = Versification.standard("eng")
+
+    # Create a parser
+    parser = RefParser(style, versification)
+
+    # Scan a string with multiple references
+    text = "Look at Matt 5:3-12 and John 3:16 for important teachings."
+    refs = list(parser.scan_string(text))
+
+    assert len(refs) == 2
+
+    # Check first reference (Matthew)
+    ref1, start1, end1 = refs[0]
+    assert ref1.simple_refs[0].book_id == "MAT"
+    assert len(ref1.simple_refs[0].ranges) == 1
+    assert ref1.simple_refs[0].ranges[0].start_chapter == 5
+    assert ref1.simple_refs[0].ranges[0].start_verse == 3
+    assert ref1.simple_refs[0].ranges[0].end_chapter == 5
+    assert ref1.simple_refs[0].ranges[0].end_verse == 12
+    assert text[start1:end1] == "Matt 5:3-12"
+
+    # Check second reference (John)
+    ref2, start2, end2 = refs[1]
+    assert ref2.simple_refs[0].book_id == "JHN"
+    assert len(ref2.simple_refs[0].ranges) == 1
+    assert ref2.simple_refs[0].ranges[0].start_chapter == 3
+    assert ref2.simple_refs[0].ranges[0].start_verse == 16
+    assert ref2.simple_refs[0].ranges[0].end_chapter == 3
+    assert ref2.simple_refs[0].ranges[0].end_verse == 16
+    assert text[start2:end2] == "John 3:16"
+
+
+def test_scan_string_with_multi_book_reference() -> None:
+    """Test scanning a string for multi-book Bible references."""
+    # Create a style
+    names = standard_names("en-cmos_short")
+    style = RefStyle(names=names)
+
+    # Create a versification
+    versification = Versification.standard("eng")
+
+    # Create a parser
+    parser = RefParser(style, versification)
+
+    # Scan a string with a multi-book reference
+    text = "The prophecy in Is 7:10-14; Lk 1:26-38 is important."
+    refs = list(parser.scan_string(text))
+
+    assert len(refs) == 1
+
+    ref, start, end = refs[0]
+    assert len(ref.simple_refs) == 2
+
+    # Check first book (Isaiah)
+    assert ref.simple_refs[0].book_id == "ISA"
+    assert len(ref.simple_refs[0].ranges) == 1
+    assert ref.simple_refs[0].ranges[0].start_chapter == 7
+    assert ref.simple_refs[0].ranges[0].start_verse == 10
+    assert ref.simple_refs[0].ranges[0].end_chapter == 7
+    assert ref.simple_refs[0].ranges[0].end_verse == 14
+
+    # Check second book (Luke)
+    assert ref.simple_refs[1].book_id == "LUK"
+    assert len(ref.simple_refs[1].ranges) == 1
+    assert ref.simple_refs[1].ranges[0].start_chapter == 1
+    assert ref.simple_refs[1].ranges[0].start_verse == 26
+    assert ref.simple_refs[1].ranges[0].end_chapter == 1
+    assert ref.simple_refs[1].ranges[0].end_verse == 38
+
+    assert text[start:end] == "Is 7:10-14; Lk 1:26-38"
+
+
+def test_sub_refs() -> None:
+    """Test using sub_refs to normalize references to SBL style."""
+    # Create a style for parsing (CMOS)
+    cmos_names = standard_names("en-cmos_short")
+    cmos_style = RefStyle(names=cmos_names)
+
+    # Create a style for formatting (SBL)
+    sbl_names = standard_names("en-sbl_abbreviations")
+    sbl_style = RefStyle(names=sbl_names)
+
+    # Create a versification
+    versification = Versification.standard("eng")
+
+    # Create a parser
+    parser = RefParser(cmos_style, versification)
+
+    # Define a callback function to normalize references
+    def normalize_ref(ref: BibleRef) -> Optional[str]:
+        return ref.format(sbl_style)
+
+    # Test text with multiple references
+    text = "See Is 7:10-14; Lk 1:26-38 and Jn 1:1-5, 14 for more."
+    result = parser.sub_refs(text, normalize_ref)
+
+    # The references should be normalized to SBL style
+    expected = "See Isa 7:10–14; Luke 1:26–38 and John 1:1–5, 14 for more."
+    assert result == expected

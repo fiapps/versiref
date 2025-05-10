@@ -472,6 +472,38 @@ class RefParser:
                 assert ref.original_text is not None
                 yield (ref, start, start + len(ref.original_text))
 
+    def scan_string(
+        self, text: str, as_ranges: bool = False
+    ) -> Generator[Tuple["BibleRef", int, int], None, None]:
+        """Scan a string for BibleRefs.
+
+        This method scans the entire string for references to one or more books of the Bible.
+
+        Args:
+            text: The string to scan
+            as_ranges: If True, yield a BibleRef for each verse range
+
+        Yields:
+            A reference and the start and end of its location in text.
+            (ref: BibleRef, start: int, end: int)
+
+        """
+        for tokens, start, end in self.bible_ref_parser.scan_string(text):
+            ref = tokens[0]
+            assert isinstance(ref, BibleRef)
+            if as_ranges:
+                next_start = start
+                for range_ref in ref.range_refs():
+                    # Use the original text to find the start and end.
+                    assert range_ref.original_text is not None
+                    range_start = text.find(range_ref.original_text, next_start)
+                    assert range_start >= 0
+                    next_start = range_start + len(range_ref.original_text)
+                    yield (range_ref, range_start, next_start)
+            else:
+                assert ref.original_text is not None
+                yield (ref, start, start + len(ref.original_text))
+
     def sub_refs_simple(
         self,
         text: str,
@@ -496,6 +528,38 @@ class RefParser:
         result = []
         last_end = 0
         for ref, start, end in self.scan_string_simple(text, as_ranges):
+            replacement = callback(ref)
+            if replacement is not None:
+                result.append(text[last_end:start])
+                result.append(replacement)
+                last_end = end
+        result.append(text[last_end:])
+        return "".join(result)
+
+    def sub_refs(
+        self,
+        text: str,
+        callback: Callable[[BibleRef], Optional[str]],
+        as_ranges: bool = False,
+    ) -> str:
+        """Substitute BibleRefs in a string.
+
+        This method scans the entire string for references to one or more books of the Bible and
+        applies a callback function to each reference.
+
+        Args:
+            text: The string to scan
+            callback: A function that takes a BibleRef and returns a string or None
+                If None is returned, the reference is not replaced.
+            as_ranges: If True, yield a BibleRef for each verse range
+
+        Returns:
+            The modified string
+
+        """
+        result = []
+        last_end = 0
+        for ref, start, end in self.scan_string(text, as_ranges):
             replacement = callback(ref)
             if replacement is not None:
                 result.append(text[last_end:start])
