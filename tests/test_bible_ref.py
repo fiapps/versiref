@@ -538,9 +538,11 @@ def test_bible_ref_initialization() -> None:
     assert ref.simple_refs[0] == simple_ref
     assert ref.versification is versification
     assert ref.original_text is None
-    
+
     # With original text
-    ref = BibleRef(simple_refs=[simple_ref], versification=versification, original_text="John 3:16")
+    ref = BibleRef(
+        simple_refs=[simple_ref], versification=versification, original_text="John 3:16"
+    )
     assert ref.original_text == "John 3:16"
 
 
@@ -559,9 +561,11 @@ def test_bible_ref_for_range() -> None:
     assert ref.simple_refs[0].ranges[0].end_verse == 16
     assert ref.versification is versification
     assert ref.original_text is None
-    
+
     # With original text
-    ref = BibleRef.for_range("JHN", 3, 16, original_text="John 3:16", versification=versification)
+    ref = BibleRef.for_range(
+        "JHN", 3, 16, original_text="John 3:16", versification=versification
+    )
     assert ref.original_text == "John 3:16"
     assert ref.simple_refs[0].original_text == "John 3:16"
 
@@ -702,7 +706,9 @@ def test_bible_ref_range_refs() -> None:
     assert list(ref.range_refs()) == []
 
     # Single reference with single range
-    ref = BibleRef.for_range("JHN", 3, 16, original_text="John 3:16", versification=versification)
+    ref = BibleRef.for_range(
+        "JHN", 3, 16, original_text="John 3:16", versification=versification
+    )
     range_refs = list(ref.range_refs())
     assert len(range_refs) == 1
     assert isinstance(range_refs[0], BibleRef)
@@ -716,7 +722,11 @@ def test_bible_ref_range_refs() -> None:
     vr1 = VerseRange(3, 16, "", 3, 16, "", original_text="John 3:16")
     vr2 = VerseRange(3, 18, "", 3, 20, "", original_text="18-20")
     simple_ref = SimpleBibleRef("JHN", [vr1, vr2])
-    ref = BibleRef(simple_refs=[simple_ref], versification=versification, original_text="John 3:16, 18-20")
+    ref = BibleRef(
+        simple_refs=[simple_ref],
+        versification=versification,
+        original_text="John 3:16, 18-20",
+    )
     range_refs = list(ref.range_refs())
     assert len(range_refs) == 2
     assert all(isinstance(r, BibleRef) for r in range_refs)
