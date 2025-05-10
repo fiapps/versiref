@@ -81,6 +81,59 @@ def test_parse_sbl_and_format_cei(sbl_ref: str, expected_cei_ref: str) -> None:
     assert formatted_ref == expected_cei_ref
 
 
+@pytest.mark.parametrize(
+    "cmos_ref,expected_sbl_ref",
+    [
+        # Single book with multiple references
+        ("Rom 8:28-30; 12:1-2", "Rom 8:28–30; 12:1–2"),
+        ("Jn 1:1-5, 14", "John 1:1–5, 14"),
+        # Multiple books
+        ("Is 7:10-14; Lk 1:26-38", "Isa 7:10–14; Luke 1:26–38"),
+        # Cross-chapter reference and whole chapter
+        ("Gn 1:1-2:3; Ps 8:1-9", "Gen 1:1–2:3; Ps 8:1–9"),
+        # Multiple books with multiple ranges
+        ("Mt 5:3-12; 6:9-13; Jn 3:16-17", "Matt 5:3–12; 6:9–13; John 3:16–17"),
+        (
+            "1 Cor 13:4-7, 13; Eph 2:8-10; Phil 4:4-7",
+            "1 Cor 13:4–7, 13; Eph 2:8–10; Phil 4:4–7",
+        ),
+        # Books with spaces in names
+        ("1 Jn 1:5-10; 2 Jn 5-6", "1 John 1:5–10; 2 John 5–6"),
+        ("1 Kgs 8:22-30; 2 Chr 7:1-3", "1 Kgs 8:22–30; 2 Chr 7:1–3"),
+        # Mix of single-chapter and multi-chapter books
+        ("Jude 3-4; Rv 21:1-5", "Jude 3–4; Rev 21:1–5"),
+        ("Ob 15-18; Heb 11:1-6", "Obad 15–18; Heb 11:1–6"),
+        # With subverses
+        ("Rom 5:1-2a; Gal 2:20", "Rom 5:1–2a; Gal 2:20"),
+        ("Jn 1:1a; 1 Jn 1:1b-2", "John 1:1a; 1 John 1:1b–2"),
+        # With following verses notation
+        ("Mk 16:15f; Acts 1:8", "Mark 16:15–16; Acts 1:8"),
+        ("Heb 12:1ff; Jas 1:2-4", "Heb 12:1ff; Jas 1:2–4"),
+    ],
+)
+def test_parse_cmos_and_format_sbl(cmos_ref: str, expected_sbl_ref: str) -> None:
+    """Test parsing references in CMOS style and formatting them in SBL style."""
+    # Setup
+    cmos_style = RefStyle(names=standard_names("en-cmos_short"))
+    sbl_style = RefStyle(names=standard_names("en-sbl_abbreviations"))
+    eng_versification = Versification.standard("eng")
+
+    # Create parser with CMOS style
+    parser = RefParser(cmos_style, eng_versification)
+
+    # Parse the reference
+    bible_ref = parser.parse(cmos_ref)
+
+    # Assert the reference was parsed successfully
+    assert bible_ref is not None, f"Failed to parse: {cmos_ref}"
+
+    # Format the reference in SBL style
+    formatted_ref = bible_ref.format(sbl_style)
+
+    # Assert the formatted reference matches the expected SBL style
+    assert formatted_ref == expected_sbl_ref
+
+
 def test_scan_string_simple() -> None:
     """Test scanning text for Bible references."""
     # Setup
