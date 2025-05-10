@@ -147,3 +147,97 @@ def test_parse_multi_chapter_book_with_space() -> None:
     assert ref.ranges[0].start_chapter == 8
     assert ref.ranges[0].start_verse == 10
     assert ref.ranges[0].original_text == "1 Kgs 8:10"
+
+
+def test_parse_multiple_books() -> None:
+    """Test parsing a reference that spans multiple books."""
+    # Create a style
+    names = standard_names("en-cmos_short")
+    style = RefStyle(names=names)
+
+    # Create a versification
+    versification = Versification.standard("eng")
+
+    # Create a parser
+    parser = RefParser(style, versification)
+
+    # Parse a reference with multiple books: "Is 7:10-14; Lk 1:26-38"
+    ref = parser.parse("Is 7:10-14; Lk 1:26-38")
+
+    assert ref is not None
+    assert len(ref.simple_refs) == 2
+
+    # Check first book (Isaiah)
+    assert ref.simple_refs[0].book_id == "ISA"
+    assert len(ref.simple_refs[0].ranges) == 1
+    assert ref.simple_refs[0].ranges[0].start_chapter == 7
+    assert ref.simple_refs[0].ranges[0].start_verse == 10
+    assert ref.simple_refs[0].ranges[0].end_chapter == 7
+    assert ref.simple_refs[0].ranges[0].end_verse == 14
+
+    # Check second book (Luke)
+    assert ref.simple_refs[1].book_id == "LUK"
+    assert len(ref.simple_refs[1].ranges) == 1
+    assert ref.simple_refs[1].ranges[0].start_chapter == 1
+    assert ref.simple_refs[1].ranges[0].start_verse == 26
+    assert ref.simple_refs[1].ranges[0].end_chapter == 1
+    assert ref.simple_refs[1].ranges[0].end_verse == 38
+
+
+def test_parse_multiple_books_with_multiple_ranges() -> None:
+    """Test parsing a reference with multiple books and multiple verse ranges."""
+    # Create a style
+    names = standard_names("en-sbl_abbreviations")
+    style = RefStyle(names=names)
+
+    # Create a versification
+    versification = Versification.standard("eng")
+
+    # Create a parser
+    parser = RefParser(style, versification)
+
+    # Parse a complex reference: "Matt 5:3-12; 6:9-13; 1 John 3:16-17"
+    ref = parser.parse("Matt 5:3-12; 6:9-13; 1 John 3:16-17")
+
+    assert ref is not None
+    assert len(ref.simple_refs) == 2
+
+    # Check first book (Matthew)
+    assert ref.simple_refs[0].book_id == "MAT"
+    assert len(ref.simple_refs[0].ranges) == 2
+    # First range in Matthew
+    assert ref.simple_refs[0].ranges[0].start_chapter == 5
+    assert ref.simple_refs[0].ranges[0].start_verse == 3
+    assert ref.simple_refs[0].ranges[0].end_chapter == 5
+    assert ref.simple_refs[0].ranges[0].end_verse == 12
+    # Second range in Matthew
+    assert ref.simple_refs[0].ranges[1].start_chapter == 6
+    assert ref.simple_refs[0].ranges[1].start_verse == 9
+    assert ref.simple_refs[0].ranges[1].end_chapter == 6
+    assert ref.simple_refs[0].ranges[1].end_verse == 13
+
+    # Check second book (1 John)
+    assert ref.simple_refs[1].book_id == "1JN"
+    assert len(ref.simple_refs[1].ranges) == 1
+    assert ref.simple_refs[1].ranges[0].start_chapter == 3
+    assert ref.simple_refs[1].ranges[0].start_verse == 16
+    assert ref.simple_refs[1].ranges[0].end_chapter == 3
+    assert ref.simple_refs[1].ranges[0].end_verse == 17
+
+
+def test_parse_nonexistent_multi_book_reference() -> None:
+    """Test parsing a string that is not a valid multi-book Bible reference."""
+    # Create a style
+    names = standard_names("en-sbl_abbreviations")
+    style = RefStyle(names=names)
+
+    # Create a versification
+    versification = Versification.standard("eng")
+
+    # Create a parser
+    parser = RefParser(style, versification)
+
+    # Try to parse a non-reference
+    ref = parser.parse("This is not a Bible reference")
+
+    assert ref is None
