@@ -90,8 +90,17 @@ class RefParser:
             verse.copy().set_results_name("start_verse")
             + optional_subverse.set_results_name("start_subverse")
             + pp.Opt(
-                pp.Literal(self.style.following_verses).set_name("following_verses")
-                | pp.Literal(self.style.following_verse).set_name("following_verse")
+                (
+                    (
+                        pp.Literal(self.style.following_verses).set_name(
+                            "following_verses"
+                        )
+                        | pp.Literal(self.style.following_verse).set_name(
+                            "following_verse"
+                        )
+                    )
+                    + ~pp.Char(pp.identbodychars)  # word boundary
+                )
                 | (
                     range_separator
                     + (
