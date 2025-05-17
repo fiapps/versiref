@@ -1,8 +1,9 @@
 [project]
 name = "versiref"
 version = "0.1.0"
-description = "Add your description here"
+description = "A Python package for sophisticated parsing, manipulation, and printing of references to the Bible"
 readme = "README.md"
+license = "MIT"
 authors = [
     { name = "Fr. John Lawrence M. Polis", email = "emptier-sank-dose@duck.com" }
 ]
