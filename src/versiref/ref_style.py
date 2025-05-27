@@ -113,8 +113,11 @@ def standard_names(identifier: str) -> Dict[str, str]:
 
     """
     # Use importlib.resources to find the file
-    with resources.open_text("versiref.data.book_names", f"{identifier}.json") as f:
-        data = json.load(f)
+    data = json.loads(
+        resources.files("versiref")
+        .joinpath("data", "book_names", f"{identifier}.json")
+        .read_text()
+    )
     if not isinstance(data, dict):
         raise ValueError(f"Invalid format in {identifier}.json: not a dictionary")
     if not all(isinstance(k, str) and isinstance(v, str) for k, v in data.items()):
