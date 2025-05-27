@@ -4,7 +4,7 @@ This module provides classes for representing and manipulating Bible references.
 """
 
 from dataclasses import dataclass, field
-from typing import Generator, List, Optional
+from typing import Generator, Optional
 
 from versiref.ref_style import RefStyle
 from versiref.versification import Versification
@@ -95,7 +95,7 @@ class SimpleBibleRef:
     """
 
     book_id: str
-    ranges: List[VerseRange] = field(default_factory=list)
+    ranges: list[VerseRange] = field(default_factory=list)
     original_text: Optional[str] = None
 
     @classmethod
@@ -316,7 +316,7 @@ class BibleRef:
     It optionally stores the original text from which this reference was parsed.
     """
 
-    simple_refs: List[SimpleBibleRef] = field(default_factory=list)
+    simple_refs: list[SimpleBibleRef] = field(default_factory=list)
     versification: Optional[Versification] = None
     original_text: Optional[str] = None
 

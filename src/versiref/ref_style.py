@@ -7,16 +7,16 @@ are converted to and from strings.
 import json
 from dataclasses import dataclass, field
 from importlib import resources
-from typing import Dict, Union
+from typing import Union
 
 
-def _invert(d: Dict[str, str]) -> Dict[str, str]:
+def _invert(d: dict[str, str]) -> dict[str, str]:
     """Invert an ID->name dictionary, resolving conflicts if possible.
 
     In the event of a PSA/PSAS conflict or a EST/ESG conflict, the former of the
     pair is preferred. Any other conflict will raise a ValueError.
     """
-    inverted: Dict[str, str] = {}
+    inverted: dict[str, str] = {}
     for k, v in d.items():
         if v in inverted:
             if inverted[v] == "PSA" or inverted[v] == "PSAS":
@@ -50,14 +50,14 @@ class RefStyle:
 
     """
 
-    names: Dict[str, str]
+    names: dict[str, str]
     chapter_verse_separator: str = ":"
     range_separator: str = "–"
     following_verse: str = "f"
     following_verses: str = "ff"
     verse_range_separator: str = ", "
     chapter_separator: str = "; "
-    recognized_names: Dict[str, str] = field(default_factory=dict)
+    recognized_names: dict[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         """Initialize recognized_names if not provided.
@@ -68,7 +68,7 @@ class RefStyle:
         if not self.recognized_names:
             self.recognized_names = _invert(self.names)
 
-    def also_recognize(self, names: Union[Dict[str, str], str]) -> None:
+    def also_recognize(self, names: Union[dict[str, str], str]) -> None:
         """Add a set of book names to the recognized_names mapping.
 
         In the event of a conflict, the existing name will be preferred.
@@ -90,7 +90,7 @@ class RefStyle:
         )
 
 
-def standard_names(identifier: str) -> Dict[str, str]:
+def standard_names(identifier: str) -> dict[str, str]:
     """Load and return a standard set of book names.
 
     These can be passed to RefStyle(). Since the return value is freshly

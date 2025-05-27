@@ -5,7 +5,7 @@ This module provides the RefParser class for parsing Bible references from strin
 We don't call pp.ParserElement.enablePackrat() because it made parsing slower.
 """
 
-from typing import Callable, Generator, Optional, Tuple
+from typing import Callable, Generator, Optional
 
 import pyparsing as pp
 from pyparsing import common
@@ -451,7 +451,7 @@ class RefParser:
 
     def scan_string_simple(
         self, text: str, as_ranges: bool = False
-    ) -> Generator[Tuple["SimpleBibleRef", int, int], None, None]:
+    ) -> Generator[tuple["SimpleBibleRef", int, int], None, None]:
         """Scan a string for SimpleBibleRefs.
 
         This method scans the entire string for references to a single book of the Bible.
@@ -483,7 +483,7 @@ class RefParser:
 
     def scan_string(
         self, text: str, as_ranges: bool = False
-    ) -> Generator[Tuple["BibleRef", int, int], None, None]:
+    ) -> Generator[tuple["BibleRef", int, int], None, None]:
         """Scan a string for BibleRefs.
 
         This method scans the entire string for references to one or more books of the Bible.

@@ -3,7 +3,7 @@
 import json
 from dataclasses import dataclass, field
 from importlib import resources
-from typing import Dict, List, Optional
+from typing import Optional
 
 
 @dataclass
@@ -15,7 +15,7 @@ class Versification:
     of a given chapter in a given book.
     """
 
-    max_verses: Dict[str, List[int]] = field(default_factory=dict)
+    max_verses: dict[str, list[int]] = field(default_factory=dict)
     identifier: Optional[str] = None
 
     @classmethod
