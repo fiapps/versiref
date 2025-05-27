@@ -15,7 +15,7 @@ def test_parse_simple_verse() -> None:
     style = RefStyle(names=names)
 
     # Create a versification
-    versification = Versification.standard("eng")
+    versification = Versification.named("eng")
 
     # Create a parser
     parser = RefParser(style, versification)
@@ -42,7 +42,7 @@ def test_parse_verse_with_subverse() -> None:
     style = RefStyle(names=names)
 
     # Create a versification
-    versification = Versification.standard("eng")
+    versification = Versification.named("eng")
 
     # Create a parser
     parser = RefParser(style, versification)
@@ -69,7 +69,7 @@ def test_parse_single_chapter_book() -> None:
     style = RefStyle(names=names)
 
     # Create a versification with Jude as a single-chapter book
-    versification = Versification.standard("eng")
+    versification = Versification.named("eng")
 
     # Create a parser
     parser = RefParser(style, versification)
@@ -94,7 +94,7 @@ def test_parse_nonexistent_reference() -> None:
     style = RefStyle(names=names)
 
     # Create a versification
-    versification = Versification.standard("eng")
+    versification = Versification.named("eng")
 
     # Create a parser
     parser = RefParser(style, versification)
@@ -112,7 +112,7 @@ def test_parse_book_with_space() -> None:
     style = RefStyle(names=names)
 
     # Create a versification
-    versification = Versification.standard("eng")
+    versification = Versification.named("eng")
 
     # Create a parser
     parser = RefParser(style, versification)
@@ -135,7 +135,7 @@ def test_parse_multi_chapter_book_with_space() -> None:
     style = RefStyle(names=names)
 
     # Create a versification
-    versification = Versification.standard("eng")
+    versification = Versification.named("eng")
 
     # Create a parser
     parser = RefParser(style, versification)
@@ -158,7 +158,7 @@ def test_parse_multiple_books() -> None:
     style = RefStyle(names=names)
 
     # Create a versification
-    versification = Versification.standard("eng")
+    versification = Versification.named("eng")
 
     # Create a parser
     parser = RefParser(style, versification)
@@ -193,7 +193,7 @@ def test_parse_multiple_books_with_multiple_ranges() -> None:
     style = RefStyle(names=names)
 
     # Create a versification
-    versification = Versification.standard("eng")
+    versification = Versification.named("eng")
 
     # Create a parser
     parser = RefParser(style, versification)
@@ -234,7 +234,7 @@ def test_parse_nonexistent_multi_book_reference() -> None:
     style = RefStyle(names=names)
 
     # Create a versification
-    versification = Versification.standard("eng")
+    versification = Versification.named("eng")
 
     # Create a parser
     parser = RefParser(style, versification)
@@ -252,7 +252,7 @@ def test_scan_string() -> None:
     style = RefStyle(names=names)
 
     # Create a versification
-    versification = Versification.standard("eng")
+    versification = Versification.named("eng")
 
     # Create a parser
     parser = RefParser(style, versification)
@@ -291,7 +291,7 @@ def test_scan_string_with_multi_book_reference() -> None:
     style = RefStyle(names=names)
 
     # Create a versification
-    versification = Versification.standard("eng")
+    versification = Versification.named("eng")
 
     # Create a parser
     parser = RefParser(style, versification)
@@ -335,7 +335,7 @@ def test_sub_refs() -> None:
     sbl_style = RefStyle(names=sbl_names)
 
     # Create a versification
-    versification = Versification.standard("eng")
+    versification = Versification.named("eng")
 
     # Create a parser
     parser = RefParser(cmos_style, versification)

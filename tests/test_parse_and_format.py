@@ -63,7 +63,7 @@ def test_parse_sbl_and_format_cei(sbl_ref: str, expected_cei_ref: str) -> None:
         verse_range_separator=".",
     )
 
-    eng_versification = Versification.standard("eng")
+    eng_versification = Versification.named("eng")
 
     # Create parser with SBL style
     parser = RefParser(sbl_style, eng_versification)
@@ -116,7 +116,7 @@ def test_parse_cmos_and_format_sbl(cmos_ref: str, expected_sbl_ref: str) -> None
     # Setup
     cmos_style = RefStyle(names=standard_names("en-cmos_short"))
     sbl_style = RefStyle(names=standard_names("en-sbl_abbreviations"))
-    eng_versification = Versification.standard("eng")
+    eng_versification = Versification.named("eng")
 
     # Create parser with CMOS style
     parser = RefParser(cmos_style, eng_versification)
@@ -142,7 +142,7 @@ def test_scan_string_simple() -> None:
         chapter_verse_separator=":",
         verse_range_separator=",",
     )
-    eng_versification = Versification.standard("eng")
+    eng_versification = Versification.named("eng")
     parser = RefParser(sbl_style, eng_versification)
 
     # Test text with multiple references
@@ -169,7 +169,7 @@ def test_scan_string_simple_as_ranges() -> None:
     """Test scanning text for Bible references split into verse ranges."""
     # Setup
     sbl_style = RefStyle(names=standard_names("en-sbl_abbreviations"))
-    eng_versification = Versification.standard("eng")
+    eng_versification = Versification.named("eng")
     parser = RefParser(sbl_style, eng_versification)
 
     # Test text with references containing multiple ranges
@@ -209,7 +209,7 @@ def test_scan_string_simple_with_noise() -> None:
     # Setup
     sbl_names = RefStyle(names=standard_names("en-sbl_names"))
     sbl_abbrevs = RefStyle(names=standard_names("en-sbl_abbreviations"))
-    eng_versification = Versification.standard("eng")
+    eng_versification = Versification.named("eng")
     parser = RefParser(sbl_names, eng_versification)
 
     # Test text with references mixed with other content
@@ -241,7 +241,7 @@ def test_sub_refs_simple_normalize() -> None:
     sbl_style.also_recognize("en-cmos_short")
     sbl_style.also_recognize("en-cmos_long")
 
-    eng_versification = Versification.standard("eng")
+    eng_versification = Versification.named("eng")
     parser = RefParser(sbl_style, eng_versification)
 
     # Test text with inconsistently formatted references
@@ -287,7 +287,7 @@ def test_sub_refs_simple_no_change() -> None:
     sbl_style.also_recognize("en-cmos_short")
     sbl_style.also_recognize("en-cmos_long")
 
-    eng_versification = Versification.standard("eng")
+    eng_versification = Versification.named("eng")
     parser = RefParser(sbl_style, eng_versification)
 
     # Test text with non-SBL references to convert.

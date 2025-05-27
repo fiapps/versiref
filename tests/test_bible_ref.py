@@ -163,7 +163,7 @@ def test_simple_bible_ref_for_range() -> None:
 def test_simple_bible_ref_is_valid() -> None:
     """Test the is_valid method of SimpleBibleRef."""
     # Create a versification
-    versification = Versification.standard("eng")
+    versification = Versification.named("eng")
 
     # Valid whole book reference
     ref = SimpleBibleRef("GEN")
@@ -453,7 +453,7 @@ def test_format_single_chapter_book_with_versification() -> None:
     style = RefStyle(names=names)
 
     # Create a versification where Philemon (PHM) is a single-chapter book
-    versification = Versification.standard("eng")
+    versification = Versification.named("eng")
 
     # Create a reference for Philemon 6
     ref = SimpleBibleRef.for_range("PHM", 1, 6)
@@ -474,7 +474,7 @@ def test_format_single_chapter_book_verse_range() -> None:
     style = RefStyle(names=names)
 
     # Create a versification
-    versification = Versification.standard("eng")
+    versification = Versification.named("eng")
 
     # Create a reference for Jude 3-5
     ref = SimpleBibleRef.for_range("JUD", 1, 3, end_verse=5)
@@ -489,7 +489,7 @@ def test_resolve_following_verses() -> None:
     # Create a style and versification.
     names = standard_names("en-sbl_abbreviations")
     style = RefStyle(names=names)
-    versification = Versification.standard("eng")
+    versification = Versification.named("eng")
 
     ref1 = SimpleBibleRef.for_range("MAT", 12, 46, end_verse=-1)
     ref1.resolve_following_verses(versification)
@@ -525,7 +525,7 @@ def test_bible_ref_initialization() -> None:
     assert ref.original_text is None
 
     # With versification
-    versification = Versification.standard("eng")
+    versification = Versification.named("eng")
     ref = BibleRef(versification=versification)
     assert ref.simple_refs == []
     assert ref.versification is versification
@@ -548,7 +548,7 @@ def test_bible_ref_initialization() -> None:
 
 def test_bible_ref_for_range() -> None:
     """Test the for_range class method of BibleRef."""
-    versification = Versification.standard("eng")
+    versification = Versification.named("eng")
 
     # Basic usage
     ref = BibleRef.for_range("JHN", 3, 16, versification=versification)
@@ -596,7 +596,7 @@ def test_bible_ref_for_range() -> None:
 
 def test_bible_ref_is_whole_books() -> None:
     """Test the is_whole_books method of BibleRef."""
-    versification = Versification.standard("eng")
+    versification = Versification.named("eng")
 
     # Empty BibleRef is vacuously whole books
     ref = BibleRef(versification=versification)
@@ -626,7 +626,7 @@ def test_bible_ref_is_whole_books() -> None:
 
 def test_bible_ref_is_whole_chapters() -> None:
     """Test the is_whole_chapters method of BibleRef."""
-    versification = Versification.standard("eng")
+    versification = Versification.named("eng")
 
     # Empty BibleRef is vacuously whole chapters
     ref = BibleRef(versification=versification)
@@ -664,7 +664,7 @@ def test_bible_ref_is_whole_chapters() -> None:
 
 def test_bible_ref_is_valid() -> None:
     """Test the is_valid method of BibleRef."""
-    versification = Versification.standard("eng")
+    versification = Versification.named("eng")
 
     # Empty BibleRef is vacuously valid
     ref = BibleRef(versification=versification)
@@ -699,7 +699,7 @@ def test_bible_ref_is_valid() -> None:
 
 def test_bible_ref_range_refs() -> None:
     """Test the range_refs method of BibleRef."""
-    versification = Versification.standard("eng")
+    versification = Versification.named("eng")
 
     # Empty BibleRef yields nothing
     ref = BibleRef(versification=versification)
@@ -757,7 +757,7 @@ def test_bible_ref_range_refs() -> None:
 
 def test_bible_ref_format() -> None:
     """Test the format method of BibleRef."""
-    versification = Versification.standard("eng")
+    versification = Versification.named("eng")
     names = standard_names("en-sbl_abbreviations")
     style = RefStyle(names=names)
 

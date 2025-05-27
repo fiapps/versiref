@@ -14,7 +14,7 @@ def test_empty_versification() -> None:
 
 def test_standard_versification_eng() -> None:
     """Test loading the English standard versification."""
-    v = Versification.standard("eng")
+    v = Versification.named("eng")
     assert v is not None
     assert v.identifier == "eng"
 
@@ -29,18 +29,18 @@ def test_standard_versification_eng() -> None:
 def test_nonexistent_standard_versification() -> None:
     """Test that requesting a nonexistent versification raises FileNotFoundError."""
     with pytest.raises(FileNotFoundError):
-        Versification.standard("nonexistent")
+        Versification.named("nonexistent")
 
 
 def test_last_verse_nonexistent_book() -> None:
     """Test that requesting a nonexistent book returns -1."""
-    v = Versification.standard("eng")
+    v = Versification.named("eng")
     assert v.last_verse("XYZ", 1) == -1
 
 
 def test_last_verse_nonexistent_chapter() -> None:
     """Test that requesting a nonexistent chapter returns -1."""
-    v = Versification.standard("eng")
+    v = Versification.named("eng")
     assert v.last_verse("GEN", 100) == -1
     assert v.last_verse("GEN", -1) == -1
 
@@ -60,9 +60,9 @@ def test_from_file() -> None:
 
 def test_multiple_versifications() -> None:
     """Test loading and comparing multiple versifications."""
-    eng = Versification.standard("eng")
-    lxx = Versification.standard("lxx")
-    vul = Versification.standard("vulgata")
+    eng = Versification.named("eng")
+    lxx = Versification.named("lxx")
+    vul = Versification.named("vulgata")
 
     assert eng is not None
     assert lxx is not None
@@ -80,7 +80,7 @@ def test_multiple_versifications() -> None:
 
 def test_is_single_chapter() -> None:
     """Test ."""
-    v = Versification.standard("eng")
+    v = Versification.named("eng")
     assert v.is_single_chapter("GEN") is False
     assert v.is_single_chapter("PSAS") is False
     assert v.is_single_chapter("2JN") is True
@@ -88,7 +88,7 @@ def test_is_single_chapter() -> None:
 
 def test_includes() -> None:
     """Test checking if a book is included in the versification."""
-    v = Versification.standard("eng")
+    v = Versification.named("eng")
     assert v.includes("GEN") is True
     assert v.includes("PSA") is True
     assert v.includes("PSAS") is True

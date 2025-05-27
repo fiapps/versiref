@@ -47,7 +47,7 @@ class Versification:
             raise ValueError("Versification file does not match schema")
 
     @classmethod
-    def standard(cls, identifier: str) -> "Versification":
+    def named(cls, identifier: str) -> "Versification":
         """Create an instance of a standard versification.
 
         Constructs an instance by loading JSON data from the package's data
@@ -59,7 +59,7 @@ class Versification:
                 This is converted to lowercase to find the file to load.
 
         Raises:
-            FileNotFoundError: If the names file doesn't exist
+            FileNotFoundError: If the named file doesn't exist
             json.JSONDecodeError: if the file contains invalid JSON ValueError: If the JSON is not in the expected format
             The latter two represent internal errors in the package.
 
