@@ -13,6 +13,12 @@ class Versification:
     Versifications are defined by JSON data that is loaded from a file when an instance is created.
     The class provides methods to query information about the versification, such as the last verse
     of a given chapter in a given book.
+
+    Attributes:
+        max_verses: last valid verse number for each chapter of each book
+            The order of keys defines the book order.
+        identifier: optional name for the versification
+
     """
 
     max_verses: dict[str, list[int]] = field(default_factory=dict)
