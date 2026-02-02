@@ -24,6 +24,20 @@ class Versification:
     max_verses: dict[str, list[int]] = field(default_factory=dict)
     identifier: Optional[str] = None
 
+    def __str__(self) -> str:
+        """Return a string representation of this versification.
+
+        If an identifier is set, returns a concise form: Versification.named("identifier")
+        Otherwise, returns the default dataclass representation.
+
+        Returns:
+            A string representation of this versification
+
+        """
+        if self.identifier:
+            return f'Versification.named("{self.identifier}")'
+        return object.__str__(self)
+
     @classmethod
     def from_file(
         cls, file_path: str, identifier: Optional[str] = None

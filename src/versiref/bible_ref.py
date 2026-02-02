@@ -6,7 +6,7 @@ This module provides classes for representing and manipulating Bible references.
 from dataclasses import dataclass, field
 from typing import Generator, Optional
 
-from versiref.ref_style import RefStyle
+from versiref.ref_style import RefStyle, standard_names
 from versiref.versification import Versification
 
 
@@ -97,6 +97,21 @@ class SimpleBibleRef:
     book_id: str
     ranges: list[VerseRange] = field(default_factory=list)
     original_text: Optional[str] = None
+
+    def __str__(self) -> str:
+        """Return a string representation of this simple Bible reference.
+
+        Shows a concise representation using the reference's original text
+        or formatted representation.
+
+        Returns:
+            A string representation of this simple Bible reference
+
+        """
+        ref_part = self.original_text or self.format(
+            RefStyle(names=standard_names("en-sbl_abbreviations"))
+        )
+        return f'SimpleBibleRef("{ref_part}")'
 
     @classmethod
     def for_range(
@@ -319,6 +334,23 @@ class BibleRef:
     simple_refs: list[SimpleBibleRef] = field(default_factory=list)
     versification: Optional[Versification] = None
     original_text: Optional[str] = None
+
+    def __str__(self) -> str:
+        """Return a string representation of this Bible reference.
+
+        Shows a concise representation using the versification identifier if available,
+        and the reference's original text or formatted representation.
+
+        Returns:
+            A string representation of this Bible reference
+
+        """
+        ref_part = self.original_text or self.format(
+            RefStyle(names=standard_names("en-sbl_abbreviations"))
+        )
+        if self.versification is None:
+            return f'BibleRef("{ref_part}")'
+        return f'BibleRef("{ref_part}", versification={self.versification})'
 
     @classmethod
     def for_range(
