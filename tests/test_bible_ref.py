@@ -797,3 +797,160 @@ def test_bible_ref_format() -> None:
         chapter_separator=" e ",
     )
     assert ref.format(custom_style) == "Giovanni 3,16; 18-20 e Romani 8,28-39"
+
+
+def test_bible_ref_range_keys_single_verse() -> None:
+    """Test range_keys for a single verse reference."""
+    versification = Versification.named("eng")
+
+    # John 3:16 - John is book 43
+    ref = BibleRef.for_range("JHN", 3, 16, versification=versification)
+    keys = list(ref.range_keys())
+    assert len(keys) == 1
+    start_key, end_key = keys[0]
+    assert start_key == 43003016  # 43 (John) | 003 (chapter 3) | 016 (verse 16)
+    assert end_key == 43003016
+
+
+def test_bible_ref_range_keys_verse_range() -> None:
+    """Test range_keys for a range of verses within a chapter."""
+    versification = Versification.named("eng")
+
+    # Genesis 1:1-5 - Genesis is book 1
+    ref = BibleRef.for_range("GEN", 1, 1, end_verse=5, versification=versification)
+    keys = list(ref.range_keys())
+    assert len(keys) == 1
+    start_key, end_key = keys[0]
+    assert start_key == 1001001  # 01 (Genesis) | 001 (chapter 1) | 001 (verse 1)
+    assert end_key == 1001005  # 01 (Genesis) | 001 (chapter 1) | 005 (verse 5)
+
+
+def test_bible_ref_range_keys_cross_chapter() -> None:
+    """Test range_keys for a range spanning multiple chapters."""
+    versification = Versification.named("eng")
+
+    # John 7:53-8:11 - the pericope adulterae
+    ref = BibleRef.for_range(
+        "JHN", 7, 53, end_chapter=8, end_verse=11, versification=versification
+    )
+    keys = list(ref.range_keys())
+    assert len(keys) == 1
+    start_key, end_key = keys[0]
+    assert start_key == 43007053  # John 7:53
+    assert end_key == 43008011  # John 8:11
+
+
+def test_bible_ref_range_keys_isaiah() -> None:
+    """Test range_keys using Isaiah as specified in the requirements."""
+    versification = Versification.named("eng")
+
+    # Isaiah 7:14 - Isaiah is book 23
+    ref = BibleRef.for_range("ISA", 7, 14, versification=versification)
+    keys = list(ref.range_keys())
+    assert len(keys) == 1
+    start_key, end_key = keys[0]
+    assert start_key == 23007014  # 23 (Isaiah) | 007 (chapter 7) | 014 (verse 14)
+    assert end_key == 23007014
+
+
+def test_bible_ref_range_keys_multiple_ranges() -> None:
+    """Test range_keys for a reference with multiple verse ranges."""
+    versification = Versification.named("eng")
+
+    # John 3:16, 18-20
+    vr1 = VerseRange(3, 16, "", 3, 16, "")
+    vr2 = VerseRange(3, 18, "", 3, 20, "")
+    simple_ref = SimpleBibleRef("JHN", [vr1, vr2])
+    ref = BibleRef(simple_refs=[simple_ref], versification=versification)
+
+    keys = list(ref.range_keys())
+    assert len(keys) == 2
+    assert keys[0] == (43003016, 43003016)
+    assert keys[1] == (43003018, 43003020)
+
+
+def test_bible_ref_range_keys_multiple_books() -> None:
+    """Test range_keys for a reference spanning multiple books."""
+    versification = Versification.named("eng")
+
+    # John 3:16; Romans 8:28-39
+    simple_ref1 = SimpleBibleRef.for_range("JHN", 3, 16)
+    simple_ref2 = SimpleBibleRef.for_range("ROM", 8, 28, end_verse=39)
+    ref = BibleRef(simple_refs=[simple_ref1, simple_ref2], versification=versification)
+
+    keys = list(ref.range_keys())
+    assert len(keys) == 2
+    assert keys[0] == (43003016, 43003016)  # John 3:16
+    assert keys[1] == (45008028, 45008039)  # Romans 8:28-39
+
+
+def test_bible_ref_range_keys_whole_chapter() -> None:
+    """Test range_keys for a whole chapter reference."""
+    versification = Versification.named("eng")
+
+    # John 6 (whole chapter, represented as 6:-1 to 6:-1)
+    ref = BibleRef.for_range("JHN", 6, -1, versification=versification)
+    keys = list(ref.range_keys())
+    assert len(keys) == 1
+    start_key, end_key = keys[0]
+    # -1 verses should resolve to the first and last verses of the chapter
+    assert start_key == 43006000  # first verse assumed to be 0
+    assert end_key == 43006071  # last verse of John 6 is 71
+
+
+def test_bible_ref_range_keys_without_versification() -> None:
+    """Test range_keys when no versification is set."""
+    ref = BibleRef.for_range("JHN", 3, 16, versification=None)
+    keys = list(ref.range_keys())
+    assert len(keys) == 0
+
+
+def test_bible_ref_range_keys_unknown_book() -> None:
+    """Test range_keys with an unknown book ID in versification."""
+    versification = Versification.named("eng")
+
+    # Create a reference with an unknown book ID
+    simple_ref = SimpleBibleRef("XYZ", [VerseRange(1, 1, "", 1, 1, "")])
+    ref = BibleRef(simple_refs=[simple_ref], versification=versification)
+
+    keys = list(ref.range_keys())
+    assert len(keys) == 0
+
+
+def test_bible_ref_range_keys_mixed_known_unknown() -> None:
+    """Test range_keys with a mix of known and unknown book IDs."""
+    versification = Versification.named("eng")
+
+    # Mix of known (John) and unknown (XYZ) books
+    simple_ref1 = SimpleBibleRef.for_range("JHN", 3, 16)
+    simple_ref2 = SimpleBibleRef("XYZ", [VerseRange(1, 1, "", 1, 1, "")])
+    ref = BibleRef(simple_refs=[simple_ref1, simple_ref2], versification=versification)
+
+    keys = list(ref.range_keys())
+    # Only the John reference should be yielded
+    assert len(keys) == 1
+    assert keys[0] == (43003016, 43003016)
+
+
+def test_bible_ref_range_keys_empty_reference() -> None:
+    """Test range_keys for an empty BibleRef."""
+    versification = Versification.named("eng")
+    ref = BibleRef(versification=versification)
+    keys = list(ref.range_keys())
+    assert len(keys) == 0
+
+
+def test_bible_ref_range_keys_ff_notation() -> None:
+    """Test range_keys for ff (following verses) notation."""
+    versification = Versification.named("eng")
+
+    # Matthew 12:46ff (46 to end of chapter)
+    ref = BibleRef.for_range(
+        "MAT", 12, 46, end_chapter=12, end_verse=-1, versification=versification
+    )
+    keys = list(ref.range_keys())
+    assert len(keys) == 1
+    start_key, end_key = keys[0]
+    # Matthew is book 40
+    assert start_key == 40012046  # Matthew 12:46
+    assert end_key == 40012050  # last verse of Matthew 12 is 50
