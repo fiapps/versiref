@@ -3,7 +3,6 @@
 import json
 from dataclasses import dataclass, field
 from importlib import resources
-from typing import Optional
 
 
 @dataclass
@@ -22,7 +21,7 @@ class Versification:
     """
 
     max_verses: dict[str, list[int]] = field(default_factory=dict)
-    identifier: Optional[str] = None
+    identifier: str | None = None
 
     def __str__(self) -> str:
         """Return a string representation of this versification.
@@ -40,7 +39,7 @@ class Versification:
 
     @classmethod
     def from_file(
-        cls, file_path: str, identifier: Optional[str] = None
+        cls, file_path: str, identifier: str | None = None
     ) -> "Versification":
         """Create an instance from a JSON file.
 

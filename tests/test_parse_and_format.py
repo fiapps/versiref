@@ -1,7 +1,6 @@
 """Test parsing and formatting Bible references."""
 
 import pytest
-from typing import Optional
 from versiref import RefParser, RefStyle, SimpleBibleRef, Versification, standard_names
 
 
@@ -258,7 +257,7 @@ def test_sub_refs_simple_normalize() -> None:
     )
 
     # Function to format references consistently
-    def normalize_ref(ref: SimpleBibleRef) -> Optional[str]:
+    def normalize_ref(ref: SimpleBibleRef) -> str | None:
         return ref.format(sbl_style)
 
     # Normalize all references
@@ -294,7 +293,7 @@ def test_sub_refs_simple_no_change() -> None:
     text = "See Jn 13:16 and Mk 28:1–15."
 
     # Function to format references consistently
-    def normalize_ref(ref: SimpleBibleRef) -> Optional[str]:
+    def normalize_ref(ref: SimpleBibleRef) -> str | None:
         if ref.is_valid(eng_versification):
             return ref.format(sbl_style)
         else:

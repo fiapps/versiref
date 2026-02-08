@@ -7,7 +7,6 @@ are converted to and from strings.
 import json
 from dataclasses import dataclass, field
 from importlib import resources
-from typing import Union
 
 
 def _invert(d: dict[str, str]) -> dict[str, str]:
@@ -68,7 +67,7 @@ class RefStyle:
         if not self.recognized_names:
             self.recognized_names = _invert(self.names)
 
-    def also_recognize(self, names: Union[dict[str, str], str]) -> None:
+    def also_recognize(self, names: dict[str, str] | str) -> None:
         """Add a set of book names to the recognized_names mapping.
 
         In the event of a conflict, the existing name will be preferred.

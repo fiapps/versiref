@@ -1,7 +1,6 @@
 """Tests for the ref_parser module."""
 
 import pytest  # noqa: F401
-from typing import Optional
 from versiref.bible_ref import BibleRef
 from versiref.ref_parser import RefParser
 from versiref.ref_style import RefStyle, standard_names
@@ -341,7 +340,7 @@ def test_sub_refs() -> None:
     parser = RefParser(cmos_style, versification)
 
     # Define a callback function to normalize references
-    def normalize_ref(ref: BibleRef) -> Optional[str]:
+    def normalize_ref(ref: BibleRef) -> str | None:
         return ref.format(sbl_style)
 
     # Test text with multiple references

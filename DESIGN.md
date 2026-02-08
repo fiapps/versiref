@@ -11,7 +11,7 @@ These ranges are not necessarily in numeric order because the person who creates
 The class is naive in that it doesn't specify its versification (this is something like `datetime`'s naive classes, which don't specify a time zone).
 In the simplest case, it designates a single chapter and verse, such as John 3:16.
 More generally, each range contains a start chapter, start verse, start subverse, end chapter, end verse, and end subverse.
-Each range also has `original_text: Optional[str]`: this is the text from which the range was parsed, if any.
+Each range also has `original_text: str | None`: this is the text from which the range was parsed, if any.
 The class stores a list of such ranges, a book ID, and the `original_text` from which the book ID was parsed.
 Book IDs are the three-letter codes used by Paratext, e.g., "GEN", "1CO", or "JHN".
 The start and end chapter numbers will almost always be the same, but the volume of data is probably not large enough to justify complicating the code by optimizing for that.

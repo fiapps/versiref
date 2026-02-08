@@ -5,7 +5,7 @@ This module provides the RefParser class for parsing Bible references from strin
 We don't call pp.ParserElement.enablePackrat() because it made parsing slower.
 """
 
-from typing import Callable, Generator, Optional
+from typing import Callable, Generator
 
 import pyparsing as pp
 from pyparsing import common
@@ -397,7 +397,7 @@ class RefParser:
             original_text=ref_original_text,
         )
 
-    def parse_simple(self, text: str, silent: bool = True) -> Optional[SimpleBibleRef]:
+    def parse_simple(self, text: str, silent: bool = True) -> SimpleBibleRef | None:
         """Parse a string to produce a SimpleBibleRef.
 
         This method attempts to parse the entire string as a reference to a single book of the Bible.
@@ -423,7 +423,7 @@ class RefParser:
             else:
                 raise e
 
-    def parse(self, text: str, silent: bool = True) -> Optional[BibleRef]:
+    def parse(self, text: str, silent: bool = True) -> BibleRef | None:
         """Parse a string to produce a BibleRef.
 
         This method attempts to parse the entire string as a reference to one or more books of the Bible.
@@ -516,7 +516,7 @@ class RefParser:
     def sub_refs_simple(
         self,
         text: str,
-        callback: Callable[[SimpleBibleRef], Optional[str]],
+        callback: Callable[[SimpleBibleRef], str | None],
         as_ranges: bool = False,
     ) -> str:
         """Substitute SimpleBibleRefs in a string.
@@ -548,7 +548,7 @@ class RefParser:
     def sub_refs(
         self,
         text: str,
-        callback: Callable[[BibleRef], Optional[str]],
+        callback: Callable[[BibleRef], str | None],
         as_ranges: bool = False,
     ) -> str:
         """Substitute BibleRefs in a string.

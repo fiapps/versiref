@@ -4,7 +4,7 @@ This module provides classes for representing and manipulating Bible references.
 """
 
 from dataclasses import dataclass, field
-from typing import Generator, Optional
+from typing import Generator
 
 from versiref.ref_style import RefStyle, standard_names
 from versiref.versification import Versification
@@ -36,7 +36,7 @@ class VerseRange:
     end_chapter: int
     end_verse: int
     end_subverse: str
-    original_text: Optional[str] = None
+    original_text: str | None = None
 
     def is_whole_chapters(self) -> bool:
         """Return True if this range does not specify verse limits."""
@@ -96,7 +96,7 @@ class SimpleBibleRef:
 
     book_id: str
     ranges: list[VerseRange] = field(default_factory=list)
-    original_text: Optional[str] = None
+    original_text: str | None = None
 
     def __str__(self) -> str:
         """Return a string representation of this simple Bible reference.
@@ -119,11 +119,11 @@ class SimpleBibleRef:
         book_id: str,
         chapter: int,
         start_verse: int,
-        end_chapter: Optional[int] = None,
-        end_verse: Optional[int] = None,
+        end_chapter: int | None = None,
+        end_verse: int | None = None,
         start_subverse: str = "",
         end_subverse: str = "",
-        original_text: Optional[str] = None,
+        original_text: str | None = None,
     ) -> "SimpleBibleRef":
         """Create a SimpleBibleRef with a single VerseRange.
 
@@ -242,7 +242,7 @@ class SimpleBibleRef:
             )
 
     def format(
-        self, style: RefStyle, versification: Optional[Versification] = None
+        self, style: RefStyle, versification: Versification | None = None
     ) -> str:
         """Format this Bible reference as a string according to the given style.
 
@@ -332,8 +332,8 @@ class BibleRef:
     """
 
     simple_refs: list[SimpleBibleRef] = field(default_factory=list)
-    versification: Optional[Versification] = None
-    original_text: Optional[str] = None
+    versification: Versification | None = None
+    original_text: str | None = None
 
     def __str__(self) -> str:
         """Return a string representation of this Bible reference.
@@ -358,12 +358,12 @@ class BibleRef:
         book_id: str,
         chapter: int,
         start_verse: int,
-        end_chapter: Optional[int] = None,
-        end_verse: Optional[int] = None,
+        end_chapter: int | None = None,
+        end_verse: int | None = None,
         start_subverse: str = "",
         end_subverse: str = "",
-        original_text: Optional[str] = None,
-        versification: Optional[Versification] = None,
+        original_text: str | None = None,
+        versification: Versification | None = None,
     ) -> "BibleRef":
         """Create a BibleRef with a single SimpleBibleRef containing a single VerseRange.
 
