@@ -92,7 +92,7 @@ scan_string(text)
 
 Output:
 
-```
+```text
 Acts 2:1–11; Ps 104:1, 24, 29–30, 31, 34; 1 Cor 12:3b–7, 12–13; John 20:19–23
 Isa 7:10–14
 Luke 1:26–38
