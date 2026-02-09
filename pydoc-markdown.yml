@@ -1,0 +1,11 @@
+loaders:
+  - type: python
+    search_path: [src/versiref]
+processors:
+  - type: filter
+    expression: not name.startswith('_') and default()
+  - type: smart
+  - type: crossref
+renderer:
+  type: markdown
+  filename: build/api.md
