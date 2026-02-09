@@ -99,3 +99,21 @@ Luke 1:26–38
 Warning: Ps 118:120 is not a valid reference.
 Found 4 references.
 ```
+
+## Development
+
+This project uses [uv](https://github.com/astral-sh/uv) for project setup and dependencies.
+
+To build documentation, run
+
+```sh
+uv run mkdocs build
+```
+
+To build API documentation for LLMs, run
+
+```sh
+uv run pydoc-markdown
+```
+
+This creates or updates `build/api.md`. Supplement this with `README.md`.
