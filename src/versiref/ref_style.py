@@ -73,9 +73,9 @@ class RefStyle:
         In the event of a conflict, the existing name will be preferred.
 
         Args:
-            names: Either dictionary mapping names or abbreviations to book IDs
-            or a string that names a standard set of names, e.g.,
-            "en-sbl_abbreviations".
+            names: Either a dictionary mapping names or abbreviations to book IDs,
+                or a string that names a standard set of names, e.g.,
+                "en-sbl_abbreviations".
 
         """
         if isinstance(names, str):
@@ -99,16 +99,16 @@ def standard_names(identifier: str) -> dict[str, str]:
 
     Args:
         identifier: The identifier for the names file, e.g.,
-        "en-sbl_abbreviations"
+                "en-sbl_abbreviations"
 
     Returns:
         A dictionary mapping book IDs to names or abbreviations.
 
     Raises:
         FileNotFoundError: If the names file doesn't exist
-        json.JSONDecodeError: if the file contains invalid JSON
-        ValueError: If the JSON is not in the expected format
-        The latter two represent internal errors in the package.
+        json.JSONDecodeError: If the file contains invalid JSON
+        ValueError: If the JSON is not in the expected format.
+            The latter two represent internal errors in the package.
 
     """
     # Use importlib.resources to find the file

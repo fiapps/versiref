@@ -311,8 +311,7 @@ class SimpleBibleRef:
         last verse of the chapter.
 
         Args:
-            versification: The Versification to use for resolving following
-            verses
+            versification: The Versification to use for resolving following verses
 
         """
         for range in self.ranges:

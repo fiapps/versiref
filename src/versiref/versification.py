@@ -74,13 +74,12 @@ class Versification:
 
         Args:
             identifier: Standard versification identifier (e.g., "org", "eng",
-            "LXX", "Vulgata")
-                This is converted to lowercase to find the file to load.
+                "LXX", "Vulgata"). This is converted to lowercase to find the file to load.
 
         Raises:
             FileNotFoundError: If the named file doesn't exist
-            json.JSONDecodeError: if the file contains invalid JSON ValueError: If the JSON is not in the expected format
-            The latter two represent internal errors in the package.
+            json.JSONDecodeError: If the file contains invalid JSON
+            ValueError: If the JSON is not in the expected format
 
         Returns:
             A newly constructed Versification
