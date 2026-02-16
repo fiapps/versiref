@@ -10,6 +10,8 @@ from versiref.ref_parser import RefParser
 from versiref.ref_style import RefStyle, standard_names
 from versiref.versification import Versification
 
+__path__ = __import__("pkgutil").extend_path(__path__, __name__)
+
 __all__ = [
     "BibleRef",
     "SimpleBibleRef",
