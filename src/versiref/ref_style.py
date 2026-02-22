@@ -224,13 +224,13 @@ def standard_names(identifier: str) -> dict[str, str]:
     Args:
         identifier: Identifier for the names file. Available values:
 
-            - "en-sbl_abbreviations" — SBL abbreviations (e.g., "Gen", "1 Sam")
-            - "en-sbl_names" — SBL full names (e.g., "Genesis", "1 Samuel")
-            - "en-cmos_short" — CMOS short forms (e.g., "Gn", "1 Sm")
-            - "en-cmos_long" — CMOS long forms (e.g., "Gen.", "1 Sam.")
-            - "en-douay-rheims_names" — Douay-Rheims names
-            - "it-cei_abbreviazioni" — Italian CEI abbreviations
-            - "it-cei_nomi" — Italian CEI full names
+            - "en-sbl_abbreviations" — SBL abbreviations (e.g., "Josh", "1 Kgs")
+            - "en-sbl_names" — SBL full names (e.g., "Joshua", "1 Kings")
+            - "en-cmos_short" — Chicago Manual of Style short forms (e.g., "Jo", "1 Kgs")
+            - "en-cmos_long" — Chicago Manual of Style long forms (e.g., "Josh.", "1 Kings")
+            - "en-douay-rheims_names" — Douay-Rheims names (e.g., "Josue", "3 Kings")
+            - "it-cei_abbreviazioni" — Italian CEI abbreviations (e.g., "Gs", "1Re")
+            - "it-cei_nomi" — Italian CEI full names (e.g., "Giosuè", "1 Re")
 
     Returns:
         A dictionary mapping book IDs to names or abbreviations.
