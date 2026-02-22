@@ -27,20 +27,18 @@ VersiRef is a Python package for sophisticated parsing, manipulation, and printi
 
 ```python
 from pyparsing import ParseException
-from versiref import RefParser, RefStyle, standard_names, Versification
+from versiref import RefParser, RefStyle, Versification
 
-def parse_reference(reference: str) -> None:
+def convert_reference(reference: str) -> None:
     """Parse argument and print result."""
-    # Expect SBL abbreviations in the input
-    sbl_abbrevs = standard_names("en-sbl_abbreviations")
-    sbl_style = RefStyle(names=sbl_abbrevs)
+    # Expect SBL style references
+    sbl_style = RefStyle.named("en-sbl")
     # Use typical versification for English Bibles
     versification = Versification.named("eng")
     # Build parser for style
     parser = RefParser(sbl_style, versification)
     # Use Italian CEI Bible style for output
-    cei_abbrevs = standard_names("it-cei_abbreviazioni")
-    cei_style = RefStyle(names=cei_abbrevs, chapter_verse_separator=",", verse_range_separator=".")
+    cei_style = sbl_style = RefStyle.named("it-cei")
     try:
         ref = parser.parse(reference, silent=False)
         # Check whether it refers to verse ranges that exist
@@ -52,7 +50,7 @@ def parse_reference(reference: str) -> None:
         print(e)
 
 # Prints "Gv 7,53–8,11"
-parse_reference("John 7:53–8:11")
+convert_reference("John 7:53–8:11")
 ```
 
 ### Look for references in a string
