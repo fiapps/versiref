@@ -159,9 +159,7 @@ class RefStyle:
         return style
 
     @classmethod
-    def from_file(
-        cls, file_path: str, identifier: str | None = None
-    ) -> "RefStyle":
+    def from_file(cls, file_path: str, identifier: str | None = None) -> "RefStyle":
         """Create an instance from a JSON file.
 
         Args:
