@@ -1,0 +1,7 @@
+{
+  "names": "en-cmos_short",
+  "also_recognize": [
+    "en-cmos_long",
+    "en-sbl_names"
+  ]
+}

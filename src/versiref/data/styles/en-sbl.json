@@ -1,0 +1,10 @@
+{
+  "names": "en-sbl_abbreviations",
+  "also_recognize": [
+    "en-sbl_names",
+    {"1 Kgdms": "1SA", "1 Kingdoms": "1SA", "2 Kgdms": "2SA", "2 Kingdoms": "2SA",
+     "3 Kgdms": "1KI", "3 Kingdoms": "1KI", "4 Kgdms": "2KI", "4 Kingdoms": "2KI",
+     "Qoh": "ECC", "Qoheleth": "ECC", "Song of Solomon": "SNG", "Cant": "SNG",
+     "Canticles": "SNG", "Ecclesiasticus": "SIR"}
+  ]
+}

@@ -46,6 +46,7 @@ class RefStyle:
         verse_range_separator: Separates ranges of verses in a single chapter
         chapter_separator: Separates ranges of verses in different chapters
         recognized_names: Maps abbreviations/names to Bible book IDs for parsing
+        identifier: optional name for the style
 
     """
 
@@ -57,6 +58,7 @@ class RefStyle:
     verse_range_separator: str = ", "
     chapter_separator: str = "; "
     recognized_names: dict[str, str] = field(default_factory=dict)
+    identifier: str | None = None
 
     def __post_init__(self) -> None:
         """Initialize recognized_names if not provided.
@@ -66,6 +68,20 @@ class RefStyle:
         """
         if not self.recognized_names:
             self.recognized_names = _invert(self.names)
+
+    def __str__(self) -> str:
+        """Return a string representation of this style.
+
+        If an identifier is set, returns a concise form: RefStyle.named("identifier")
+        Otherwise, returns the default representation.
+
+        Returns:
+            A string representation of this style
+
+        """
+        if self.identifier:
+            return f'RefStyle.named("{self.identifier}")'
+        return object.__str__(self)
 
     def also_recognize(self, names: dict[str, str] | str) -> None:
         """Add a set of book names to the recognized_names mapping.
@@ -87,6 +103,112 @@ class RefStyle:
                 if name not in self.recognized_names
             }
         )
+
+    @classmethod
+    def from_dict(cls, data: dict[str, object]) -> "RefStyle":
+        """Create an instance from a dictionary.
+
+        Args:
+            data: A dictionary with a required "names" key (string identifier or
+                dict mapping book IDs to names), optional separator fields, and an
+                optional "also_recognize" list.
+
+        Raises:
+            ValueError: If "names" is missing from the dictionary.
+
+        Returns:
+            A newly constructed RefStyle
+
+        """
+        if "names" not in data:
+            raise ValueError("RefStyle data must include 'names'")
+
+        names_value = data["names"]
+        if isinstance(names_value, str):
+            names = standard_names(names_value)
+        elif isinstance(names_value, dict):
+            names = dict(names_value)
+        else:
+            raise ValueError("'names' must be a string or dict")
+
+        def _str(key: str, default: str) -> str:
+            val = data.get(key, default)
+            return val if isinstance(val, str) else default
+
+        style = cls(
+            names=names,
+            chapter_verse_separator=_str("chapter_verse_separator", ":"),
+            range_separator=_str("range_separator", "\u2013"),
+            following_verse=_str("following_verse", "f"),
+            following_verses=_str("following_verses", "ff"),
+            verse_range_separator=_str("verse_range_separator", ", "),
+            chapter_separator=_str("chapter_separator", "; "),
+        )
+
+        also_recognize = data.get("also_recognize")
+        if isinstance(also_recognize, list):
+            for entry in also_recognize:
+                if isinstance(entry, str):
+                    style.also_recognize(entry)
+                elif isinstance(entry, dict):
+                    str_dict: dict[str, str] = {
+                        str(k): str(v) for k, v in entry.items()
+                    }
+                    style.also_recognize(str_dict)
+
+        return style
+
+    @classmethod
+    def from_file(
+        cls, file_path: str, identifier: str | None = None
+    ) -> "RefStyle":
+        """Create an instance from a JSON file.
+
+        Args:
+            file_path: Path to a JSON file containing style data.
+            identifier: Optional identifier to store in the constructed RefStyle.
+
+        Raises:
+            FileNotFoundError: If file_path does not exist.
+            json.JSONDecodeError: If file_path is not well-formed JSON.
+            ValueError: If the data is missing required fields.
+
+        Returns:
+            A newly constructed RefStyle
+
+        """
+        with open(file_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        style = cls.from_dict(data)
+        style.identifier = identifier
+        return style
+
+    @classmethod
+    def named(cls, identifier: str) -> "RefStyle":
+        """Create an instance of a standard style.
+
+        Constructs an instance by loading JSON data from the package's data
+        directory.
+
+        Args:
+            identifier: Standard style identifier (e.g., "en-sbl",
+                "en-cmos_short").
+
+        Raises:
+            FileNotFoundError: If the named style doesn't exist.
+            json.JSONDecodeError: If the file contains invalid JSON.
+            ValueError: If the JSON is not in the expected format.
+
+        Returns:
+            A newly constructed RefStyle
+
+        """
+        filename = f"{identifier}.json"
+        path = resources.files("versiref").joinpath("data", "styles", filename)
+        if path.is_file():
+            return cls.from_file(str(path), identifier)
+        else:
+            raise FileNotFoundError(f"Unknown style identifier: {identifier}")
 
 
 def standard_names(identifier: str) -> dict[str, str]:
