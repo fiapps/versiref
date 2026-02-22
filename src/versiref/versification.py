@@ -73,8 +73,18 @@ class Versification:
         directory.
 
         Args:
-            identifier: Standard versification identifier (e.g., "org", "eng",
-                "LXX", "Vulgata"). This is converted to lowercase to find the file to load.
+            identifier: Standard versification identifier. Available values:
+
+                - "org" — original languages (BHS, UBS GNT)
+                - "eng" — typical English Bible
+                - "lxx" — Septuagint
+                - "vulgata" — Latin Vulgate
+                - "nova-vulgata" — Nova Vulgata
+                - "nabre" — New American Bible Revised Edition
+                - "rsc" — Russian Synodal, Protestant canon
+                - "rso" — Russian Synodal, Orthodox canon
+
+                Case-insensitive (converted to lowercase to find the file).
 
         Raises:
             FileNotFoundError: If the named file doesn't exist

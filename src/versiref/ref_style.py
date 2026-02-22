@@ -189,8 +189,12 @@ class RefStyle:
         directory.
 
         Args:
-            identifier: Standard style identifier (e.g., "en-sbl",
-                "en-cmos_short").
+            identifier: Standard style identifier. Available values:
+
+                - "en-sbl" — SBL (Society of Biblical Literature)
+                - "en-cmos_short" — Chicago Manual of Style, short abbreviations
+                - "en-cmos_long" — Chicago Manual of Style, long abbreviations
+                - "it-cei" — Italian CEI (Conferenza Episcopale Italiana)
 
         Raises:
             FileNotFoundError: If the named style doesn't exist.
@@ -218,8 +222,15 @@ def standard_names(identifier: str) -> dict[str, str]:
     callers.
 
     Args:
-        identifier: The identifier for the names file, e.g.,
-                "en-sbl_abbreviations"
+        identifier: Identifier for the names file. Available values:
+
+            - "en-sbl_abbreviations" — SBL abbreviations (e.g., "Gen", "1 Sam")
+            - "en-sbl_names" — SBL full names (e.g., "Genesis", "1 Samuel")
+            - "en-cmos_short" — CMOS short forms (e.g., "Gn", "1 Sm")
+            - "en-cmos_long" — CMOS long forms (e.g., "Gen.", "1 Sam.")
+            - "en-douay-rheims_names" — Douay-Rheims names
+            - "it-cei_abbreviazioni" — Italian CEI abbreviations
+            - "it-cei_nomi" — Italian CEI full names
 
     Returns:
         A dictionary mapping book IDs to names or abbreviations.
