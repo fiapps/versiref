@@ -1,0 +1,8 @@
+{
+  "names": "it-cei_abbreviazioni",
+  "chapter_verse_separator": ",",
+  "verse_range_separator": ".",
+  "also_recognize": [
+    "it-cei_nomi"
+  ]
+}

@@ -1,7 +1,7 @@
 {
-  "names": "en-cmos_short",
+  "names": "en-cmos_long",
   "also_recognize": [
-    "en-cmos_long",
+    "en-cmos_short",
     "en-sbl_names",
     {"Song of Solomon": "SNG", "Manasseh": "MAN", "Ecclesiasticus": "SIR",
     "Song of Three Children": "S3Y", "Song of the Three Holy Children": "S3Y",

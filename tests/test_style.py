@@ -59,13 +59,15 @@ def test_from_dict_with_dict_names() -> None:
 
 def test_from_dict_with_separators() -> None:
     """Test from_dict applies separator overrides."""
-    style = RefStyle.from_dict({
-        "names": "en-sbl_abbreviations",
-        "chapter_verse_separator": ",",
-        "range_separator": "-",
-        "verse_range_separator": ". ",
-        "chapter_separator": " / ",
-    })
+    style = RefStyle.from_dict(
+        {
+            "names": "en-sbl_abbreviations",
+            "chapter_verse_separator": ",",
+            "range_separator": "-",
+            "verse_range_separator": ". ",
+            "chapter_separator": " / ",
+        }
+    )
     assert style.chapter_verse_separator == ","
     assert style.range_separator == "-"
     assert style.verse_range_separator == ". "
@@ -80,32 +82,38 @@ def test_from_dict_missing_names() -> None:
 
 def test_from_dict_with_also_recognize_string() -> None:
     """Test from_dict processes also_recognize string entries."""
-    style = RefStyle.from_dict({
-        "names": "en-sbl_abbreviations",
-        "also_recognize": ["en-sbl_names"],
-    })
+    style = RefStyle.from_dict(
+        {
+            "names": "en-sbl_abbreviations",
+            "also_recognize": ["en-sbl_names"],
+        }
+    )
     assert style.recognized_names["Genesis"] == "GEN"
 
 
 def test_from_dict_with_also_recognize_dict() -> None:
     """Test from_dict processes also_recognize dict entries."""
-    style = RefStyle.from_dict({
-        "names": "en-sbl_abbreviations",
-        "also_recognize": [{"Cant": "SNG", "Qoh": "ECC"}],
-    })
+    style = RefStyle.from_dict(
+        {
+            "names": "en-sbl_abbreviations",
+            "also_recognize": [{"Cant": "SNG", "Qoh": "ECC"}],
+        }
+    )
     assert style.recognized_names["Cant"] == "SNG"
     assert style.recognized_names["Qoh"] == "ECC"
 
 
 def test_from_dict_with_also_recognize_mixed() -> None:
     """Test from_dict processes a mix of string and dict entries."""
-    style = RefStyle.from_dict({
-        "names": "en-sbl_abbreviations",
-        "also_recognize": [
-            "en-sbl_names",
-            {"Cant": "SNG"},
-        ],
-    })
+    style = RefStyle.from_dict(
+        {
+            "names": "en-sbl_abbreviations",
+            "also_recognize": [
+                "en-sbl_names",
+                {"Cant": "SNG"},
+            ],
+        }
+    )
     assert style.recognized_names["Genesis"] == "GEN"
     assert style.recognized_names["Cant"] == "SNG"
 
@@ -119,9 +127,7 @@ def test_from_file() -> None:
         "names": "en-sbl_abbreviations",
         "chapter_verse_separator": ":",
     }
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".json", delete=False
-    ) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
         json.dump(data, f)
         f.flush()
         style = RefStyle.from_file(f.name, identifier="test-style")
@@ -133,9 +139,7 @@ def test_from_file() -> None:
 def test_from_file_without_identifier() -> None:
     """Test from_file without an identifier."""
     data = {"names": "en-sbl_abbreviations"}
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".json", delete=False
-    ) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
         json.dump(data, f)
         f.flush()
         style = RefStyle.from_file(f.name)
@@ -184,6 +188,24 @@ def test_named_en_cmos_short() -> None:
     style = RefStyle.named("en-cmos_short")
     assert style.identifier == "en-cmos_short"
     assert style.recognized_names["Genesis"] == "GEN"
+    assert style.recognized_names["Apocalypse"] == "REV"
+
+
+def test_named_en_cmos_long() -> None:
+    """Test loading the en-cmos_long standard style."""
+    style = RefStyle.named("en-cmos_long")
+    assert style.identifier == "en-cmos_long"
+    assert style.recognized_names["Song of Solomon"] == "SNG"
+    assert style.recognized_names["Apocalypse"] == "REV"
+
+
+def test_named_it_cei() -> None:
+    """Test loading the it-cei standard style."""
+    style = RefStyle.named("it-cei")
+    assert style.identifier == "it-cei"
+    assert style.chapter_verse_separator == ","
+    assert style.verse_range_separator == "."
+    assert style.recognized_names["Genesi"] == "GEN"
 
 
 def test_named_nonexistent() -> None:
