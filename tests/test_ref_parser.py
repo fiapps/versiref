@@ -99,7 +99,7 @@ def test_parse_nonexistent_reference() -> None:
     parser = RefParser(style, versification)
 
     # Try to parse a non-reference
-    ref = parser.parse_simple("This is not a Bible reference")
+    ref = parser.parse_simple("This is not a Bible reference", silent=True)
 
     assert ref is None
 
@@ -239,7 +239,7 @@ def test_parse_nonexistent_multi_book_reference() -> None:
     parser = RefParser(style, versification)
 
     # Try to parse a non-reference
-    ref = parser.parse("This is not a Bible reference")
+    ref = parser.parse("This is not a Bible reference", silent=True)
 
     assert ref is None
 

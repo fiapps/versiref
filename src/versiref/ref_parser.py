@@ -397,7 +397,7 @@ class RefParser:
             original_text=ref_original_text,
         )
 
-    def parse_simple(self, text: str, silent: bool = True) -> SimpleBibleRef | None:
+    def parse_simple(self, text: str, silent: bool = False) -> SimpleBibleRef | None:
         """Parse a string to produce a SimpleBibleRef.
 
         This method attempts to parse the entire string as a reference to a single book of the Bible.
@@ -407,7 +407,7 @@ class RefParser:
             silent: If True, return None on failure instead of raising a pyparsing.ParseException
 
         Returns:
-            A SimpleBibleRef instance, or None if parsing fails
+            A SimpleBibleRef instance, or None if silent=True and parsing fails
 
         """
         try:
@@ -423,7 +423,7 @@ class RefParser:
             else:
                 raise e
 
-    def parse(self, text: str, silent: bool = True) -> BibleRef | None:
+    def parse(self, text: str, silent: bool = False) -> BibleRef | None:
         """Parse a string to produce a BibleRef.
 
         This method attempts to parse the entire string as a reference to one or more books of the Bible.
@@ -433,7 +433,7 @@ class RefParser:
             silent: If True, return None on failure instead of raising a pyparsing.ParseException
 
         Returns:
-            A BibleRef instance, or None if parsing fails
+            A BibleRef instance, or None if silent=True and parsing fails
 
         """
         try:
