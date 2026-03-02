@@ -127,10 +127,11 @@ class Versification:
                 - "eng" — typical English Bible
                 - "lxx" — Septuagint
                 - "vulgata" — Latin Vulgate
-                - "nova-vulgata" — Nova Vulgata
+                - "nova_vulgata" — Nova Vulgata
                 - "nabre" — New American Bible Revised Edition
                 - "rsc" — Russian Synodal, Protestant canon
                 - "rso" — Russian Synodal, Orthodox canon
+                - "ethiopian_custom" — used by the Ethiopian Orthodox Church
 
                 Case-insensitive (converted to lowercase to find the file).
 

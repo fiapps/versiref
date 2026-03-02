@@ -48,7 +48,7 @@ The package has a layered architecture with five main classes:
 
 3. **`BibleRef`** - Represents verse ranges across one or more books. Contains a `Versification` and a list of `SimpleBibleRef`s. This is the main class for multi-book references.
 
-4. **`Versification`** - Represents how the Bible is divided into chapters and verses. Different texts (BHS, UBS GNT, LXX, Vulgate, English Bibles) divide things differently. Loaded from JSON data files in `src/versiref/data/versifications/`. Standard versifications: "org" (original languages), "eng" (English), "lxx", "vulgata", "nova-vulgata".
+4. **`Versification`** - Represents how the Bible is divided into chapters and verses. Different texts (BHS, UBS GNT, LXX, Vulgate, English Bibles) divide things differently. Loaded from JSON data files in `src/versiref/data/versifications/`. Standard versifications include "org" (original languages), "eng" (typical English), "lxx", and "vulgata".
 
 5. **`RefStyle`** - Defines separators and book names/abbreviations for formatting and parsing. Controls things like ":" vs "," for chapter-verse separator, "–" vs "-" for ranges, etc.
 
