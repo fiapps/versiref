@@ -21,6 +21,12 @@ VersiRef is a Python package for sophisticated parsing, manipulation, and printi
 - `RefParser` creates PEG parsers based on a `RefStyle` and `Versification`.
     - These can be used to parse a single reference or to find all references in a long string, e.g., the content of a text file.
 
+## License
+
+- Files in `src/versiref/data` are supplied under the [CC BY-SA 4.0 license](LICENSE-DATA).
+    - Data files defining these versifications were [created by the Copenhagen Alliance](https://github.com/Copenhagen-Alliance/versification-specification): eng, ethiopian_custom, lxx, nova_vulgata, org, rsc, rso, and vulgata.
+- All other files are supplied under an [MIT License](LICENSE).
+
 ## Examples
 
 ### Convert references from one style to another
