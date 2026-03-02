@@ -86,6 +86,59 @@ def test_is_single_chapter() -> None:
     assert v.is_single_chapter("2JN") is True
 
 
+def test_mapping_data_loaded() -> None:
+    """Test that mappedVerses data is parsed into mapping dicts."""
+    eng = Versification.named("eng")
+    assert len(eng._map_to_org) > 0
+    assert len(eng._map_from_org) > 0
+    # GEN 31:55 in eng maps to GEN 32:1 in org
+    assert eng._map_to_org[("GEN", 31, 55)] == ("GEN", 32, 1)
+
+
+def test_map_verse_with_mapping() -> None:
+    """Test mapping a verse that has an explicit mapping entry."""
+    eng = Versification.named("eng")
+    org = Versification.named("org")
+    assert eng.map_verse("GEN", 32, 1, org) == ("GEN", 32, 2)
+
+
+def test_map_verse_identity() -> None:
+    """Test mapping a verse with no mapping entry (identity)."""
+    eng = Versification.named("eng")
+    org = Versification.named("org")
+    assert eng.map_verse("GEN", 1, 1, org) == ("GEN", 1, 1)
+
+
+def test_map_verse_same_versification() -> None:
+    """Test mapping to the same versification returns input unchanged."""
+    eng = Versification.named("eng")
+    assert eng.map_verse("GEN", 32, 1, eng) == ("GEN", 32, 1)
+
+
+def test_map_verse_cross_book() -> None:
+    """Test mapping a verse that changes book ID."""
+    eng = Versification.named("eng")
+    org = Versification.named("org")
+    # eng BAR 6:1 maps to org LJE 1:1
+    assert eng.map_verse("BAR", 6, 1, org) == ("LJE", 1, 1)
+
+
+def test_map_verse_between_non_org() -> None:
+    """Test mapping between two non-org versifications via org."""
+    eng = Versification.named("eng")
+    vul = Versification.named("vulgata")
+    # eng GEN 32:1 -> org GEN 32:2 -> vul GEN 32:1
+    assert eng.map_verse("GEN", 32, 1, vul) == ("GEN", 32, 1)
+
+
+def test_map_verse_nonexistent_in_target() -> None:
+    """Test that mapping returns None when the verse doesn't exist in target."""
+    eng = Versification.named("eng")
+    org = Versification.named("org")
+    # BAR 6:73 maps to LJE 1:73 but LJE only has 72 verses in org
+    assert eng.map_verse("BAR", 6, 73, org) is None
+
+
 def test_includes() -> None:
     """Test checking if a book is included in the versification."""
     v = Versification.named("eng")

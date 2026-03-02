@@ -484,6 +484,107 @@ def test_format_single_chapter_book_verse_range() -> None:
     assert formatted == "Jude 3–5"
 
 
+def test_simple_map_with_mapping() -> None:
+    """Test mapping a SimpleBibleRef where verses have explicit mappings."""
+    eng = Versification.named("eng")
+    org = Versification.named("org")
+    # eng GEN 32:1-32 maps to org GEN 32:2-33
+    ref = SimpleBibleRef.for_range("GEN", 32, 1, end_verse=32)
+    mapped = ref.map(eng, org)
+    assert mapped is not None
+    assert mapped.book_id == "GEN"
+    vr = mapped.ranges[0]
+    assert vr.start_chapter == 32
+    assert vr.start_verse == 2
+    assert vr.end_verse == 33
+
+
+def test_simple_map_identity() -> None:
+    """Test mapping a SimpleBibleRef with no mapping entry (identity)."""
+    eng = Versification.named("eng")
+    org = Versification.named("org")
+    ref = SimpleBibleRef.for_range("GEN", 1, 1, end_verse=5)
+    mapped = ref.map(eng, org)
+    assert mapped is not None
+    vr = mapped.ranges[0]
+    assert vr.start_chapter == 1
+    assert vr.start_verse == 1
+    assert vr.end_verse == 5
+
+
+def test_simple_map_same_versification() -> None:
+    """Test mapping to the same versification returns equivalent ref."""
+    eng = Versification.named("eng")
+    ref = SimpleBibleRef.for_range("GEN", 32, 1, end_verse=32)
+    mapped = ref.map(eng, eng)
+    assert mapped is not None
+    vr = mapped.ranges[0]
+    assert vr.start_verse == 1
+    assert vr.end_verse == 32
+
+
+def test_simple_map_cross_book() -> None:
+    """Test mapping a SimpleBibleRef that changes book ID."""
+    eng = Versification.named("eng")
+    org = Versification.named("org")
+    # eng BAR 6:1-5 maps to org LJE 1:1-5
+    ref = SimpleBibleRef.for_range("BAR", 6, 1, end_verse=5)
+    mapped = ref.map(eng, org)
+    assert mapped is not None
+    assert mapped.book_id == "LJE"
+    vr = mapped.ranges[0]
+    assert vr.start_chapter == 1
+    assert vr.start_verse == 1
+    assert vr.end_verse == 5
+
+
+def test_simple_map_between_non_org() -> None:
+    """Test mapping between two non-org versifications."""
+    eng = Versification.named("eng")
+    vul = Versification.named("vulgata")
+    ref = SimpleBibleRef.for_range("GEN", 32, 1, end_verse=5)
+    mapped = ref.map(eng, vul)
+    assert mapped is not None
+    assert mapped.book_id == "GEN"
+
+
+def test_simple_map_whole_chapter() -> None:
+    """Test that whole-chapter references pass through unchanged."""
+    eng = Versification.named("eng")
+    org = Versification.named("org")
+    ref = SimpleBibleRef.for_range("GEN", 32, -1)
+    mapped = ref.map(eng, org)
+    assert mapped is not None
+    assert mapped.book_id == "GEN"
+    vr = mapped.ranges[0]
+    assert vr.start_chapter == 32
+    assert vr.start_verse == -1
+    assert vr.end_verse == -1
+
+
+def test_simple_map_nonexistent_in_target() -> None:
+    """Test that map returns None when a verse doesn't exist in the target."""
+    eng = Versification.named("eng")
+    org = Versification.named("org")
+    # BAR 6:73 maps to LJE 1:73 but LJE only has 72 verses in org
+    ref = SimpleBibleRef.for_range("BAR", 6, 70, end_verse=73)
+    mapped = ref.map(eng, org)
+    assert mapped is None
+
+
+def test_simple_map_ff_notation() -> None:
+    """Test mapping a reference with ff notation."""
+    eng = Versification.named("eng")
+    org = Versification.named("org")
+    # eng GEN 32:1ff -> org GEN 32:2ff
+    ref = SimpleBibleRef.for_range("GEN", 32, 1, end_verse=-1)
+    mapped = ref.map(eng, org)
+    assert mapped is not None
+    vr = mapped.ranges[0]
+    assert vr.start_verse == 2
+    assert vr.end_verse == -1
+
+
 def test_resolve_following_verses() -> None:
     """Test resolving ff ranges to definite references."""
     # Create a style and versification.
@@ -954,3 +1055,90 @@ def test_bible_ref_range_keys_ff_notation() -> None:
     # Matthew is book 40
     assert start_key == 40012046  # Matthew 12:46
     assert end_key == 40012050  # last verse of Matthew 12 is 50
+
+
+def test_map_to_with_mapping() -> None:
+    """Test mapping a verse range where verses have explicit mappings."""
+    eng = Versification.named("eng")
+    org = Versification.named("org")
+    # eng GEN 32:1-32 maps to org GEN 32:2-33
+    ref = BibleRef.for_range("GEN", 32, 1, end_verse=32, versification=eng)
+    mapped = ref.map_to(org)
+    assert mapped is not None
+    assert mapped.versification is org
+    assert mapped.simple_refs[0].book_id == "GEN"
+    vr = mapped.simple_refs[0].ranges[0]
+    assert vr.start_chapter == 32
+    assert vr.start_verse == 2
+    assert vr.end_chapter == 32
+    assert vr.end_verse == 33
+
+
+def test_map_to_identity() -> None:
+    """Test mapping a verse with no mapping entry passes through unchanged."""
+    eng = Versification.named("eng")
+    org = Versification.named("org")
+    ref = BibleRef.for_range("GEN", 1, 1, end_verse=5, versification=eng)
+    mapped = ref.map_to(org)
+    assert mapped is not None
+    vr = mapped.simple_refs[0].ranges[0]
+    assert vr.start_chapter == 1
+    assert vr.start_verse == 1
+    assert vr.end_verse == 5
+
+
+def test_map_to_same_versification() -> None:
+    """Test mapping to the same versification returns equivalent ref."""
+    eng = Versification.named("eng")
+    ref = BibleRef.for_range("GEN", 32, 1, end_verse=32, versification=eng)
+    mapped = ref.map_to(eng)
+    assert mapped is not None
+    assert mapped.versification is eng
+    vr = mapped.simple_refs[0].ranges[0]
+    assert vr.start_verse == 1
+    assert vr.end_verse == 32
+
+
+def test_map_to_cross_book() -> None:
+    """Test mapping a verse range that changes book ID."""
+    eng = Versification.named("eng")
+    org = Versification.named("org")
+    # eng BAR 6:1-5 maps to org LJE 1:1-5
+    ref = BibleRef.for_range("BAR", 6, 1, end_verse=5, versification=eng)
+    mapped = ref.map_to(org)
+    assert mapped is not None
+    assert mapped.simple_refs[0].book_id == "LJE"
+    vr = mapped.simple_refs[0].ranges[0]
+    assert vr.start_chapter == 1
+    assert vr.start_verse == 1
+    assert vr.end_verse == 5
+
+
+def test_map_to_between_non_org() -> None:
+    """Test mapping between two non-org versifications."""
+    eng = Versification.named("eng")
+    vul = Versification.named("vulgata")
+    ref = BibleRef.for_range("GEN", 32, 1, end_verse=5, versification=eng)
+    mapped = ref.map_to(vul)
+    assert mapped is not None
+    assert mapped.versification is vul
+
+
+def test_map_to_whole_chapter() -> None:
+    """Test that whole-chapter references pass through unchanged."""
+    eng = Versification.named("eng")
+    org = Versification.named("org")
+    ref = BibleRef.for_range("GEN", 32, -1, versification=eng)
+    mapped = ref.map_to(org)
+    assert mapped is not None
+    vr = mapped.simple_refs[0].ranges[0]
+    assert vr.start_chapter == 32
+    assert vr.start_verse == -1
+    assert vr.end_verse == -1
+
+
+def test_map_to_no_versification() -> None:
+    """Test that map_to returns None when versification is not set."""
+    ref = BibleRef.for_range("GEN", 1, 1)
+    org = Versification.named("org")
+    assert ref.map_to(org) is None

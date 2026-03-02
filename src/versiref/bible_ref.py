@@ -304,6 +304,86 @@ class SimpleBibleRef:
             last_range = range
         return result
 
+    def map(
+        self, source: Versification, target: Versification
+    ) -> "SimpleBibleRef | None":
+        """Map this reference from one versification to another.
+
+        Each verse location is mapped from the source versification to the
+        target, going through the "org" (original languages) versification as
+        an intermediary. Whole-chapter references pass through unchanged.
+
+        Args:
+            source: The Versification this reference is currently in
+            target: The Versification to map into
+
+        Returns:
+            A new SimpleBibleRef in the target versification, or None if any
+            verse does not exist in the target
+
+        """
+        new_ranges: list[VerseRange] = []
+        for vr in self.ranges:
+            if vr.is_whole_chapters():
+                new_ranges.append(
+                    VerseRange(
+                        vr.start_chapter,
+                        vr.start_verse,
+                        vr.start_subverse,
+                        vr.end_chapter,
+                        vr.end_verse,
+                        vr.end_subverse,
+                    )
+                )
+                continue
+
+            start = source.map_verse(
+                self.book_id, vr.start_chapter, vr.start_verse, target
+            )
+            if start is None:
+                return None
+
+            if vr.end_verse < 0:
+                new_ranges.append(
+                    VerseRange(
+                        start[1],
+                        start[2],
+                        vr.start_subverse,
+                        start[1],
+                        vr.end_verse,
+                        vr.end_subverse,
+                    )
+                )
+                continue
+
+            end = source.map_verse(self.book_id, vr.end_chapter, vr.end_verse, target)
+            if end is None:
+                return None
+
+            new_ranges.append(
+                VerseRange(
+                    start[1],
+                    start[2],
+                    vr.start_subverse,
+                    end[1],
+                    end[2],
+                    vr.end_subverse,
+                )
+            )
+
+        new_book = self.book_id
+        if new_ranges and not new_ranges[0].is_whole_chapters():
+            mapped_start = source.map_verse(
+                self.book_id,
+                self.ranges[0].start_chapter,
+                max(self.ranges[0].start_verse, 1),
+                target,
+            )
+            if mapped_start is not None:
+                new_book = mapped_start[0]
+
+        return SimpleBibleRef(new_book, new_ranges)
+
     def resolve_following_verses(self, versification: Versification) -> None:
         """Resolve following verses in the verse ranges.
 
@@ -487,6 +567,35 @@ class BibleRef:
                     versification=self.versification,
                     original_text=range_ref.original_text,
                 )
+
+    def map_to(self, target: Versification) -> "BibleRef | None":
+        """Map this reference into a different versification.
+
+        Each verse location is mapped from this reference's versification to
+        the target, going through the "org" (original languages) versification
+        as an intermediary. Whole-chapter and whole-book references pass
+        through unchanged.
+
+        Args:
+            target: The target Versification to map into
+
+        Returns:
+            A new BibleRef in the target versification, or None if this
+            reference has no versification set or any verse does not exist
+            in the target
+
+        """
+        if self.versification is None:
+            return None
+
+        new_simple_refs: list[SimpleBibleRef] = []
+        for simple_ref in self.simple_refs:
+            mapped = simple_ref.map(self.versification, target)
+            if mapped is None:
+                return None
+            new_simple_refs.append(mapped)
+
+        return BibleRef(new_simple_refs, target)
 
     def format(self, style: RefStyle) -> str:
         """Format this Bible reference as a string according to the given style.
