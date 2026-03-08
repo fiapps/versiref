@@ -44,7 +44,7 @@ def convert_reference(reference: str) -> None:
     # Build parser for style
     parser = RefParser(sbl_style, versification)
     # Use Italian CEI Bible style for output
-    cei_style = sbl_style = RefStyle.named("it-cei")
+    cei_style = RefStyle.named("it-cei")
     try:
         ref = parser.parse(reference, silent=False)
         # Check whether it refers to verse ranges that exist
@@ -102,6 +102,26 @@ Isa 7:10–14
 Luke 1:26–38
 Warning: Ps 118:120 is not a valid reference.
 Found 4 references.
+```
+
+### Map a reference to a different versification
+
+```python
+from versiref import RefParser, RefStyle, Versification
+
+# Parse a reference using typical English versification
+eng = Versification.named("eng")
+style = RefStyle.named("en-sbl")
+parser = RefParser(style, eng)
+ref = parser.parse("Ps 23:1-3")
+
+# Map to Septuagint versification
+lxx = Versification.named("LXX")  # Names are case insensitive.
+mapped = ref.map_to(lxx)
+
+# The Psalm number is one lower
+assert mapped is not None
+print(mapped.format(style))  # Ps 22:1-3
 ```
 
 ## Development
