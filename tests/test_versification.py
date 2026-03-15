@@ -94,7 +94,10 @@ def test_mapping_data_loaded() -> None:
     assert len(eng._map_to_org) > 0
     assert len(eng._map_from_org) > 0
     # GEN 31:55 in eng maps to GEN 32:1 in org
-    assert eng._map_to_org[("GEN", 31, 55, "")] == ("GEN", 32, 1, "")
+    assert eng._map_to_org[("GEN", 31, 55, "")] == (
+        ("GEN", 32, 1, ""),
+        ("GEN", 32, 1, ""),
+    )
 
 
 def test_map_verse_with_mapping() -> None:
@@ -156,7 +159,10 @@ def test_subverse_mapping_data_loaded() -> None:
     eng = Versification.named("eng")
     # ESG 1:1 in eng maps to ESG 1:1a in org
     assert ("ESG", 1, 1, "") in eng._map_to_org
-    assert eng._map_to_org[("ESG", 1, 1, "")] == ("ESG", 1, 1, "a")
+    assert eng._map_to_org[("ESG", 1, 1, "")] == (
+        ("ESG", 1, 1, "a"),
+        ("ESG", 1, 1, "a"),
+    )
 
 
 def test_map_verse_with_subverse() -> None:
@@ -174,6 +180,39 @@ def test_map_verse_subverse_roundtrip() -> None:
     assert result is not None
     back = org.map_verse(result[0], result[1], result[2], eng, subverse=result[3])
     assert back == ("ESG", 8, 32, "")
+
+
+def test_mismatched_mapping_data_loaded() -> None:
+    """Test that mismatched-size mappedVerses entries are loaded."""
+    rsc = Versification.named("rsc")
+    # PSA 141:0 in rsc maps to PSA 142:0-1 in org (1:2 mapping)
+    assert rsc._map_to_org[("PSA", 141, 0, "")] == (
+        ("PSA", 142, 0, ""),
+        ("PSA", 142, 1, ""),
+    )
+
+
+def test_map_verse_1_to_n_start() -> None:
+    """Test mapping start of a 1:N verse mapping."""
+    rsc = Versification.named("rsc")
+    org = Versification.named("org")
+    assert rsc.map_verse("PSA", 141, 0, org, end=False) == ("PSA", 142, 0, "")
+
+
+def test_map_verse_1_to_n_end() -> None:
+    """Test mapping end of a 1:N verse mapping."""
+    rsc = Versification.named("rsc")
+    org = Versification.named("org")
+    assert rsc.map_verse("PSA", 141, 0, org, end=True) == ("PSA", 142, 1, "")
+
+
+def test_map_verse_n_to_1() -> None:
+    """Test mapping an N:1 verse mapping returns same result for start and end."""
+    rsc = Versification.named("rsc")
+    org = Versification.named("org")
+    # PSA 89:0-1 in rsc maps to PSA 90:0 in org
+    assert rsc.map_verse("PSA", 89, 1, org, end=False) == ("PSA", 90, 0, "")
+    assert rsc.map_verse("PSA", 89, 1, org, end=True) == ("PSA", 90, 0, "")
 
 
 def test_no_warnings_loading_versifications(caplog: pytest.LogCaptureFixture) -> None:

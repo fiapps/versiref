@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 _VERSE_RE = re.compile(r"^([A-Z0-9]{3}) (\d+):(\d+)([a-z])?(?:-(\d+)([a-z])?)?$")
 
 _VerseLoc = tuple[str, int, int, str]
+_VerseLocRange = tuple[_VerseLoc, _VerseLoc]
 
 
 @dataclass
@@ -30,8 +31,12 @@ class Versification:
 
     max_verses: dict[str, list[int]] = field(default_factory=dict)
     identifier: str | None = None
-    _map_to_org: dict[_VerseLoc, _VerseLoc] = field(default_factory=dict, repr=False)
-    _map_from_org: dict[_VerseLoc, _VerseLoc] = field(default_factory=dict, repr=False)
+    _map_to_org: dict[_VerseLoc, _VerseLocRange] = field(
+        default_factory=dict, repr=False
+    )
+    _map_from_org: dict[_VerseLoc, _VerseLocRange] = field(
+        default_factory=dict, repr=False
+    )
 
     def __str__(self) -> str:
         """Return a string representation of this versification.
@@ -73,8 +78,8 @@ class Versification:
         for book, verses in data["maxVerses"].items():
             max_verses[book] = [int(v) for v in verses]
 
-        map_to_org: dict[_VerseLoc, _VerseLoc] = {}
-        map_from_org: dict[_VerseLoc, _VerseLoc] = {}
+        map_to_org: dict[_VerseLoc, _VerseLocRange] = {}
+        map_from_org: dict[_VerseLoc, _VerseLocRange] = {}
         for src_str, dst_str in data.get("mappedVerses", {}).items():
             src_m = _VERSE_RE.match(src_str)
             dst_m = _VERSE_RE.match(dst_str)
@@ -99,21 +104,34 @@ class Versification:
             dst_sv1 = dst_m.group(4) or ""
             src_v2 = int(src_m.group(5)) if src_m.group(5) else src_v1
             dst_v2 = int(dst_m.group(5)) if dst_m.group(5) else dst_v1
-            count = src_v2 - src_v1 + 1
-            if count != dst_v2 - dst_v1 + 1 or count < 1:
+            src_count = src_v2 - src_v1 + 1
+            dst_count = dst_v2 - dst_v1 + 1
+            if src_count < 1 or dst_count < 1:
                 logger.debug(
-                    "Skipping mappedVerses entry with mismatched range sizes: %r -> %r",
+                    "Skipping mappedVerses entry with invalid range: %r -> %r",
                     src_str,
                     dst_str,
                 )
                 continue
-            for i in range(count):
-                src_sv = src_sv1 if count == 1 else ""
-                dst_sv = dst_sv1 if count == 1 else ""
-                src_loc = (src_book, src_ch, src_v1 + i, src_sv)
-                dst_loc = (dst_book, dst_ch, dst_v1 + i, dst_sv)
-                map_to_org[src_loc] = dst_loc
-                map_from_org[dst_loc] = src_loc
+            if src_count == dst_count:
+                for i in range(src_count):
+                    src_sv = src_sv1 if src_count == 1 else ""
+                    dst_sv = dst_sv1 if src_count == 1 else ""
+                    src_loc = (src_book, src_ch, src_v1 + i, src_sv)
+                    dst_loc = (dst_book, dst_ch, dst_v1 + i, dst_sv)
+                    map_to_org[src_loc] = (dst_loc, dst_loc)
+                    map_from_org[dst_loc] = (src_loc, src_loc)
+            else:
+                dst_start: _VerseLoc = (dst_book, dst_ch, dst_v1, dst_sv1)
+                dst_end: _VerseLoc = (dst_book, dst_ch, dst_v2, "")
+                src_start: _VerseLoc = (src_book, src_ch, src_v1, src_sv1)
+                src_end: _VerseLoc = (src_book, src_ch, src_v2, "")
+                for i in range(src_count):
+                    src_loc = (src_book, src_ch, src_v1 + i, "")
+                    map_to_org[src_loc] = (dst_start, dst_end)
+                for i in range(dst_count):
+                    dst_loc = (dst_book, dst_ch, dst_v1 + i, "")
+                    map_from_org[dst_loc] = (src_start, src_end)
 
         return cls(max_verses, identifier, map_to_org, map_from_org)
 
@@ -222,6 +240,8 @@ class Versification:
         verse: int,
         target: "Versification",
         subverse: str = "",
+        *,
+        end: bool = False,
     ) -> _VerseLoc | None:
         """Map a single verse location from this versification to another.
 
@@ -236,6 +256,7 @@ class Versification:
             verse: The verse number in this versification
             target: The target Versification to map into
             subverse: The subverse letter in this versification (default "")
+            end: If True, select the end of the mapped range; otherwise the start
 
         Returns:
             A (book, chapter, verse, subverse) tuple in the target
@@ -246,8 +267,11 @@ class Versification:
             return (book, chapter, verse, subverse)
 
         loc = (book, chapter, verse, subverse)
-        org_loc = self._map_to_org.get(loc, loc)
-        result = target._map_from_org.get(org_loc, org_loc)
+        idx = 1 if end else 0
+        org_range = self._map_to_org.get(loc)
+        org_loc = org_range[idx] if org_range else loc
+        target_range = target._map_from_org.get(org_loc)
+        result = target_range[idx] if target_range else org_loc
 
         if target.last_verse(result[0], result[1]) < result[2]:
             return None

@@ -1168,6 +1168,38 @@ def test_simple_map_subverse_roundtrip() -> None:
     assert vr.start_subverse == ""
 
 
+def test_simple_map_1_to_n() -> None:
+    """Test mapping a SimpleBibleRef with a 1:N verse mapping."""
+    rsc = Versification.named("rsc")
+    org = Versification.named("org")
+    # rsc PSA 141:0 maps to org PSA 142:0-1
+    ref = SimpleBibleRef.for_range("PSA", 141, 0)
+    mapped = ref.map(rsc, org)
+    assert mapped is not None
+    assert mapped.book_id == "PSA"
+    vr = mapped.ranges[0]
+    assert vr.start_chapter == 142
+    assert vr.start_verse == 0
+    assert vr.end_chapter == 142
+    assert vr.end_verse == 1
+
+
+def test_simple_map_n_to_1() -> None:
+    """Test mapping a SimpleBibleRef with an N:1 verse mapping."""
+    rsc = Versification.named("rsc")
+    org = Versification.named("org")
+    # rsc PSA 89:0-1 maps to org PSA 90:0
+    ref = SimpleBibleRef.for_range("PSA", 89, 0, end_verse=1)
+    mapped = ref.map(rsc, org)
+    assert mapped is not None
+    assert mapped.book_id == "PSA"
+    vr = mapped.ranges[0]
+    assert vr.start_chapter == 90
+    assert vr.start_verse == 0
+    assert vr.end_chapter == 90
+    assert vr.end_verse == 0
+
+
 def test_map_to_no_versification() -> None:
     """Test that map_to returns None when versification is not set."""
     ref = BibleRef.for_range("GEN", 1, 1)

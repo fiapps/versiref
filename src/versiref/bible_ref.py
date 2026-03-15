@@ -366,6 +366,7 @@ class SimpleBibleRef:
                 vr.end_verse,
                 target,
                 subverse=vr.end_subverse,
+                end=True,
             )
             if end is None:
                 return None
