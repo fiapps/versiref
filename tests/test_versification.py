@@ -1,5 +1,7 @@
 """Tests for the Versification class."""
 
+import logging
+
 import pytest  # noqa: F401
 from versiref.versification import Versification
 
@@ -92,27 +94,27 @@ def test_mapping_data_loaded() -> None:
     assert len(eng._map_to_org) > 0
     assert len(eng._map_from_org) > 0
     # GEN 31:55 in eng maps to GEN 32:1 in org
-    assert eng._map_to_org[("GEN", 31, 55)] == ("GEN", 32, 1)
+    assert eng._map_to_org[("GEN", 31, 55, "")] == ("GEN", 32, 1, "")
 
 
 def test_map_verse_with_mapping() -> None:
     """Test mapping a verse that has an explicit mapping entry."""
     eng = Versification.named("eng")
     org = Versification.named("org")
-    assert eng.map_verse("GEN", 32, 1, org) == ("GEN", 32, 2)
+    assert eng.map_verse("GEN", 32, 1, org) == ("GEN", 32, 2, "")
 
 
 def test_map_verse_identity() -> None:
     """Test mapping a verse with no mapping entry (identity)."""
     eng = Versification.named("eng")
     org = Versification.named("org")
-    assert eng.map_verse("GEN", 1, 1, org) == ("GEN", 1, 1)
+    assert eng.map_verse("GEN", 1, 1, org) == ("GEN", 1, 1, "")
 
 
 def test_map_verse_same_versification() -> None:
     """Test mapping to the same versification returns input unchanged."""
     eng = Versification.named("eng")
-    assert eng.map_verse("GEN", 32, 1, eng) == ("GEN", 32, 1)
+    assert eng.map_verse("GEN", 32, 1, eng) == ("GEN", 32, 1, "")
 
 
 def test_map_verse_cross_book() -> None:
@@ -120,7 +122,7 @@ def test_map_verse_cross_book() -> None:
     eng = Versification.named("eng")
     org = Versification.named("org")
     # eng BAR 6:1 maps to org LJE 1:1
-    assert eng.map_verse("BAR", 6, 1, org) == ("LJE", 1, 1)
+    assert eng.map_verse("BAR", 6, 1, org) == ("LJE", 1, 1, "")
 
 
 def test_map_verse_between_non_org() -> None:
@@ -128,7 +130,7 @@ def test_map_verse_between_non_org() -> None:
     eng = Versification.named("eng")
     vul = Versification.named("vulgata")
     # eng GEN 32:1 -> org GEN 32:2 -> vul GEN 32:1
-    assert eng.map_verse("GEN", 32, 1, vul) == ("GEN", 32, 1)
+    assert eng.map_verse("GEN", 32, 1, vul) == ("GEN", 32, 1, "")
 
 
 def test_map_verse_nonexistent_in_target() -> None:
@@ -147,3 +149,47 @@ def test_includes() -> None:
     assert v.includes("PSAS") is True
     assert v.includes("XYZ") is False  # Nonexistent book
     assert v.includes("REV") is True
+
+
+def test_subverse_mapping_data_loaded() -> None:
+    """Test that subverse mapping entries are parsed correctly."""
+    eng = Versification.named("eng")
+    # ESG 1:1 in eng maps to ESG 1:1a in org
+    assert ("ESG", 1, 1, "") in eng._map_to_org
+    assert eng._map_to_org[("ESG", 1, 1, "")] == ("ESG", 1, 1, "a")
+
+
+def test_map_verse_with_subverse() -> None:
+    """Test mapping a verse that maps to a subverse location."""
+    eng = Versification.named("eng")
+    org = Versification.named("org")
+    assert eng.map_verse("ESG", 8, 32, org) == ("ESG", 8, 12, "u")
+
+
+def test_map_verse_subverse_roundtrip() -> None:
+    """Test round-tripping a subverse mapping eng -> org -> eng."""
+    eng = Versification.named("eng")
+    org = Versification.named("org")
+    result = eng.map_verse("ESG", 8, 32, org)
+    assert result is not None
+    back = org.map_verse(result[0], result[1], result[2], eng, subverse=result[3])
+    assert back == ("ESG", 8, 32, "")
+
+
+def test_no_warnings_loading_versifications(caplog: pytest.LogCaptureFixture) -> None:
+    """Test that loading all standard versifications produces no warnings."""
+    identifiers = [
+        "org",
+        "eng",
+        "lxx",
+        "vulgata",
+        "nova_vulgata",
+        "nabre",
+        "rsc",
+        "rso",
+        "ethiopian_custom",
+    ]
+    with caplog.at_level(logging.WARNING, logger="versiref.versification"):
+        for ident in identifiers:
+            Versification.named(ident)
+    assert len(caplog.records) == 0

@@ -1137,6 +1137,37 @@ def test_map_to_whole_chapter() -> None:
     assert vr.end_verse == -1
 
 
+def test_simple_map_with_subverse() -> None:
+    """Test mapping a SimpleBibleRef that maps to a subverse location."""
+    eng = Versification.named("eng")
+    org = Versification.named("org")
+    # eng ESG 8:13 maps to org ESG 8:12a (single verse)
+    ref = SimpleBibleRef("ESG", [VerseRange(8, 13, "", 8, 13, "")])
+    mapped = ref.map(eng, org)
+    assert mapped is not None
+    assert mapped.book_id == "ESG"
+    vr = mapped.ranges[0]
+    assert vr.start_chapter == 8
+    assert vr.start_verse == 12
+    assert vr.start_subverse == "a"
+
+
+def test_simple_map_subverse_roundtrip() -> None:
+    """Test round-tripping a subverse mapping through SimpleBibleRef.map()."""
+    eng = Versification.named("eng")
+    org = Versification.named("org")
+    ref = SimpleBibleRef("ESG", [VerseRange(8, 13, "", 8, 13, "")])
+    mapped = ref.map(eng, org)
+    assert mapped is not None
+    back = mapped.map(org, eng)
+    assert back is not None
+    assert back.book_id == "ESG"
+    vr = back.ranges[0]
+    assert vr.start_chapter == 8
+    assert vr.start_verse == 13
+    assert vr.start_subverse == ""
+
+
 def test_map_to_no_versification() -> None:
     """Test that map_to returns None when versification is not set."""
     ref = BibleRef.for_range("GEN", 1, 1)

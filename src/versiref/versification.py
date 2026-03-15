@@ -8,9 +8,9 @@ from importlib import resources
 
 logger = logging.getLogger(__name__)
 
-_VERSE_RE = re.compile(r"^([A-Z0-9]{3}) (\d+):(\d+)(?:-(\d+))?$")
+_VERSE_RE = re.compile(r"^([A-Z0-9]{3}) (\d+):(\d+)([a-z])?(?:-(\d+)([a-z])?)?$")
 
-_VerseLoc = tuple[str, int, int]
+_VerseLoc = tuple[str, int, int, str]
 
 
 @dataclass
@@ -90,24 +90,28 @@ class Versification:
                 int(src_m.group(2)),
                 int(src_m.group(3)),
             )
+            src_sv1 = src_m.group(4) or ""
             dst_book, dst_ch, dst_v1 = (
                 dst_m.group(1),
                 int(dst_m.group(2)),
                 int(dst_m.group(3)),
             )
-            src_v2 = int(src_m.group(4)) if src_m.group(4) else src_v1
-            dst_v2 = int(dst_m.group(4)) if dst_m.group(4) else dst_v1
+            dst_sv1 = dst_m.group(4) or ""
+            src_v2 = int(src_m.group(5)) if src_m.group(5) else src_v1
+            dst_v2 = int(dst_m.group(5)) if dst_m.group(5) else dst_v1
             count = src_v2 - src_v1 + 1
             if count != dst_v2 - dst_v1 + 1 or count < 1:
-                logger.warning(
+                logger.debug(
                     "Skipping mappedVerses entry with mismatched range sizes: %r -> %r",
                     src_str,
                     dst_str,
                 )
                 continue
             for i in range(count):
-                src_loc = (src_book, src_ch, src_v1 + i)
-                dst_loc = (dst_book, dst_ch, dst_v1 + i)
+                src_sv = src_sv1 if count == 1 else ""
+                dst_sv = dst_sv1 if count == 1 else ""
+                src_loc = (src_book, src_ch, src_v1 + i, src_sv)
+                dst_loc = (dst_book, dst_ch, dst_v1 + i, dst_sv)
                 map_to_org[src_loc] = dst_loc
                 map_from_org[dst_loc] = src_loc
 
@@ -217,6 +221,7 @@ class Versification:
         chapter: int,
         verse: int,
         target: "Versification",
+        subverse: str = "",
     ) -> _VerseLoc | None:
         """Map a single verse location from this versification to another.
 
@@ -230,16 +235,18 @@ class Versification:
             chapter: The chapter number in this versification
             verse: The verse number in this versification
             target: The target Versification to map into
+            subverse: The subverse letter in this versification (default "")
 
         Returns:
-            A (book, chapter, verse) tuple in the target versification,
-            or None if the verse does not exist there
+            A (book, chapter, verse, subverse) tuple in the target
+            versification, or None if the verse does not exist there
 
         """
         if self is target:
-            return (book, chapter, verse)
+            return (book, chapter, verse, subverse)
 
-        org_loc = self._map_to_org.get((book, chapter, verse), (book, chapter, verse))
+        loc = (book, chapter, verse, subverse)
+        org_loc = self._map_to_org.get(loc, loc)
         result = target._map_from_org.get(org_loc, org_loc)
 
         if target.last_verse(result[0], result[1]) < result[2]:

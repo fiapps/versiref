@@ -338,7 +338,11 @@ class SimpleBibleRef:
                 continue
 
             start = source.map_verse(
-                self.book_id, vr.start_chapter, vr.start_verse, target
+                self.book_id,
+                vr.start_chapter,
+                vr.start_verse,
+                target,
+                subverse=vr.start_subverse,
             )
             if start is None:
                 return None
@@ -348,7 +352,7 @@ class SimpleBibleRef:
                     VerseRange(
                         start[1],
                         start[2],
-                        vr.start_subverse,
+                        start[3],
                         start[1],
                         vr.end_verse,
                         vr.end_subverse,
@@ -356,7 +360,13 @@ class SimpleBibleRef:
                 )
                 continue
 
-            end = source.map_verse(self.book_id, vr.end_chapter, vr.end_verse, target)
+            end = source.map_verse(
+                self.book_id,
+                vr.end_chapter,
+                vr.end_verse,
+                target,
+                subverse=vr.end_subverse,
+            )
             if end is None:
                 return None
 
@@ -364,10 +374,10 @@ class SimpleBibleRef:
                 VerseRange(
                     start[1],
                     start[2],
-                    vr.start_subverse,
+                    start[3],
                     end[1],
                     end[2],
-                    vr.end_subverse,
+                    end[3],
                 )
             )
 
@@ -378,6 +388,7 @@ class SimpleBibleRef:
                 self.ranges[0].start_chapter,
                 max(self.ranges[0].start_verse, 1),
                 target,
+                subverse=self.ranges[0].start_subverse,
             )
             if mapped_start is not None:
                 new_book = mapped_start[0]
