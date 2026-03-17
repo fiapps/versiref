@@ -153,7 +153,6 @@ class Versification:
                 - "nabre" — New American Bible Revised Edition
                 - "rsc" — Russian Synodal, Protestant canon
                 - "rso" — Russian Synodal, Orthodox canon
-                - "ethiopian_custom" — used by the Ethiopian Orthodox Church
 
                 Case-insensitive (converted to lowercase to find the file).
 

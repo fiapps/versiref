@@ -226,7 +226,6 @@ def test_no_warnings_loading_versifications(caplog: pytest.LogCaptureFixture) ->
         "nabre",
         "rsc",
         "rso",
-        "ethiopian_custom",
     ]
     with caplog.at_level(logging.WARNING, logger="versiref.versification"):
         for ident in identifiers:
