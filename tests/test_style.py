@@ -199,6 +199,14 @@ def test_named_en_cmos_long() -> None:
     assert style.recognized_names["Apocalypse"] == "REV"
 
 
+def test_named_en_bibleworks() -> None:
+    """Test loading the en-bibleworks standard style."""
+    style = RefStyle.named("en-bibleworks")
+    assert style.identifier == "en-bibleworks"
+    assert style.recognized_names["Esg"] == "ESG"
+    assert style.recognized_names["Tbs"] == "TOB"
+
+
 def test_named_it_cei() -> None:
     """Test loading the it-cei standard style."""
     style = RefStyle.named("it-cei")
