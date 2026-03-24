@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.4.1
+
+### Added
+
+- NABRE and CEI (2008) versifications with verse mappings from the Copenhagen Alliance versification sniffer.
+- BibleWorks book name abbreviations (`en-bibleworks` standard names *and* style).
+
+### Changed
+
+- `ethiopian_custom` versification excluded from the built package due to errors (resolves #27).
+- N:1 and 1:N verse mappings now supported in `BibleRef.map_to()`.
+- Subverse letters in versification mappings now supported.
+- Fixed malformed mapping entries in `vulgata`, `nova_vulgata`, `rsc`, and `rso` versifications.
+
 ## 0.4.0
 
 ### Added
