@@ -109,41 +109,68 @@ class RefStyle:
         """Create an instance from a dictionary.
 
         Args:
-            data: A dictionary with a required "names" key (string identifier or
-                dict mapping book IDs to names), optional separator fields, and an
-                optional "also_recognize" list.
+            data: A dictionary with either a "names" key (string identifier or
+                dict mapping book IDs to names) or a "base" key (identifier of a
+                standard style to inherit from), but not both. Optional separator
+                fields override the defaults (or the base style's values), and an
+                optional "also_recognize" list adds extra recognized names.
 
         Raises:
-            ValueError: If "names" is missing from the dictionary.
+            ValueError: If neither "names" nor "base" is present, or if both are.
 
         Returns:
             A newly constructed RefStyle
 
         """
-        if "names" not in data:
-            raise ValueError("RefStyle data must include 'names'")
+        has_names = "names" in data
+        has_base = "base" in data
 
-        names_value = data["names"]
-        if isinstance(names_value, str):
-            names = standard_names(names_value)
-        elif isinstance(names_value, dict):
-            names = dict(names_value)
-        else:
-            raise ValueError("'names' must be a string or dict")
+        if has_names and has_base:
+            raise ValueError("RefStyle data must not include both 'names' and 'base'")
 
-        def _str(key: str, default: str) -> str:
-            val = data.get(key, default)
-            return val if isinstance(val, str) else default
-
-        style = cls(
-            names=names,
-            chapter_verse_separator=_str("chapter_verse_separator", ":"),
-            range_separator=_str("range_separator", "\u2013"),
-            following_verse=_str("following_verse", "f"),
-            following_verses=_str("following_verses", "ff"),
-            verse_range_separator=_str("verse_range_separator", ", "),
-            chapter_separator=_str("chapter_separator", "; "),
+        _separator_keys = (
+            "chapter_verse_separator",
+            "range_separator",
+            "following_verse",
+            "following_verses",
+            "verse_range_separator",
+            "chapter_separator",
         )
+
+        if has_base:
+            base_value = data["base"]
+            if not isinstance(base_value, str):
+                raise ValueError("'base' must be a string identifier")
+            style = cls.named(base_value)
+            style.identifier = None
+            for key in _separator_keys:
+                val = data.get(key)
+                if isinstance(val, str):
+                    setattr(style, key, val)
+        else:
+            if not has_names:
+                raise ValueError("RefStyle data must include 'names' or 'base'")
+            names_value = data["names"]
+            if isinstance(names_value, str):
+                names = standard_names(names_value)
+            elif isinstance(names_value, dict):
+                names = dict(names_value)
+            else:
+                raise ValueError("'names' must be a string or dict")
+
+            def _str(key: str, default: str) -> str:
+                val = data.get(key, default)
+                return val if isinstance(val, str) else default
+
+            style = cls(
+                names=names,
+                chapter_verse_separator=_str("chapter_verse_separator", ":"),
+                range_separator=_str("range_separator", "\u2013"),
+                following_verse=_str("following_verse", "f"),
+                following_verses=_str("following_verses", "ff"),
+                verse_range_separator=_str("verse_range_separator", ", "),
+                chapter_separator=_str("chapter_separator", "; "),
+            )
 
         also_recognize = data.get("also_recognize")
         if isinstance(also_recognize, list):

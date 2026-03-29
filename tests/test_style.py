@@ -80,6 +80,38 @@ def test_from_dict_missing_names() -> None:
         RefStyle.from_dict({"chapter_verse_separator": ":"})
 
 
+def test_from_dict_with_base() -> None:
+    """Test from_dict with base inherits names and separators from the base style."""
+    base = RefStyle.named("en-sbl")
+    style = RefStyle.from_dict({"base": "en-sbl"})
+    assert style.names == base.names
+    assert style.chapter_verse_separator == base.chapter_verse_separator
+    assert style.identifier is None
+
+
+def test_from_dict_with_base_override() -> None:
+    """Test from_dict with base applies separator overrides."""
+    style = RefStyle.from_dict(
+        {"base": "en-sbl", "chapter_verse_separator": ",", "range_separator": "-"}
+    )
+    assert style.names == RefStyle.named("en-sbl").names
+    assert style.chapter_verse_separator == ","
+    assert style.range_separator == "-"
+
+
+def test_from_dict_with_base_and_also_recognize() -> None:
+    """Test from_dict with base processes also_recognize."""
+    style = RefStyle.from_dict({"base": "en-sbl", "also_recognize": ["en-sbl_names"]})
+    assert style.recognized_names["Genesis"] == "GEN"
+    assert style.recognized_names["Gen"] == "GEN"
+
+
+def test_from_dict_base_and_names_raises() -> None:
+    """Test from_dict raises ValueError when both base and names are present."""
+    with pytest.raises(ValueError, match="both"):
+        RefStyle.from_dict({"base": "en-sbl", "names": "en-sbl_abbreviations"})
+
+
 def test_from_dict_with_also_recognize_string() -> None:
     """Test from_dict processes also_recognize string entries."""
     style = RefStyle.from_dict(
