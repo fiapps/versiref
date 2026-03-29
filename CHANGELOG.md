@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.4.2
+
+### Added
+
+- `RefStyle.from_dict()` now supports a `base` key to inherit settings from another named style.
+
+### Fixed
+
+- `following_verse` and `following_verses` in the `it-cei` style now correctly use `"s"` and `"ss"`.
+
 ## 0.4.1
 
 ### Added
