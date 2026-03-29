@@ -2,6 +2,8 @@
   "names": "it-cei_abbreviazioni",
   "chapter_verse_separator": ",",
   "verse_range_separator": ".",
+  "following_verse": "s",
+  "following_verses": "ss",
   "also_recognize": [
     "it-cei_nomi"
   ]
