@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.5.0
+
+### Added
+
+- `Sensitivity` enum to control which reference types are reported when scanning text (`VERSE`, `CHAPTER`, `BOOK`).
+- `RefParser` can now parse references to whole chapters (e.g., "John 3") and whole books (e.g., "Genesis") (resolves #18).
+- `SimpleBibleRef.range_keys()` method, refactored from `BibleRef.range_keys()`.
+- Whole-book `SimpleBibleRef`s now yield a key pair spanning the entire book in `range_keys()`.
+
+### Fixed
+
+- Corrected an abbreviation in `it-cei_abbreviazioni.json`.
+
 ## 0.4.2
 
 ### Added

@@ -1,6 +1,6 @@
 [project]
 name = "versiref"
-version = "0.4.2"
+version = "0.5.0"
 description = "A package for sophisticated parsing, manipulation, and printing of references to the Bible"
 readme = "README.md"
 authors = [
