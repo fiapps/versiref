@@ -5,6 +5,7 @@ This module provides the RefParser class for parsing Bible references from strin
 We don't call pp.ParserElement.enablePackrat() because it made parsing slower.
 """
 
+from enum import Enum
 from typing import Callable, Generator
 
 import pyparsing as pp
@@ -13,6 +14,18 @@ from pyparsing import common
 from versiref.bible_ref import BibleRef, SimpleBibleRef, VerseRange
 from versiref.ref_style import RefStyle
 from versiref.versification import Versification
+
+
+class Sensitivity(Enum):
+    """Controls which references are reported when scanning text.
+
+    Higher sensitivity means more matches, including more false-positive-prone
+    ones like bare book names.
+    """
+
+    VERSE = "verse"
+    CHAPTER = "chapter"
+    BOOK = "book"
 
 
 def _get_int(tokens: pp.ParseResults, name: str, default: int) -> int:
@@ -183,8 +196,38 @@ class RefParser:
             + location_marker.copy().set_results_name("end_location")
         ).set_parse_action(self._make_simple_ref)
 
-        # Try the parser with longer matches first, lest Jude 1:5 parse as Jude 1.
-        self.simple_ref_parser = book_chapter_verse_ranges | sc_book_verse_ranges
+        # Whole-chapter references: "John 3", "John 3–5", "John 3; 5; 7"
+        chapter_only_range = (
+            chapter.copy().set_results_name("start_chapter")
+            + pp.Opt(range_separator + chapter.copy().set_results_name("end_chapter"))
+            + location_marker.copy().set_results_name("end_location")
+        ).set_parse_action(self._make_chapter_only_range)
+
+        chapter_only_ranges = pp.DelimitedList(
+            chapter_only_range, delim=pp.Suppress(self.style.chapter_separator.strip())
+        ).set_results_name("chapter_ranges")
+
+        book_chapter_only_ranges = (
+            book.copy().set_results_name("book")
+            + location_marker.copy().set_results_name("chapter_ranges_location")
+            + chapter_only_ranges
+            + location_marker.copy().set_results_name("end_location")
+        ).set_parse_action(self._make_simple_ref)
+
+        # Whole-book references: bare book name
+        book_only = (
+            book.copy().set_results_name("book")
+            + location_marker.copy().set_results_name("end_location")
+        ).set_parse_action(self._make_whole_book_ref)
+
+        # Try the parser with longer matches first, lest Jude 1:5 parse as
+        # Jude 1 or "John 3:16" parse as "John 3".
+        self.simple_ref_parser = (
+            book_chapter_verse_ranges
+            | sc_book_verse_ranges
+            | book_chapter_only_ranges
+            | book_only
+        )
 
         # Now it's simple to build a parser for BibleRef.
         self.bible_ref_parser = (
@@ -336,6 +379,53 @@ class RefParser:
         )
 
     @staticmethod
+    def _make_chapter_only_range(
+        original_text: str, loc: int, tokens: pp.ParseResults
+    ) -> VerseRange:
+        """Create a whole-chapter VerseRange from parsed tokens.
+
+        This is a parse action for use with pyparsing.
+
+        Returns:
+            A VerseRange with verse numbers set to -1 (whole chapters)
+
+        """
+        start_chapter = tokens.start_chapter
+        end_chapter = _get_int(tokens, "end_chapter", start_chapter)
+        end_location = _get_int(tokens, "end_location", -1)
+        range_original_text = original_text[loc:end_location].strip()
+        return VerseRange(
+            start_chapter=start_chapter,
+            start_verse=-1,
+            start_subverse="",
+            end_chapter=end_chapter,
+            end_verse=-1,
+            end_subverse="",
+            original_text=range_original_text,
+        )
+
+    @staticmethod
+    def _make_whole_book_ref(
+        original_text: str, loc: int, tokens: pp.ParseResults
+    ) -> SimpleBibleRef:
+        """Create a whole-book SimpleBibleRef from parsed tokens.
+
+        This is a parse action for use with pyparsing.
+
+        Returns:
+            A SimpleBibleRef with no ranges (whole book)
+
+        """
+        book_name = tokens.book
+        end_location = _get_int(tokens, "end_location", -1)
+        ref_original_text = original_text[loc:end_location].strip()
+        return SimpleBibleRef(
+            book_id=book_name,
+            ranges=[],
+            original_text=ref_original_text,
+        )
+
+    @staticmethod
     def _make_simple_ref(
         original_text: str, loc: int, tokens: pp.ParseResults
     ) -> SimpleBibleRef:
@@ -449,8 +539,31 @@ class RefParser:
             else:
                 raise e
 
+    @staticmethod
+    def _passes_sensitivity_simple(
+        ref: SimpleBibleRef, sensitivity: "Sensitivity"
+    ) -> bool:
+        """Check if a SimpleBibleRef passes the sensitivity filter."""
+        if sensitivity == Sensitivity.BOOK:
+            return True
+        if sensitivity == Sensitivity.CHAPTER:
+            return not ref.is_whole_book()
+        return not ref.is_whole_chapters()
+
+    @staticmethod
+    def _passes_sensitivity(ref: BibleRef, sensitivity: "Sensitivity") -> bool:
+        """Check if a BibleRef passes the sensitivity filter."""
+        if sensitivity == Sensitivity.BOOK:
+            return True
+        if sensitivity == Sensitivity.CHAPTER:
+            return not ref.is_whole_books()
+        return not ref.is_whole_chapters()
+
     def scan_string_simple(
-        self, text: str, as_ranges: bool = False
+        self,
+        text: str,
+        as_ranges: bool = False,
+        sensitivity: "Sensitivity" = Sensitivity.VERSE,
     ) -> Generator[tuple["SimpleBibleRef", int, int], None, None]:
         """Scan a string for SimpleBibleRefs.
 
@@ -459,6 +572,9 @@ class RefParser:
         Args:
             text: The string to scan
             as_ranges: If True, yield a SimpleBibleRef for each verse range
+            sensitivity: Controls which references are reported. VERSE (default)
+                skips whole-chapter and whole-book references. CHAPTER also
+                reports whole-chapter references. BOOK reports everything.
 
         Yields:
             A reference and the start and end of its location in text.
@@ -471,18 +587,31 @@ class RefParser:
             if as_ranges:
                 next_start = start
                 for range_ref in ref.range_refs():
+                    if not self._passes_sensitivity_simple(range_ref, sensitivity):
+                        continue
                     # Use the original text to find the start and end.
                     assert range_ref.original_text is not None
                     range_start = text.find(range_ref.original_text, next_start)
                     assert range_start >= 0
                     next_start = range_start + len(range_ref.original_text)
                     yield (range_ref, range_start, next_start)
+                # Whole-book refs have no ranges; yield as-is if allowed.
+                if ref.is_whole_book() and self._passes_sensitivity_simple(
+                    ref, sensitivity
+                ):
+                    assert ref.original_text is not None
+                    yield (ref, start, start + len(ref.original_text))
             else:
+                if not self._passes_sensitivity_simple(ref, sensitivity):
+                    continue
                 assert ref.original_text is not None
                 yield (ref, start, start + len(ref.original_text))
 
     def scan_string(
-        self, text: str, as_ranges: bool = False
+        self,
+        text: str,
+        as_ranges: bool = False,
+        sensitivity: "Sensitivity" = Sensitivity.VERSE,
     ) -> Generator[tuple["BibleRef", int, int], None, None]:
         """Scan a string for BibleRefs.
 
@@ -491,6 +620,9 @@ class RefParser:
         Args:
             text: The string to scan
             as_ranges: If True, yield a BibleRef for each verse range
+            sensitivity: Controls which references are reported. VERSE (default)
+                skips whole-chapter and whole-book references. CHAPTER also
+                reports whole-chapter references. BOOK reports everything.
 
         Yields:
             A reference and the start and end of its location in text.
@@ -503,13 +635,21 @@ class RefParser:
             if as_ranges:
                 next_start = start
                 for range_ref in ref.range_refs():
+                    if not self._passes_sensitivity(range_ref, sensitivity):
+                        continue
                     # Use the original text to find the start and end.
                     assert range_ref.original_text is not None
                     range_start = text.find(range_ref.original_text, next_start)
                     assert range_start >= 0
                     next_start = range_start + len(range_ref.original_text)
                     yield (range_ref, range_start, next_start)
+                # Whole-book refs have no ranges; yield as-is if allowed.
+                if ref.is_whole_books() and self._passes_sensitivity(ref, sensitivity):
+                    assert ref.original_text is not None
+                    yield (ref, start, start + len(ref.original_text))
             else:
+                if not self._passes_sensitivity(ref, sensitivity):
+                    continue
                 assert ref.original_text is not None
                 yield (ref, start, start + len(ref.original_text))
 
@@ -518,6 +658,7 @@ class RefParser:
         text: str,
         callback: Callable[[SimpleBibleRef], str | None],
         as_ranges: bool = False,
+        sensitivity: "Sensitivity" = Sensitivity.VERSE,
     ) -> str:
         """Substitute SimpleBibleRefs in a string.
 
@@ -529,6 +670,9 @@ class RefParser:
             callback: A function that takes a SimpleBibleRef and returns a string or None
                 If None is returned, the reference is not replaced.
             as_ranges: If True, yield a SimpleBibleRef for each verse range
+            sensitivity: Controls which references are reported. VERSE (default)
+                skips whole-chapter and whole-book references. CHAPTER also
+                reports whole-chapter references. BOOK reports everything.
 
         Returns:
             The modified string
@@ -536,7 +680,7 @@ class RefParser:
         """
         result = []
         last_end = 0
-        for ref, start, end in self.scan_string_simple(text, as_ranges):
+        for ref, start, end in self.scan_string_simple(text, as_ranges, sensitivity):
             replacement = callback(ref)
             if replacement is not None:
                 result.append(text[last_end:start])
@@ -550,6 +694,7 @@ class RefParser:
         text: str,
         callback: Callable[[BibleRef], str | None],
         as_ranges: bool = False,
+        sensitivity: "Sensitivity" = Sensitivity.VERSE,
     ) -> str:
         """Substitute BibleRefs in a string.
 
@@ -561,6 +706,9 @@ class RefParser:
             callback: A function that takes a BibleRef and returns a string or None
                 If None is returned, the reference is not replaced.
             as_ranges: If True, yield a BibleRef for each verse range
+            sensitivity: Controls which references are reported. VERSE (default)
+                skips whole-chapter and whole-book references. CHAPTER also
+                reports whole-chapter references. BOOK reports everything.
 
         Returns:
             The modified string
@@ -568,7 +716,7 @@ class RefParser:
         """
         result = []
         last_end = 0
-        for ref, start, end in self.scan_string(text, as_ranges):
+        for ref, start, end in self.scan_string(text, as_ranges, sensitivity):
             replacement = callback(ref)
             if replacement is not None:
                 result.append(text[last_end:start])

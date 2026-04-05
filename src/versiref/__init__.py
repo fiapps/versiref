@@ -6,7 +6,7 @@ generates.
 """
 
 from versiref.bible_ref import BibleRef, SimpleBibleRef, VerseRange
-from versiref.ref_parser import RefParser
+from versiref.ref_parser import RefParser, Sensitivity
 from versiref.ref_style import RefStyle, standard_names
 from versiref.versification import Versification
 
@@ -17,6 +17,7 @@ __all__ = [
     "SimpleBibleRef",
     "VerseRange",
     "RefParser",
+    "Sensitivity",
     "RefStyle",
     "Versification",
     "standard_names",

@@ -2,7 +2,7 @@
 
 import pytest  # noqa: F401
 from versiref.bible_ref import BibleRef
-from versiref.ref_parser import RefParser
+from versiref.ref_parser import RefParser, Sensitivity
 from versiref.ref_style import RefStyle, standard_names
 from versiref.versification import Versification
 
@@ -350,3 +350,198 @@ def test_sub_refs() -> None:
     # The references should be normalized to SBL style
     expected = "See Isa 7:10–14; Luke 1:26–38 and John 1:1–5, 14 for more."
     assert result == expected
+
+
+# --- Whole-chapter and whole-book parsing ---
+
+
+def _make_parser() -> RefParser:
+    names = standard_names("en-sbl_abbreviations")
+    style = RefStyle(names=names)
+    versification = Versification.named("eng")
+    return RefParser(style, versification)
+
+
+def test_parse_whole_chapter() -> None:
+    """Test parsing a whole-chapter reference like 'John 3'."""
+    parser = _make_parser()
+    ref = parser.parse_simple("John 3")
+
+    assert ref is not None
+    assert ref.book_id == "JHN"
+    assert len(ref.ranges) == 1
+    assert ref.ranges[0].start_chapter == 3
+    assert ref.ranges[0].start_verse == -1
+    assert ref.ranges[0].end_chapter == 3
+    assert ref.ranges[0].end_verse == -1
+    assert ref.ranges[0].is_whole_chapters()
+
+
+def test_parse_whole_chapter_range() -> None:
+    """Test parsing a chapter range like 'John 3–5'."""
+    parser = _make_parser()
+    ref = parser.parse_simple("John 3–5")
+
+    assert ref is not None
+    assert ref.book_id == "JHN"
+    assert len(ref.ranges) == 1
+    assert ref.ranges[0].start_chapter == 3
+    assert ref.ranges[0].end_chapter == 5
+    assert ref.ranges[0].is_whole_chapters()
+
+
+def test_parse_whole_book() -> None:
+    """Test parsing a whole-book reference like 'Genesis'."""
+    names = standard_names("en-sbl_names")
+    style = RefStyle(names=names)
+    versification = Versification.named("eng")
+    parser = RefParser(style, versification)
+    ref = parser.parse_simple("Genesis")
+
+    assert ref is not None
+    assert ref.book_id == "GEN"
+    assert ref.is_whole_book()
+    assert len(ref.ranges) == 0
+
+
+def test_parse_whole_book_abbreviation() -> None:
+    """Test parsing a whole-book reference with an abbreviation."""
+    parser = _make_parser()
+    ref = parser.parse_simple("Gen")
+
+    assert ref is not None
+    assert ref.book_id == "GEN"
+    assert ref.is_whole_book()
+    assert len(ref.ranges) == 0
+
+
+def test_parse_whole_book_bible_ref() -> None:
+    """Test parsing a whole-book reference via parse()."""
+    parser = _make_parser()
+    ref = parser.parse("Gen")
+
+    assert ref is not None
+    assert len(ref.simple_refs) == 1
+    assert ref.simple_refs[0].is_whole_book()
+    assert ref.is_whole_books()
+
+
+def test_verse_ref_still_preferred_over_chapter() -> None:
+    """Ensure 'John 3:16' parses as a verse ref, not chapter 3 followed by junk."""
+    parser = _make_parser()
+    ref = parser.parse_simple("John 3:16")
+
+    assert ref is not None
+    assert ref.book_id == "JHN"
+    assert len(ref.ranges) == 1
+    assert ref.ranges[0].start_verse == 16
+    assert ref.ranges[0].end_verse == 16
+
+
+def test_single_chapter_book_still_parses_verse() -> None:
+    """Ensure 'Jude 5' still parses as verse 5, not chapter 5."""
+    parser = _make_parser()
+    ref = parser.parse_simple("Jude 5")
+
+    assert ref is not None
+    assert ref.book_id == "JUD"
+    assert ref.ranges[0].start_chapter == 1
+    assert ref.ranges[0].start_verse == 5
+
+
+# --- Sensitivity filtering ---
+
+
+def test_scan_default_sensitivity_skips_chapters() -> None:
+    """Default sensitivity (VERSE) should skip whole-chapter references."""
+    parser = _make_parser()
+    text = "See John 3 and Matt 5:3 for context."
+    refs = list(parser.scan_string(text))
+
+    assert len(refs) == 1
+    ref, start, end = refs[0]
+    assert text[start:end] == "Matt 5:3"
+
+
+def test_scan_default_sensitivity_skips_books() -> None:
+    """Default sensitivity (VERSE) should skip whole-book references."""
+    parser = _make_parser()
+    text = "Read Gen and then John 3:16."
+    refs = list(parser.scan_string(text))
+
+    assert len(refs) == 1
+    ref, start, end = refs[0]
+    assert text[start:end] == "John 3:16"
+
+
+def test_scan_chapter_sensitivity() -> None:
+    """CHAPTER sensitivity should report whole-chapter refs but not whole-book."""
+    parser = _make_parser()
+    text = "Read Gen and John 3 and Matt 5:3."
+    refs = list(parser.scan_string(text, sensitivity=Sensitivity.CHAPTER))
+
+    assert len(refs) == 2
+    assert text[refs[0][1] : refs[0][2]] == "John 3"
+    assert text[refs[1][1] : refs[1][2]] == "Matt 5:3"
+
+
+def test_scan_book_sensitivity() -> None:
+    """BOOK sensitivity should report everything."""
+    parser = _make_parser()
+    text = "Read Gen and John 3 and Matt 5:3."
+    refs = list(parser.scan_string(text, sensitivity=Sensitivity.BOOK))
+
+    assert len(refs) == 3
+
+
+def test_scan_as_ranges_with_sensitivity() -> None:
+    """as_ranges=True with VERSE sensitivity filters individual ranges."""
+    parser = _make_parser()
+    text = "See John 1:14 and John 3 and Rev 12 and Matt 5:3 here."
+    refs = list(parser.scan_string(text, as_ranges=True, sensitivity=Sensitivity.VERSE))
+
+    assert len(refs) == 2
+    assert text[refs[0][1] : refs[0][2]] == "John 1:14"
+    assert text[refs[1][1] : refs[1][2]] == "Matt 5:3"
+
+
+def test_scan_as_ranges_filters_chapter_from_multi_range() -> None:
+    """as_ranges=True filters chapter-only ranges from a multi-range ref."""
+    parser = _make_parser()
+    # "Matt 5:3-12; 6:9-13" is one BibleRef with two verse-level ranges.
+    text = "See Matt 5:3-12; 6:9-13 here."
+    refs = list(parser.scan_string(text, as_ranges=True, sensitivity=Sensitivity.VERSE))
+
+    assert len(refs) == 2
+    assert text[refs[0][1] : refs[0][2]] == "Matt 5:3-12"
+    assert text[refs[1][1] : refs[1][2]] == "6:9-13"
+
+
+def test_scan_mixed_ref_not_filtered_without_as_ranges() -> None:
+    """A ref with both verse and chapter ranges passes VERSE since it's not all chapters."""
+    parser = _make_parser()
+    text = "See Matt 5:3-12; 6:9-13 here."
+    refs = list(parser.scan_string(text, sensitivity=Sensitivity.VERSE))
+
+    # is_whole_chapters() is False because the ranges specify verses
+    assert len(refs) == 1
+
+
+def test_sub_refs_with_sensitivity() -> None:
+    """sub_refs should respect sensitivity."""
+    parser = _make_parser()
+    sbl_style = RefStyle(names=standard_names("en-sbl_abbreviations"))
+
+    def normalize(ref: BibleRef) -> str | None:
+        return ref.format(sbl_style)
+
+    text = "See John 3 and Matt 5:3-12."
+    # Default sensitivity: only verse-level refs get substituted
+    result = parser.sub_refs(text, normalize)
+    assert "John 3" in result  # untouched
+    assert "Matt 5:3–12" in result  # normalized
+
+    # CHAPTER sensitivity: chapter refs also get substituted
+    result = parser.sub_refs(text, normalize, sensitivity=Sensitivity.CHAPTER)
+    assert "John 3" in result  # still there (formatted same way)
+    assert "Matt 5:3–12" in result
