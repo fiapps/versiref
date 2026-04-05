@@ -668,7 +668,8 @@ class RefParser:
         Args:
             text: The string to scan
             callback: A function that takes a SimpleBibleRef and returns a string or None
-                If None is returned, the reference is not replaced.
+                Unless None is returned, the reference is replaced with the returned
+                value.
             as_ranges: If True, yield a SimpleBibleRef for each verse range
             sensitivity: Controls which references are reported. VERSE (default)
                 skips whole-chapter and whole-book references. CHAPTER also
@@ -704,7 +705,8 @@ class RefParser:
         Args:
             text: The string to scan
             callback: A function that takes a BibleRef and returns a string or None
-                If None is returned, the reference is not replaced.
+                Unless None is returned, the reference is replaced with the returned
+                value.
             as_ranges: If True, yield a BibleRef for each verse range
             sensitivity: Controls which references are reported. VERSE (default)
                 skips whole-chapter and whole-book references. CHAPTER also
