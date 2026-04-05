@@ -1057,6 +1057,75 @@ def test_bible_ref_range_keys_ff_notation() -> None:
     assert end_key == 40012050  # last verse of Matthew 12 is 50
 
 
+def test_simple_bible_ref_range_keys_single_verse() -> None:
+    """Test SimpleBibleRef.range_keys for a single verse."""
+    versification = Versification.named("eng")
+    ref = SimpleBibleRef.for_range("JHN", 3, 16)
+    keys = list(ref.range_keys(versification))
+    assert len(keys) == 1
+    start_key, end_key = keys[0]
+    assert start_key == 43003016
+    assert end_key == 43003016
+
+
+def test_simple_bible_ref_range_keys_whole_book() -> None:
+    """Test SimpleBibleRef.range_keys for a whole-book reference (no ranges)."""
+    versification = Versification.named("eng")
+    ref = SimpleBibleRef("JHN")
+    keys = list(ref.range_keys(versification))
+    assert len(keys) == 1
+    start_key, end_key = keys[0]
+    # John is book 43; first verse is 43001001; last chapter of John is 21, last verse is 25
+    assert start_key == 43001001
+    assert end_key == 43021025
+
+
+def test_simple_bible_ref_range_keys_whole_book_genesis() -> None:
+    """Test SimpleBibleRef.range_keys for Genesis whole-book reference."""
+    versification = Versification.named("eng")
+    ref = SimpleBibleRef("GEN")
+    keys = list(ref.range_keys(versification))
+    assert len(keys) == 1
+    start_key, end_key = keys[0]
+    # Genesis is book 1; first verse is 1001001; last chapter is 50, last verse is 26
+    assert start_key == 1001001
+    assert end_key == 1050026
+
+
+def test_simple_bible_ref_range_keys_unknown_book() -> None:
+    """Test SimpleBibleRef.range_keys yields nothing for unknown book."""
+    versification = Versification.named("eng")
+    ref = SimpleBibleRef("XXX")
+    keys = list(ref.range_keys(versification))
+    assert len(keys) == 0
+
+
+def test_bible_ref_range_keys_whole_book() -> None:
+    """Test BibleRef.range_keys for a whole-book reference."""
+    versification = Versification.named("eng")
+    ref = BibleRef(simple_refs=[SimpleBibleRef("JHN")], versification=versification)
+    keys = list(ref.range_keys())
+    assert len(keys) == 1
+    start_key, end_key = keys[0]
+    assert start_key == 43001001
+    assert end_key == 43021025
+
+
+def test_bible_ref_range_keys_whole_books_multi() -> None:
+    """Test BibleRef.range_keys for multiple whole-book references."""
+    versification = Versification.named("eng")
+    ref = BibleRef(
+        simple_refs=[SimpleBibleRef("GEN"), SimpleBibleRef("REV")],
+        versification=versification,
+    )
+    keys = list(ref.range_keys())
+    assert len(keys) == 2
+    # Genesis: book 1, 50 chapters, last verse Gen 50:26
+    assert keys[0] == (1001001, 1050026)
+    # Revelation: book 66, 22 chapters, last verse Rev 22:21
+    assert keys[1] == (66001001, 66022021)
+
+
 def test_map_to_with_mapping() -> None:
     """Test mapping a verse range where verses have explicit mappings."""
     eng = Versification.named("eng")

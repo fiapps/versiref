@@ -241,6 +241,53 @@ class SimpleBibleRef:
                 original_text=verse_range.original_text,
             )
 
+    def range_keys(
+        self, versification: Versification
+    ) -> Generator[tuple[int, int], None, None]:
+        """Yield an integer key range for each verse range in this ref.
+
+        Book numbers are derived from versification. If this book ID is not
+        included in the versification, no ranges are yielded.
+
+        Whole-book references (with no ranges) yield a single range spanning
+        chapter 1, verse 1 through the last verse of the book.
+
+        Verse numbers less than 0 (undefined) are replaced with:
+        - 0 for start verses
+        - the last verse number for the chapter for end verses
+
+        Args:
+            versification: The Versification to use for computing keys.
+
+        Yields:
+            (start_key, end_key): integer keys for the start and end of a range.
+                Each key has 2 book digits, 3 chapter digits, and 3 verse digits.
+
+        """
+        if self.book_id not in versification.max_verses:
+            return
+
+        book_num = list(versification.max_verses.keys()).index(self.book_id) + 1
+
+        if not self.ranges:
+            last_chapter = len(versification.max_verses[self.book_id])
+            last_verse = versification.last_verse(self.book_id, last_chapter)
+            yield (
+                book_num * 1000000 + 1 * 1000 + 1,
+                book_num * 1000000 + last_chapter * 1000 + last_verse,
+            )
+            return
+
+        for range_ref in self.range_refs():
+            range = range_ref.ranges[0]
+            start_verse = 0 if range.start_verse < 0 else range.start_verse
+            end_verse = range.end_verse
+            if end_verse < 0:
+                end_verse = versification.last_verse(self.book_id, range.end_chapter)
+            start_key = book_num * 1000000 + range.start_chapter * 1000 + start_verse
+            end_key = book_num * 1000000 + range.end_chapter * 1000 + end_verse
+            yield (start_key, end_key)
+
     def format(
         self, style: RefStyle, versification: Versification | None = None
     ) -> str:
@@ -536,31 +583,7 @@ class BibleRef:
         if self.versification is None:
             return
         for simple_ref in self.simple_refs:
-            if simple_ref.book_id not in self.versification.max_verses:
-                continue
-            else:
-                book_num = (
-                    list(self.versification.max_verses.keys()).index(simple_ref.book_id)
-                    + 1
-                )
-            for range_ref in simple_ref.range_refs():
-                range = range_ref.ranges[0]
-
-                # Replace undefined start verse with 0
-                start_verse = 0 if range.start_verse < 0 else range.start_verse
-
-                # Replace undefined end verse with last verse of chapter
-                end_verse = range.end_verse
-                if end_verse < 0:
-                    end_verse = self.versification.last_verse(
-                        simple_ref.book_id, range.end_chapter
-                    )
-
-                start_key = (
-                    book_num * 1000000 + range.start_chapter * 1000 + start_verse
-                )
-                end_key = book_num * 1000000 + range.end_chapter * 1000 + end_verse
-                yield (start_key, end_key)
+            yield from simple_ref.range_keys(self.versification)
 
     def range_refs(self) -> Generator["BibleRef", None, None]:
         """Yield a new BibleRef for each verse range across all simple refs.
