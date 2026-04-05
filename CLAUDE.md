@@ -36,6 +36,17 @@ uv run pydoc-markdown            # Build API documentation for LLMs (creates bui
 uv build                         # Build distribution packages
 ```
 
+### Releasing
+
+To prepare a release:
+
+1. Bump the version in `pyproject.toml` (the sole source of the version number).
+2. Update `CHANGELOG.md` following the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
+3. Run `uv lock` to update the lock file.
+4. Run tests, type checking, and linting to verify everything passes.
+
+Git tags use bare version numbers (e.g., `0.5.0`, not `v0.5.0`). Building, publishing, and tagging are done manually after the release commit.
+
 ## Architecture
 
 ### Core Classes
