@@ -34,7 +34,7 @@ This catches *published* CVEs; it does nothing for a fresh compromise that hasn'
 
 ### 3. GitHub Dependabot alerts
 
-Dependabot provides passive monitoring between manual audits: if a new advisory lands for something in `uv.lock`, GitHub notifies the maintainer. Enable it under **Settings → Code security** in the GitHub repo if it isn't already on. Dependabot's automatic PRs are not used — upgrades go through the cooldown-bound procedure above.
+Dependabot provides passive monitoring between manual audits: when a new advisory lands for a package in `uv.lock`, GitHub notifies the maintainer. Dependabot alerts and malware alerts are both enabled on the repository under **Settings → Code security**; malware alerts flag packages pulled for known-malicious behavior, which is the fastest channel for the compromised-maintainer scenario the cooldown is designed for. Automatic upgrade PRs are not used — upgrades go through the cooldown-bound procedure above.
 
 ## What these defenses don't cover
 
