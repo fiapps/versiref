@@ -36,6 +36,30 @@ uv run pydoc-markdown            # Build API documentation for LLMs (creates bui
 uv build                         # Build distribution packages
 ```
 
+### Dependency auditing
+
+Supply-chain checks run at two points: when upgrading dependencies and before tagging a release. See `SECURITY.md` for the threat model and rationale; the commands are:
+
+**Upgrade with a 7-day cooldown** (hijacked releases are usually detected and yanked within that window):
+
+```sh
+uv lock --upgrade --exclude-newer "$(date -u -v-7d +%Y-%m-%dT%H:%M:%SZ)"
+```
+
+The date expression above is for BSD `date` (macOS). On GNU `date`: `date -u -d '7 days ago' +%Y-%m-%dT%H:%M:%SZ`.
+
+Cooldown exception: if a CVE is announced for a current dependency, bypass the cooldown and upgrade immediately — a known-bad version is worse than an unquarantined good one.
+
+**Scan the locked dependencies for known advisories:**
+
+```sh
+uv export --format requirements-txt --no-emit-project | uvx pip-audit -r /dev/stdin --disable-pip --require-hashes
+```
+
+`--disable-pip` tells pip-audit to trust the pinned+hashed list from `uv export` rather than spinning up its own venv (which fails on uv-managed Python since ensurepip is disabled there).
+
+Run after any lockfile change and before each release.
+
 ### Releasing
 
 To prepare a release:
@@ -43,7 +67,8 @@ To prepare a release:
 1. Bump the version in `pyproject.toml` (the sole source of the version number).
 2. Update `CHANGELOG.md` following the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 3. Run `uv lock` to update the lock file.
-4. Run tests, type checking, and linting to verify everything passes.
+4. Run `pip-audit` (see "Dependency auditing") and verify no unfixed advisories apply.
+5. Run tests, type checking, and linting to verify everything passes.
 
 Git tags use bare version numbers (e.g., `0.5.0`, not `v0.5.0`). Building, publishing, and tagging are done manually after the release commit.
 
