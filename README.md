@@ -137,7 +137,7 @@ uv run mkdocs build
 To build API documentation for LLMs, run
 
 ```sh
-uv run pydoc-markdown
+uv run python scripts/build_api_md.py
 ```
 
-This creates or updates `build/api.md`. Supplement this with `README.md`.
+This creates or updates `build/api.md` by walking the package with [griffe](https://mkdocstrings.github.io/griffe/) — the same tool `mkdocstrings` uses for the mkdocs site. Supplement it with `README.md`.

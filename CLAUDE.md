@@ -28,7 +28,7 @@ uv run ruff format               # Code formatting
 ```sh
 uv run mkdocs build              # Build human-readable documentation
 uv run mkdocs serve              # Serve documentation locally
-uv run pydoc-markdown            # Build API documentation for LLMs (creates build/api.md)
+uv run python scripts/build_api_md.py  # Build API documentation for LLMs (creates build/api.md)
 ```
 
 ### Building
