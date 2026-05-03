@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.5.1
+
+### Added
+
+- `Versification.available_names()` and `RefStyle.available_names()` list the identifiers their `named()` classmethods accept.
+- `available_standard_names()` lists the identifiers the `standard_names()` function accepts.
+- The two style/book-name discovery functions accept an optional glob pattern (e.g. `"en-*"`, `"it-*"`) to filter results by language prefix.
+
 ## 0.5.0
 
 ### Added
