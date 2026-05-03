@@ -7,7 +7,7 @@ generates.
 
 from versiref.bible_ref import BibleRef, SimpleBibleRef, VerseRange
 from versiref.ref_parser import RefParser, Sensitivity
-from versiref.ref_style import RefStyle, standard_names
+from versiref.ref_style import RefStyle, available_standard_names, standard_names
 from versiref.versification import Versification
 
 __path__ = __import__("pkgutil").extend_path(__path__, __name__)
@@ -20,5 +20,6 @@ __all__ = [
     "Sensitivity",
     "RefStyle",
     "Versification",
+    "available_standard_names",
     "standard_names",
 ]

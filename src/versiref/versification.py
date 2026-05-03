@@ -143,7 +143,7 @@ class Versification:
         directory.
 
         Args:
-            identifier: Standard versification identifier. Available values:
+            identifier: Standard versification identifier. Some common values:
 
                 - "org" — original languages (BHS, UBS GNT)
                 - "eng" — typical English Bible
@@ -156,6 +156,8 @@ class Versification:
                 - "rso" — Russian Synodal, Orthodox canon
 
                 Case-insensitive (converted to lowercase to find the file).
+                Call :meth:`available_names` for the full list of bundled
+                identifiers.
 
         Raises:
             FileNotFoundError: If the named file doesn't exist
@@ -173,6 +175,24 @@ class Versification:
             return cls.from_file(str(path), identifier)
         else:
             raise FileNotFoundError(f"Unknown versification identifier: {identifier}")
+
+    @classmethod
+    def available_names(cls) -> list[str]:
+        """Return the identifiers accepted by :meth:`named`.
+
+        Discovered by listing the JSON files in the package's bundled
+        versification data directory.
+
+        Returns:
+            A sorted list of identifiers that can be passed to ``named()``.
+
+        """
+        directory = resources.files("versiref").joinpath("data", "versifications")
+        return sorted(
+            entry.name.removesuffix(".json")
+            for entry in directory.iterdir()
+            if entry.is_file() and entry.name.endswith(".json")
+        )
 
     def includes(self, book_id: str) -> bool:
         """Check if the given book ID is included in this versification.

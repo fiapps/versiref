@@ -4,6 +4,7 @@ This module provides the RefStyle class which defines how Bible references
 are converted to and from strings.
 """
 
+import fnmatch
 import json
 from dataclasses import dataclass, field
 from importlib import resources
@@ -216,12 +217,15 @@ class RefStyle:
         directory.
 
         Args:
-            identifier: Standard style identifier. Available values:
+            identifier: Standard style identifier. Some common values:
 
                 - "en-sbl" — SBL (Society of Biblical Literature)
                 - "en-cmos_short" — Chicago Manual of Style, short abbreviations
                 - "en-cmos_long" — Chicago Manual of Style, long abbreviations
                 - "it-cei" — Italian CEI (Conferenza Episcopale Italiana)
+
+                Call :meth:`available_names` for the full list of bundled
+                identifiers.
 
         Raises:
             FileNotFoundError: If the named style doesn't exist.
@@ -239,6 +243,32 @@ class RefStyle:
         else:
             raise FileNotFoundError(f"Unknown style identifier: {identifier}")
 
+    @classmethod
+    def available_names(cls, pattern: str = "*") -> list[str]:
+        """Return the identifiers accepted by :meth:`named`.
+
+        Discovered by listing the JSON files in the package's bundled
+        style data directory.
+
+        Args:
+            pattern: Optional :mod:`fnmatch`-style glob applied to each
+                identifier (the JSON filename without its extension).
+                Defaults to ``"*"``, which matches every bundled style.
+                Useful for restricting results by language prefix, e.g.
+                ``"en-*"`` or ``"it-*"``.
+
+        Returns:
+            A sorted list of identifiers that can be passed to ``named()``.
+
+        """
+        directory = resources.files("versiref").joinpath("data", "styles")
+        stems = (
+            entry.name.removesuffix(".json")
+            for entry in directory.iterdir()
+            if entry.is_file() and entry.name.endswith(".json")
+        )
+        return sorted(s for s in stems if fnmatch.fnmatchcase(s, pattern))
+
 
 def standard_names(identifier: str) -> dict[str, str]:
     """Load and return a standard set of book names.
@@ -249,7 +279,7 @@ def standard_names(identifier: str) -> dict[str, str]:
     callers.
 
     Args:
-        identifier: Identifier for the names file. Available values:
+        identifier: Identifier for the names file. Some common values:
 
             - "en-sbl_abbreviations" — SBL abbreviations (e.g., "Josh", "1 Kgs")
             - "en-sbl_names" — SBL full names (e.g., "Joshua", "1 Kings")
@@ -258,6 +288,9 @@ def standard_names(identifier: str) -> dict[str, str]:
             - "en-douay-rheims_names" — Douay-Rheims names (e.g., "Josue", "3 Kings")
             - "it-cei_abbreviazioni" — Italian CEI abbreviations (e.g., "Gs", "1Re")
             - "it-cei_nomi" — Italian CEI full names (e.g., "Giosuè", "1 Re")
+
+            Call :func:`available_standard_names` for the full list of
+            bundled identifiers.
 
     Returns:
         A dictionary mapping book IDs to names or abbreviations.
@@ -282,3 +315,29 @@ def standard_names(identifier: str) -> dict[str, str]:
             f"Invalid format in {identifier}.json: all keys and values must be strings"
         )
     return data
+
+
+def available_standard_names(pattern: str = "*") -> list[str]:
+    """Return the identifiers accepted by :func:`standard_names`.
+
+    Discovered by listing the JSON files in the package's bundled book
+    names data directory.
+
+    Args:
+        pattern: Optional :mod:`fnmatch`-style glob applied to each
+            identifier (the JSON filename without its extension).
+            Defaults to ``"*"``, which matches every bundled set.
+            Useful for restricting results by language prefix, e.g.
+            ``"en-*"`` or ``"it-*"``.
+
+    Returns:
+        A sorted list of identifiers that can be passed to ``standard_names()``.
+
+    """
+    directory = resources.files("versiref").joinpath("data", "book_names")
+    stems = (
+        entry.name.removesuffix(".json")
+        for entry in directory.iterdir()
+        if entry.is_file() and entry.name.endswith(".json")
+    )
+    return sorted(s for s in stems if fnmatch.fnmatchcase(s, pattern))

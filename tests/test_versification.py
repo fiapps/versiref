@@ -231,3 +231,17 @@ def test_no_warnings_loading_versifications(caplog: pytest.LogCaptureFixture) ->
         for ident in identifiers:
             Versification.named(ident)
     assert len(caplog.records) == 0
+
+
+def test_available_names_discovers_bundled_versifications() -> None:
+    """available_names() should expose the canonical bundled versifications, sorted."""
+    available = Versification.available_names()
+    assert available
+    assert available == sorted(available)
+    assert {"org", "eng", "lxx", "vulgata"}.issubset(available)
+
+
+def test_available_names_round_trip_through_named() -> None:
+    """Every identifier from available_names() must load via named()."""
+    for ident in Versification.available_names():
+        Versification.named(ident)

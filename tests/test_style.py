@@ -5,7 +5,7 @@ import tempfile
 from pathlib import Path
 
 import pytest
-from versiref.ref_style import RefStyle, standard_names
+from versiref.ref_style import RefStyle, available_standard_names, standard_names
 
 
 def test_standard_names_abbreviations() -> None:
@@ -252,3 +252,66 @@ def test_named_nonexistent() -> None:
     """Test that loading a nonexistent style raises FileNotFoundError."""
     with pytest.raises(FileNotFoundError):
         RefStyle.named("nonexistent-style")
+
+
+# --- available_names / available_standard_names tests ---
+
+
+def test_available_names_discovers_bundled_styles() -> None:
+    """available_names() should expose the canonical bundled styles, sorted."""
+    available = RefStyle.available_names()
+    assert available
+    assert available == sorted(available)
+    assert {"en-sbl", "it-cei"}.issubset(available)
+
+
+def test_available_names_round_trip_through_named() -> None:
+    """Every identifier from available_names() must load via named()."""
+    for ident in RefStyle.available_names():
+        RefStyle.named(ident)
+
+
+def test_available_names_filters_by_glob() -> None:
+    """available_names() should restrict results to the given glob."""
+    english = RefStyle.available_names("en-*")
+    italian = RefStyle.available_names("it-*")
+    assert english
+    assert italian
+    assert all(ident.startswith("en-") for ident in english)
+    assert all(ident.startswith("it-") for ident in italian)
+    assert set(english).isdisjoint(italian)
+
+
+def test_available_names_glob_no_matches() -> None:
+    """A glob that matches nothing should return an empty list."""
+    assert RefStyle.available_names("xx-*") == []
+
+
+def test_available_standard_names_discovers_bundled_files() -> None:
+    """available_standard_names() should expose the canonical book-name sets, sorted."""
+    available = available_standard_names()
+    assert available
+    assert available == sorted(available)
+    assert {"en-sbl_abbreviations", "en-sbl_names", "it-cei_nomi"}.issubset(available)
+
+
+def test_available_standard_names_round_trip() -> None:
+    """Every identifier from available_standard_names() must load via standard_names()."""
+    for ident in available_standard_names():
+        standard_names(ident)
+
+
+def test_available_standard_names_filters_by_glob() -> None:
+    """available_standard_names() should restrict results to the given glob."""
+    english = available_standard_names("en-*")
+    italian = available_standard_names("it-*")
+    assert english
+    assert italian
+    assert all(ident.startswith("en-") for ident in english)
+    assert all(ident.startswith("it-") for ident in italian)
+    assert set(english).isdisjoint(italian)
+
+
+def test_available_standard_names_glob_no_matches() -> None:
+    """A glob that matches nothing should return an empty list."""
+    assert available_standard_names("xx-*") == []
