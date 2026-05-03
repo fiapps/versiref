@@ -150,6 +150,7 @@ class Versification:
                 - "lxx" — Septuagint
                 - "vulgata" — Latin Vulgate
                 - "nova_vulgata" — Nova Vulgata
+                - "cei" — Conferenza Episcopale Italiana (2008)
                 - "nabre" — New American Bible Revised Edition
                 - "rsc" — Russian Synodal, Protestant canon
                 - "rso" — Russian Synodal, Orthodox canon
