@@ -37,9 +37,7 @@ requires = ["uv_build>=0.9.28,<0.10.0"]
 build-backend = "uv_build"
 
 [tool.uv.build-backend]
-packages = ["src/versiref"]
-include = ["src/versiref/data/**"]
-exclude = ["src/versiref/data/versifications/ethiopian_custom.json"]
+source-exclude = ["/src/versiref/data/versifications/ethiopian_custom.json"]
 
 [tool.mypy]
 strict = true
