@@ -17,9 +17,12 @@ recognize) and a **versification** (which defines single-chapter books and what
 counts as in range). The operation commands therefore share:
 
 - `--style NAME` — the reference style to parse with. Default `en-cmos_short`.
-  See `versiref list styles`. Note that styles differ in spelling: `en-sbl`
-  recognizes `Gen` and `John`, while `en-cmos_short` recognizes `Gn`/`Gen.` and
-  `Jn`. Pick the style that matches your input.
+  See `versiref list styles`. The bundled English styles recognize a broad range
+  of input spellings — their own abbreviations plus the common forms from the
+  other bundled styles — so `Gen`, `Gn`, `Gen.`, and `Genesis` all parse.
+  Output, however, is always rendered in the chosen style's own forms (e.g.
+  `en-cmos_short` prints `Gn`). If a name still isn't recognized, add it with
+  `--also-recognize`.
 - `-v, --versification NAME` — the versification to parse/validate in. Default
   `eng`. See `versiref list versifications`.
 - `--out-style NAME` — the style used to render output (defaults to `--style`).

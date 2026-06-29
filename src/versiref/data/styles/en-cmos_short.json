@@ -1,11 +1,12 @@
 {
   "names": "en-cmos_short",
   "also_recognize": [
-    "en-cmos_long",
     "en-sbl_names",
     {"Song of Solomon": "SNG", "Manasseh": "MAN", "Ecclesiasticus": "SIR",
     "Song of Three Children": "S3Y", "Song of the Three Holy Children": "S3Y",
     "The Rest of Esther": "ESG", "Wisdom": "WIS", "Wisd. of Sol.": "WIS",
-    "Apoc.": "REV", "Apocalypse": "REV"}
+    "Apoc.": "REV", "Apocalypse": "REV"},
+    "en-cmos_long",
+    "en-sbl_abbreviations"
   ]
 }

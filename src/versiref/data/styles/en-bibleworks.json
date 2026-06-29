@@ -1,10 +1,11 @@
 {
   "names": "en-bibleworks",
   "also_recognize": [
+    {"Jsa": "JOS", "Jda": "JDG", "Tbs": "TOB", "Dng": "DAG", "Sut": "SUS",
+    "Dat": "DAG", "Bet": "BEL"},
     "en-cmos_short",
     "en-cmos_long",
     "en-sbl_names",
-    {"Jsa": "JOS", "Jda": "JDG", "Tbs": "TOB", "Dng": "DAG", "Sut": "SUS",
-    "Dat": "DAG", "Bet": "BEL"}
+    "en-sbl_abbreviations"
   ]
 }

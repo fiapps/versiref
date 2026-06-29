@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CLI introspection commands `versiref list styles`, `versiref list versifications`, and `versiref list book-names`, each accepting a `--pattern` glob and `--json`.
 - CLI reference-operation commands: `versiref parse` (normalize a reference or emit its structured form), `versiref validate` (check that a reference parses and falls in range), `versiref convert` (map a reference between versifications, e.g. the Septuagint/Vulgate Psalm numbering shifts), and `versiref scan` (extract every reference from a file or stdin with character offsets). All accept `--json` and set meaningful exit codes (`0` ok, `1` invalid/unmappable, `2` unparseable).
 
+### Changed
+
+- The `en-cmos_short`, `en-cmos_long`, and `en-bibleworks` styles now also recognize the SBL abbreviations (e.g. `Gen`, `John`) on input, in addition to their own forms. This is purely additive — existing recognized names keep their meaning (recognition is first-wins) and output formatting is unchanged.
+
 ## 0.6.0 - 2026-06-28
 
 ### Added
