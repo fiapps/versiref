@@ -110,6 +110,11 @@ class RefParser:
             range_separator = pp.Suppress(pp.one_of(range_separators))
         # Empty marker to record location
         location_marker = pp.Empty().set_parse_action(lambda s, loc, t: loc)
+        # A boundary that fails if the marker is glued to a longer word (e.g. the
+        # "ff" in "ffoo"). leave_whitespace keeps the enclosing And from skipping
+        # whitespace first and testing the next word instead of the character
+        # right after the marker.
+        word_boundary = pp.NotAny(pp.Char(pp.identbodychars)).leave_whitespace()
 
         # For now, we only parse ranges of a single verse.
         verse_range = (
@@ -118,14 +123,14 @@ class RefParser:
             + pp.Opt(
                 (
                     (
-                        pp.Literal(self.style.following_verses).set_name(
+                        pp.Literal(self.style.following_verses).set_results_name(
                             "following_verses"
                         )
-                        | pp.Literal(self.style.following_verse).set_name(
+                        | pp.Literal(self.style.following_verse).set_results_name(
                             "following_verse"
                         )
                     )
-                    + ~pp.Char(pp.identbodychars)  # word boundary
+                    + word_boundary.copy()
                 )
                 | (
                     range_separator
@@ -182,8 +187,17 @@ class RefParser:
             verse.copy().set_results_name("start_verse")
             + optional_subverse.copy().set_results_name("start_subverse")
             + pp.Opt(
-                pp.Literal(self.style.following_verses).set_name("following_verses")
-                | pp.Literal(self.style.following_verse).set_name("following_verse")
+                (
+                    (
+                        pp.Literal(self.style.following_verses).set_results_name(
+                            "following_verses"
+                        )
+                        | pp.Literal(self.style.following_verse).set_results_name(
+                            "following_verse"
+                        )
+                    )
+                    + word_boundary.copy()
+                )
                 | (
                     range_separator
                     + (

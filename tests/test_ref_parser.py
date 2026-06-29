@@ -644,3 +644,64 @@ def test_empty_designator_map_unchanged() -> None:
     assert ref.versification.identifier == "eng"
     # A trailing word that is not a designator is not consumed.
     assert parser.parse("Gen 1:1 Vulg.", silent=True) is None
+
+
+def _make_latin_marker_parser() -> RefParser:
+    """Return a parser using Latin following-verse markers "seq."/"seqq.".
+
+    These markers are longer than two characters and contain a ".", so the
+    subverse rule cannot capture them; only the explicit marker branch can.
+    """
+    style = RefStyle(
+        names=standard_names("en-sbl_abbreviations"),
+        following_verse="seq.",
+        following_verses="seqq.",
+    )
+    return RefParser(style, Versification.named("eng"))
+
+
+def _first_range(parser: RefParser, text: str) -> tuple[int, int, str]:
+    """Scan text and return (start_verse, end_verse, span) of the first match."""
+    out = list(parser.scan_string(text))
+    assert out, f"no match in {text!r}"
+    ref, start, end = out[0]
+    rng = ref.simple_refs[0].ranges[0]
+    return rng.start_verse, rng.end_verse, text[start:end]
+
+
+def test_explicit_following_verses_marker_interpreted() -> None:
+    """A non-subverse following-verses marker yields an open-ended range."""
+    parser = _make_latin_marker_parser()
+    assert _first_range(parser, "John 3:16seqq.") == (16, -1, "John 3:16seqq.")
+
+
+def test_explicit_following_verse_marker_interpreted() -> None:
+    """A non-subverse following-verse marker extends the range by one verse."""
+    parser = _make_latin_marker_parser()
+    assert _first_range(parser, "John 3:16seq.") == (16, 17, "John 3:16seq.")
+
+
+def test_following_marker_with_trailing_word() -> None:
+    """A marker followed by whitespace and a word is still recognized."""
+    parser = _make_latin_marker_parser()
+    assert _first_range(parser, "John 3:16seqq. and X") == (16, -1, "John 3:16seqq.")
+    assert _first_range(parser, "John 3:16seq. then Y") == (16, 17, "John 3:16seq.")
+
+
+def test_following_marker_glued_to_word_not_matched() -> None:
+    """A marker glued to a longer word is not treated as a marker."""
+    parser = _make_latin_marker_parser()
+    # "seqq.foo" is not the marker; only "John 3:16" is the reference.
+    assert _first_range(parser, "John 3:16seqq.foo") == (16, 16, "John 3:16")
+
+
+def test_single_chapter_following_marker_interpreted() -> None:
+    """Single-chapter books interpret an explicit following marker too."""
+    parser = _make_latin_marker_parser()
+    assert _first_range(parser, "Jude 5seqq. more") == (5, -1, "Jude 5seqq.")
+
+
+def test_single_chapter_following_marker_glued_not_matched() -> None:
+    """Single-chapter books also reject a marker glued to a longer word."""
+    parser = _make_latin_marker_parser()
+    assert _first_range(parser, "Jude 5seqq.foo") == (5, 5, "Jude 5")
