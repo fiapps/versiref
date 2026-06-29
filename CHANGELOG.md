@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - A `versiref` command-line interface (a click group) with a `docs` subcommand that prints the filesystem path to the bundled documentation, resolved via `importlib.resources` so it works in both wheel and editable installs. The documentation (`index.md`, the generated `api.md`, and `cli.md`) now ships inside the package under `src/versiref/docs/`.
+- CLI introspection commands `versiref list styles`, `versiref list versifications`, and `versiref list book-names`, each accepting a `--pattern` glob and `--json`.
+- CLI reference-operation commands: `versiref parse` (normalize a reference or emit its structured form), `versiref validate` (check that a reference parses and falls in range), `versiref convert` (map a reference between versifications, e.g. the Septuagint/Vulgate Psalm numbering shifts), and `versiref scan` (extract every reference from a file or stdin with character offsets). All accept `--json` and set meaningful exit codes (`0` ok, `1` invalid/unmappable, `2` unparseable).
 
 ## 0.6.0 - 2026-06-28
 
