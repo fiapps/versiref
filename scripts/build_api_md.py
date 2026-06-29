@@ -1,8 +1,12 @@
-"""Generate build/api.md from the versiref package using griffe.
+"""Generate the bundled API reference from the versiref package using griffe.
 
-Produces a single Markdown file summarizing the public API. Replaces the
-previous pydoc-markdown invocation and has the side benefit of pulling
-black/docspec-python out of the dev dependency tree.
+Produces a single Markdown file summarizing the public API and writes it into
+the package's bundled docs directory, so it ships in the wheel and is reachable
+at runtime via importlib.resources (see the ``versiref docs`` command). The
+file is generated, not hand-edited, and is git-ignored.
+
+Replaces the previous pydoc-markdown invocation and has the side benefit of
+pulling black/docspec-python out of the dev dependency tree.
 """
 
 from __future__ import annotations
@@ -11,7 +15,7 @@ from pathlib import Path
 
 import griffe
 
-OUTPUT_PATH = Path("build/api.md")
+OUTPUT_PATH = Path("src/versiref/docs/api.md")
 PACKAGE_NAME = "versiref"
 SEARCH_PATHS = ["src"]
 
@@ -117,7 +121,7 @@ def main() -> None:
     for m in pkg.members.values():
         if isinstance(m, griffe.Module) and is_public(m.name):
             out += render_module(m)
-    OUTPUT_PATH.parent.mkdir(exist_ok=True)
+    OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT_PATH.write_text(out)
     print(f"Wrote {OUTPUT_PATH} ({OUTPUT_PATH.stat().st_size} bytes)")
 

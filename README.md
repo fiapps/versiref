@@ -153,16 +153,16 @@ config file via a `versification_identifiers` block and reused across a corpus.
 
 This project uses [uv](https://github.com/astral-sh/uv) for project setup and dependencies.
 
-To build documentation, run
-
-```sh
-uv run mkdocs build
-```
-
-To build API documentation for LLMs, run
+To build the API reference, run
 
 ```sh
 uv run python scripts/build_api_md.py
 ```
 
-This creates or updates `build/api.md` by walking the package with [griffe](https://mkdocstrings.github.io/griffe/) — the same tool `mkdocstrings` uses for the mkdocs site. Supplement it with `README.md`.
+This creates or updates `src/versiref/docs/api.md` by walking the package with [griffe](https://mkdocstrings.github.io/griffe/). The file is generated (not hand-edited) and is git-ignored; it ships inside the package as bundled documentation alongside `index.md` (a copy of this README) and `cli.md`, reachable at runtime via `versiref docs`.
+
+Run that step before building the HTML site, which renders the same bundled docs:
+
+```sh
+uv run mkdocs build
+```

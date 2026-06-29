@@ -28,7 +28,7 @@ uv run ruff format               # Code formatting
 ```sh
 uv run mkdocs build              # Build human-readable documentation
 uv run mkdocs serve              # Serve documentation locally
-uv run python scripts/build_api_md.py  # Build API documentation for LLMs (creates build/api.md)
+uv run python scripts/build_api_md.py  # Generate the bundled API reference (creates src/versiref/docs/api.md)
 ```
 
 ### Building
@@ -77,7 +77,8 @@ When asked to make a release, Claude performs steps 1–7; publishing and pushin
 8. Manual: publish and push the commit and tag.
 
 Claude may run `uv build` to produce the artifacts, but does not publish or push.
-Before building, delete any artifacts from previous versions in `dist/` (e.g. `rm -f dist/*`), so the directory holds only the current release's files and a publish step that uploads `dist/*` cannot pick up stale builds.
+Before building, regenerate the bundled API reference with `uv run python scripts/build_api_md.py`. `src/versiref/docs/api.md` is generated and git-ignored but ships in the wheel, so skipping this bundles a stale copy (left over from an earlier code state) or, on a fresh checkout, none at all — and because the file is untracked, neither the tests nor the release commit would reveal it.
+Also before building, delete any artifacts from previous versions in `dist/` (e.g. `rm -f dist/*`), so the directory holds only the current release's files and a publish step that uploads `dist/*` cannot pick up stale builds.
 
 ## Architecture
 

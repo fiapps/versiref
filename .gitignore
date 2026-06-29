@@ -10,3 +10,6 @@ site/
 # Virtual environments
 .venv
 .aider*
+
+# Generated API reference (built by scripts/build_api_md.py into the bundled docs)
+src/versiref/docs/api.md

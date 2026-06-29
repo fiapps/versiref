@@ -948,6 +948,7 @@ name = "versiref"
 version = "0.6.0"
 source = { editable = "." }
 dependencies = [
+    { name = "click" },
     { name = "pyparsing" },
 ]
 
@@ -964,7 +965,10 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "pyparsing", specifier = ">=3.2.3" }]
+requires-dist = [
+    { name = "click", specifier = ">=8.1.0" },
+    { name = "pyparsing", specifier = ">=3.2.3" },
+]
 
 [package.metadata.requires-dev]
 dev = [

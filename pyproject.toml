@@ -26,7 +26,11 @@ license = "MIT"
 license-files = ["LICEN[CS]E*"]
 dependencies = [
     "pyparsing>=3.2.3",
+    "click>=8.1.0",
 ]
+
+[project.scripts]
+versiref = "versiref.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/fiapps/versiref"
