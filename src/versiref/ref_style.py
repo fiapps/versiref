@@ -47,6 +47,10 @@ class RefStyle:
         verse_range_separator: Separates ranges of verses in a single chapter
         chapter_separator: Separates ranges of verses in different chapters
         recognized_names: Maps abbreviations/names to Bible book IDs for parsing
+        versification_identifiers: Maps a trailing designator (e.g. "Vulg.",
+            "(LXX)") to a versification id string (e.g. "vulgata", "lxx"). A
+            parser uses these to recognize a designator at the end of a reference
+            and apply the named versification to it.
         identifier: optional name for the style
 
     """
@@ -59,6 +63,7 @@ class RefStyle:
     verse_range_separator: str = ", "
     chapter_separator: str = "; "
     recognized_names: dict[str, str] = field(default_factory=dict)
+    versification_identifiers: dict[str, str] = field(default_factory=dict)
     identifier: str | None = None
 
     def __post_init__(self) -> None:
@@ -105,6 +110,26 @@ class RefStyle:
             }
         )
 
+    def also_recognize_versifications(self, mapping: dict[str, str]) -> None:
+        """Add designators to the versification_identifiers mapping.
+
+        In the event of a conflict, the existing entry will be preferred. This
+        lets a base style's designators win over a derived style's, mirroring
+        :meth:`also_recognize`.
+
+        Args:
+            mapping: A dictionary mapping trailing designators (e.g. "Vulg.")
+                to versification id strings (e.g. "vulgata").
+
+        """
+        self.versification_identifiers.update(
+            {
+                designator: id
+                for designator, id in mapping.items()
+                if designator not in self.versification_identifiers
+            }
+        )
+
     @classmethod
     def from_dict(cls, data: dict[str, object]) -> "RefStyle":
         """Create an instance from a dictionary.
@@ -113,8 +138,11 @@ class RefStyle:
             data: A dictionary with either a "names" key (string identifier or
                 dict mapping book IDs to names) or a "base" key (identifier of a
                 standard style to inherit from), but not both. Optional separator
-                fields override the defaults (or the base style's values), and an
-                optional "also_recognize" list adds extra recognized names.
+                fields override the defaults (or the base style's values), an
+                optional "also_recognize" list adds extra recognized names, and an
+                optional "versification_identifiers" dict maps trailing
+                designators to versification id strings (existing entries win, so
+                a base style's designators are preserved).
 
         Raises:
             ValueError: If neither "names" nor "base" is present, or if both are.
@@ -183,6 +211,12 @@ class RefStyle:
                         str(k): str(v) for k, v in entry.items()
                     }
                     style.also_recognize(str_dict)
+
+        versification_identifiers = data.get("versification_identifiers")
+        if isinstance(versification_identifiers, dict):
+            style.also_recognize_versifications(
+                {str(k): str(v) for k, v in versification_identifiers.items()}
+            )
 
         return style
 

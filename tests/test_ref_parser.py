@@ -545,3 +545,102 @@ def test_sub_refs_with_sensitivity() -> None:
     result = parser.sub_refs(text, normalize, sensitivity=Sensitivity.CHAPTER)
     assert "John 3" in result  # still there (formatted same way)
     assert "Matt 5:3–12" in result
+
+
+def _make_designator_parser() -> RefParser:
+    """Return a parser recognizing LXX/Vulgate designators, defaulting to eng."""
+    style = RefStyle(names=standard_names("en-sbl_abbreviations"))
+    style.also_recognize_versifications(
+        {"Vulg.": "vulgata", "Vulgate": "vulgata", "LXX": "lxx", "(LXX)": "lxx"}
+    )
+    return RefParser(style, Versification.named("eng"))
+
+
+def test_designator_overrides_versification() -> None:
+    """A trailing designator yields a BibleRef in the named versification."""
+    parser = _make_designator_parser()
+    ref = parser.parse("Dan 13:23 Vulg.")
+    assert ref is not None
+    assert ref.versification is not None
+    assert ref.versification.identifier == "vulgata"
+    assert ref.is_valid()
+    assert ref.original_text == "Dan 13:23 Vulg."
+
+
+def test_designated_ref_invalid_under_default() -> None:
+    """The same ref without a designator is invalid under the eng default."""
+    parser = _make_designator_parser()
+    ref = parser.parse("Dan 13:23")
+    assert ref is not None
+    assert ref.versification is not None
+    assert ref.versification.identifier == "eng"
+    assert not ref.is_valid()
+
+
+def test_designator_applies_to_whole_list() -> None:
+    """A designator at the end of a multi-book list applies to every book."""
+    parser = _make_designator_parser()
+    ref = parser.parse("Gen 1:1; Dan 13:23 Vulg.")
+    assert ref is not None
+    assert ref.versification is not None
+    assert ref.versification.identifier == "vulgata"
+    assert len(ref.simple_refs) == 2
+
+
+def test_designator_aliases_and_longest_match() -> None:
+    """Aliases resolve, and 'Vulgate' is not parsed as 'Vulg.' plus 'ate'."""
+    parser = _make_designator_parser()
+    assert parser.parse("Esth 13 Vulgate").versification.identifier == "vulgata"
+    assert parser.parse("Gen 1:1 (LXX)").versification.identifier == "lxx"
+    assert parser.parse("Gen 1:1 LXX").versification.identifier == "lxx"
+
+
+def test_no_designator_uses_default_versification() -> None:
+    """Without a designator the parser default versification is used."""
+    parser = _make_designator_parser()
+    ref = parser.parse("Gen 1:1")
+    assert ref is not None
+    assert ref.versification.identifier == "eng"
+
+
+def test_parse_simple_discards_designator() -> None:
+    """parse_simple matches and discards a trailing designator."""
+    parser = _make_designator_parser()
+    ref = parser.parse_simple("Dan 13:23 Vulg.")
+    assert ref is not None
+    assert ref.book_id == "DAN"
+    assert ref.original_text == "Dan 13:23"
+
+
+def test_scan_string_includes_designator_in_span() -> None:
+    """scan_string reports a span covering the designator and the right versification."""
+    parser = _make_designator_parser()
+    text = "see Dan 13:23 Vulg. here and Gen 1:1 too"
+    refs = list(parser.scan_string(text))
+    assert len(refs) == 2
+    designated, start, end = refs[0]
+    assert text[start:end] == "Dan 13:23 Vulg."
+    assert designated.versification.identifier == "vulgata"
+    plain, p_start, p_end = refs[1]
+    assert text[p_start:p_end] == "Gen 1:1"
+    assert plain.versification.identifier == "eng"
+
+
+def test_scan_string_simple_excludes_designator() -> None:
+    """scan_string_simple's span ends before the discarded designator."""
+    parser = _make_designator_parser()
+    text = "see Dan 13:23 Vulg. here"
+    refs = list(parser.scan_string_simple(text))
+    assert len(refs) == 1
+    ref, start, end = refs[0]
+    assert text[start:end] == "Dan 13:23"
+
+
+def test_empty_designator_map_unchanged() -> None:
+    """A style with no designators parses exactly as before."""
+    parser = _make_parser()
+    ref = parser.parse("Gen 1:1")
+    assert ref is not None
+    assert ref.versification.identifier == "eng"
+    # A trailing word that is not a designator is not consumed.
+    assert parser.parse("Gen 1:1 Vulg.", silent=True) is None

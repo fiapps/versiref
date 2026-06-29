@@ -124,6 +124,31 @@ assert mapped is not None
 print(mapped.format(style))  # Ps 22:1-3
 ```
 
+### Recognize a versification designator
+
+A reference is sometimes followed by a designator such as `Vulg.` or `(LXX)`
+signaling that it uses a different versification. Teach a `RefStyle` to
+recognize these, and the parser returns a `BibleRef` in the named versification
+for those references while keeping its default for the rest.
+
+```python
+from versiref import RefParser, RefStyle, Versification, standard_names
+
+style = RefStyle(names=standard_names("en-sbl_abbreviations"))
+# Map each designator to a versification id.
+style.also_recognize_versifications({"Vulg.": "vulgata", "LXX": "lxx", "(LXX)": "lxx"})
+parser = RefParser(style, Versification.named("eng"))
+
+# Susanna is Daniel 13 in the Vulgate but invalid under English numbering.
+assert parser.parse("Dan 13:23").is_valid() is False
+assert parser.parse("Dan 13:23 Vulg.").is_valid() is True
+assert parser.parse("Dan 13:23 Vulg.").versification.identifier == "vulgata"
+```
+
+The designator is recognized only at the end of a whole reference and applies to
+every book in it. The map is part of `RefStyle`, so it can be declared in a style
+config file via a `versification_identifiers` block and reused across a corpus.
+
 ## Development
 
 This project uses [uv](https://github.com/astral-sh/uv) for project setup and dependencies.

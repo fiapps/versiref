@@ -315,3 +315,33 @@ def test_available_standard_names_filters_by_glob() -> None:
 def test_available_standard_names_glob_no_matches() -> None:
     """A glob that matches nothing should return an empty list."""
     assert available_standard_names("xx-*") == []
+
+
+def test_also_recognize_versifications_existing_wins() -> None:
+    """also_recognize_versifications keeps existing entries on conflict."""
+    style = RefStyle(names=standard_names("en-sbl_abbreviations"))
+    style.also_recognize_versifications({"Vulg.": "vulgata"})
+    style.also_recognize_versifications({"Vulg.": "nova_vulgata", "LXX": "lxx"})
+    assert style.versification_identifiers == {"Vulg.": "vulgata", "LXX": "lxx"}
+
+
+def test_from_dict_versification_identifiers_names_form() -> None:
+    """from_dict reads a versification_identifiers block on a names-based style."""
+    style = RefStyle.from_dict(
+        {
+            "names": "en-sbl_abbreviations",
+            "versification_identifiers": {"Vulg.": "vulgata", "LXX": "lxx"},
+        }
+    )
+    assert style.versification_identifiers == {"Vulg.": "vulgata", "LXX": "lxx"}
+
+
+def test_from_dict_versification_identifiers_base_form() -> None:
+    """from_dict reads a versification_identifiers block on a base-derived style."""
+    style = RefStyle.from_dict(
+        {
+            "base": "en-sbl",
+            "versification_identifiers": {"Vulg.": "vulgata"},
+        }
+    )
+    assert style.versification_identifiers == {"Vulg.": "vulgata"}

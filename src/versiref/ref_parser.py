@@ -65,10 +65,23 @@ class RefParser:
         Non-strict parsers currently recognize as range separators hyphens, en
         dashes, and the style's range separator if it differs from these.
 
+        Raises:
+            FileNotFoundError: If the style names a versification designator
+                whose id does not correspond to a bundled versification.
+
         """
         self.style = style
         self.versification = versification
         self.strict = strict
+
+        # Resolve each distinct versification id once, so aliases such as
+        # "Vulg." and "Vulgate" -> "vulgata" load a single Versification.
+        resolved: dict[str, Versification] = {}
+        self._designator_versifications: dict[str, Versification] = {}
+        for designator, vid in style.versification_identifiers.items():
+            if vid not in resolved:
+                resolved[vid] = Versification.named(vid)
+            self._designator_versifications[designator] = resolved[vid]
 
         # Build the parser
         self._build_parser()
@@ -229,11 +242,42 @@ class RefParser:
             | book_only
         )
 
-        # Now it's simple to build a parser for BibleRef.
+        # A trailing versification designator (e.g. "Vulg.", "(LXX)"). one_of
+        # escapes regex metacharacters and prefers longer matches, so "Vulgate"
+        # wins over "Vulg.". The word boundary keeps "LXX" from matching inside a
+        # longer word. The parse action resolves the designator to a Versification.
+        if self._designator_versifications:
+            # leave_whitespace on the boundary keeps the And from skipping past
+            # the space after the designator and testing the next word instead.
+            designator = (
+                pp.one_of(list(self._designator_versifications.keys()))
+                + pp.NotAny(pp.Char(pp.identbodychars)).leave_whitespace()
+            )
+            designator.set_parse_action(lambda t: self._designator_versifications[t[0]])
+        else:
+            designator = None
+
+        # Now it's simple to build a parser for BibleRef. A designator at the end
+        # of the whole reference applies to every book in it.
+        bible_ref_body: pp.ParserElement = pp.DelimitedList(
+            self.simple_ref_parser, self.style.chapter_separator
+        )
+        if designator is not None:
+            bible_ref_body = bible_ref_body + pp.Opt(
+                designator.copy().set_results_name("versification_designator")
+            )
         self.bible_ref_parser = (
-            pp.DelimitedList(self.simple_ref_parser, self.style.chapter_separator)
-            + location_marker.copy().set_results_name("end_location")
+            bible_ref_body + location_marker.copy().set_results_name("end_location")
         ).set_parse_action(self._make_bible_ref)
+
+        # A SimpleBibleRef carries no versification, so parse_simple matches and
+        # discards a trailing designator (parse_all then succeeds on the suffix).
+        if designator is not None:
+            self.simple_ref_parser_top = self.simple_ref_parser + pp.Opt(
+                pp.Suppress(designator.copy())
+            )
+        else:
+            self.simple_ref_parser_top = self.simple_ref_parser
 
     def _make_verse_range(
         self, original_text: str, loc: int, tokens: pp.ParseResults
@@ -480,9 +524,16 @@ class RefParser:
         simple_refs = [r for r in tokens if isinstance(r, SimpleBibleRef)]
         ref_original_text = original_text[loc:end_location].strip()
 
+        # A trailing designator overrides the parser's default versification.
+        versification = self.versification
+        if "versification_designator" in tokens:
+            designated = tokens["versification_designator"]
+            assert isinstance(designated, Versification)
+            versification = designated
+
         # Create a BibleRef with the parsed data
         return BibleRef(
-            versification=self.versification,
+            versification=versification,
             simple_refs=simple_refs,
             original_text=ref_original_text,
         )
@@ -502,7 +553,7 @@ class RefParser:
         """
         try:
             # Try to parse the text
-            result = self.simple_ref_parser.parse_string(text, parse_all=True)
+            result = self.simple_ref_parser_top.parse_string(text, parse_all=True)
             ref = result[0]
             assert isinstance(ref, SimpleBibleRef)
             return ref
