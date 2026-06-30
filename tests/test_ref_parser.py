@@ -705,3 +705,53 @@ def test_single_chapter_following_marker_glued_not_matched() -> None:
     """Single-chapter books also reject a marker glued to a longer word."""
     parser = _make_latin_marker_parser()
     assert _first_range(parser, "Jude 5seqq.foo") == (5, 5, "Jude 5")
+
+
+def _make_dot_separator_parser() -> RefParser:
+    """Return a parser whose verse-range separator is "." rather than ", ".
+
+    With this style "Lk 1:28.42" denotes verses 28 and 42, and a trailing
+    "Vulg." designator resolves the reference to the vulgata versification.
+    "Esth" is added as a recognized name for Esther.
+    """
+    style = RefStyle.from_dict(
+        {
+            "base": "en-cmos_short",
+            "verse_range_separator": ".",
+            "also_recognize": [{"Esth": "EST"}],
+            "versification_identifiers": {"Vulg.": "vulgata"},
+        }
+    )
+    return RefParser(style, Versification.named("eng"))
+
+
+def test_custom_verse_range_separator_parses_full_list() -> None:
+    """A style's custom verse-range separator is honored, not the class default."""
+    parser = _make_dot_separator_parser()
+    ref = parser.parse("Lk 1:28.42")
+    assert ref is not None
+    ranges = ref.simple_refs[0].ranges
+    assert len(ranges) == 2
+    assert (ranges[0].start_verse, ranges[0].end_verse) == (28, 28)
+    assert (ranges[1].start_verse, ranges[1].end_verse) == (42, 42)
+
+
+def test_custom_verse_range_separator_with_designator() -> None:
+    """The full list parses, validates, and resolves the trailing designator."""
+    parser = _make_dot_separator_parser()
+    ref = parser.parse("Esth 15:5.10.15 Vulg.")
+    assert ref is not None
+    assert ref.versification.identifier == "vulgata"
+    assert ref.is_valid()
+    ranges = ref.simple_refs[0].ranges
+    assert [r.start_verse for r in ranges] == [5, 10, 15]
+
+
+def test_default_verse_range_separator_unchanged() -> None:
+    """The default comma-separated verse list still parses as before."""
+    parser = _make_parser()
+    ref = parser.parse("Rom 1:3, 5")
+    assert ref is not None
+    ranges = ref.simple_refs[0].ranges
+    assert len(ranges) == 2
+    assert (ranges[0].start_verse, ranges[1].start_verse) == (3, 5)
