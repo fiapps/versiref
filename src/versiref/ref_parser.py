@@ -153,7 +153,7 @@ class RefParser:
         ).set_parse_action(self._make_verse_range)
 
         verse_ranges = pp.DelimitedList(
-            verse_range, delim=pp.Suppress(RefStyle.verse_range_separator.strip())
+            verse_range, delim=pp.Suppress(self.style.verse_range_separator.strip())
         ).set_results_name("verse_ranges")
 
         chapter_range = (
@@ -213,7 +213,7 @@ class RefParser:
         ).set_parse_action(self._make_sc_verse_range)
 
         sc_verse_ranges = pp.DelimitedList(
-            sc_verse_range, delim=pp.Suppress(RefStyle.verse_range_separator.strip())
+            sc_verse_range, delim=pp.Suppress(self.style.verse_range_separator.strip())
         ).set_results_name("chapter_ranges")
 
         sc_book_verse_ranges = (
