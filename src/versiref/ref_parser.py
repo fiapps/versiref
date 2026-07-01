@@ -247,9 +247,19 @@ class RefParser:
             + location_marker.copy().set_results_name("end_location")
         ).set_parse_action(self._make_whole_book_ref)
 
+        # A leading word boundary keeps a book name from matching when it is
+        # glued to the end of a longer word (e.g. the "Rom" in "CongrRom") while
+        # scanning free text. It is a Unicode-aware negative look-behind for a
+        # letter, so accented letters in non-ASCII book names count as letters;
+        # start of string, whitespace, digits, and punctuation are all valid
+        # boundaries. It is zero-width and suppressed, so it neither shifts the
+        # match location nor adds a token. At string start (parse/validate) the
+        # look-behind has nothing to reject, leaving those code paths unchanged.
+        leading_word_boundary = pp.Suppress(pp.Regex(r"(?<![^\W\d_])"))
+
         # Try the parser with longer matches first, lest Jude 1:5 parse as
         # Jude 1 or "John 3:16" parse as "John 3".
-        self.simple_ref_parser = (
+        self.simple_ref_parser = leading_word_boundary + (
             book_chapter_verse_ranges
             | sc_book_verse_ranges
             | book_chapter_only_ranges

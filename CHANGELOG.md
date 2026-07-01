@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Fixed
+
+- The free-text scanner (`RefParser.scan_string`/`scan_string_simple`, used by `versiref scan` and reference indexing) no longer matches a book name glued to the end of a longer word. A leading Unicode-aware word-boundary look-behind now requires the character before a book name to be a non-letter, so a citation prefix like `CongrRom 5:65-103` no longer yields a phantom `Rom 5:65–103`. Matches after whitespace, digits, and punctuation (parentheses, quotes, brackets, en/em dashes) are unchanged, as is single-reference `parse`/`validate` behavior.
+
 ## 0.7.1 - 2026-06-29
 
 ### Fixed

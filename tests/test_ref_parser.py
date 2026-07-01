@@ -323,6 +323,31 @@ def test_scan_string_with_multi_book_reference() -> None:
     assert text[start:end] == "Is 7:10-14; Lk 1:26-38"
 
 
+def test_scan_ignores_book_name_glued_to_preceding_word() -> None:
+    """A book name preceded by a letter is not a reference (e.g. "Rom" in "CongrRom")."""
+    names = standard_names("en-cmos_short")
+    style = RefStyle(names=names)
+    versification = Versification.named("eng")
+    parser = RefParser(style, versification)
+
+    refs = list(parser.scan_string("in CongrRom 5:65-103"))
+    assert refs == []
+
+
+def test_scan_finds_book_name_at_word_boundary() -> None:
+    """A book name at a word boundary is still found (companion to the glued case)."""
+    names = standard_names("en-cmos_short")
+    style = RefStyle(names=names)
+    versification = Versification.named("eng")
+    parser = RefParser(style, versification)
+
+    refs = list(parser.scan_string("see Rom 5:1 now"))
+    assert len(refs) == 1
+    ref, start, end = refs[0]
+    assert ref.simple_refs[0].book_id == "ROM"
+    assert "see Rom 5:1 now"[start:end] == "Rom 5:1"
+
+
 def test_sub_refs() -> None:
     """Test using sub_refs to normalize references to SBL style."""
     # Create a style for parsing (CMOS)
