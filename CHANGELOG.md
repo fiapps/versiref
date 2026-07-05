@@ -89,7 +89,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `BibleRef.map_to()` maps a reference from one versification to another, going through the original-language versification as an intermediary.
-  - Limitation: NABRE versification still lacks mapping data.
+    - Limitation: NABRE versification still lacks mapping data.
 
 ### Changed
 
