@@ -182,6 +182,37 @@ def test_map_verse_subverse_roundtrip() -> None:
     assert back == ("ESG", 8, 32, "")
 
 
+def test_map_verse_portion_subverse_carried_through_1_to_1() -> None:
+    """A portion-of-verse subverse survives a 1:1 mapping (case 2)."""
+    eng = Versification.named("eng")
+    vul = Versification.named("vulgata")
+    # Ps 45:15b (eng) is Ps 44:16b (vulgata); "b" is a line within the verse.
+    assert eng.map_verse("PSA", 45, 15, vul, subverse="b") == ("PSA", 44, 16, "b")
+
+
+def test_map_verse_portion_subverse_carried_through_identity() -> None:
+    """A portion-of-verse subverse survives an unmapped (identity) verse."""
+    eng = Versification.named("eng")
+    org = Versification.named("org")
+    assert eng.map_verse("GEN", 1, 1, org, subverse="a") == ("GEN", 1, 1, "a")
+
+
+def test_map_verse_portion_subverse_discarded_1_to_n() -> None:
+    """A portion-of-verse subverse is discarded across a 1:N mapping."""
+    rsc = Versification.named("rsc")
+    org = Versification.named("org")
+    # PSA 141:0 (rsc) explodes into PSA 142:0-1 (org); the line is ambiguous.
+    assert rsc.map_verse("PSA", 141, 0, org, subverse="b") == ("PSA", 142, 0, "")
+
+
+def test_map_verse_portion_subverse_discarded_n_to_1() -> None:
+    """A portion-of-verse subverse is discarded across an N:1 mapping."""
+    rsc = Versification.named("rsc")
+    org = Versification.named("org")
+    # PSA 89:0-1 (rsc) collapses into PSA 90:0 (org); the line is ambiguous.
+    assert rsc.map_verse("PSA", 89, 1, org, subverse="b") == ("PSA", 90, 0, "")
+
+
 def test_mismatched_mapping_data_loaded() -> None:
     """Test that mismatched-size mappedVerses entries are loaded."""
     rsc = Versification.named("rsc")
