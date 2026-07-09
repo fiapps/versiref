@@ -14,6 +14,43 @@ _VerseLoc = tuple[str, int, int, str]
 _VerseLocRange = tuple[_VerseLoc, _VerseLoc]
 
 
+def _map_stage(
+    mapping: dict[_VerseLoc, _VerseLocRange],
+    multi: set[_VerseLoc],
+    loc: _VerseLoc,
+    idx: int,
+) -> tuple[_VerseLoc, bool]:
+    """Map one location through a single mapping dictionary.
+
+    Args:
+        mapping: A verse mapping (``_map_to_org`` or ``_map_from_org``)
+        multi: Base locations whose mapping is not one-to-one
+        loc: The (book, chapter, verse, subverse) location to map
+        idx: 0 for the start of the mapped range, 1 for the end
+
+    Returns:
+        A (mapped location, is_one_to_one) pair. The mapped location's
+        subverse carries ``loc``'s subverse through a one-to-one mapping and is
+        empty otherwise.
+
+    """
+    book, chapter, verse, subverse = loc
+    if subverse:
+        exact = mapping.get(loc)
+        if exact is not None:
+            return exact[idx], True
+    base = (book, chapter, verse, "")
+    rng = mapping.get(base)
+    if rng is None:
+        return loc, True
+    mapped = rng[idx]
+    if base in multi:
+        return (mapped[0], mapped[1], mapped[2], ""), False
+    # A subverse on the mapped location is a structural (deuterocanonical)
+    # insertion from the data; otherwise carry the input's portion subverse.
+    return (mapped[0], mapped[1], mapped[2], mapped[3] or subverse), True
+
+
 @dataclass
 class Versification:
     """Represents a way of dividing the text of the Bible into chapters and verses.
@@ -37,6 +74,11 @@ class Versification:
     _map_from_org: dict[_VerseLoc, _VerseLocRange] = field(
         default_factory=dict, repr=False
     )
+    # Base locations (subverse "") whose verse mapping is not one-to-one, i.e.
+    # part of a 1:N or N:1 mapping. A portion-of-verse subverse cannot survive
+    # such a mapping and must be discarded.
+    _multi_to_org: set[_VerseLoc] = field(default_factory=set, repr=False)
+    _multi_from_org: set[_VerseLoc] = field(default_factory=set, repr=False)
 
     def __str__(self) -> str:
         """Return a string representation of this versification.
@@ -80,6 +122,8 @@ class Versification:
 
         map_to_org: dict[_VerseLoc, _VerseLocRange] = {}
         map_from_org: dict[_VerseLoc, _VerseLocRange] = {}
+        multi_to_org: set[_VerseLoc] = set()
+        multi_from_org: set[_VerseLoc] = set()
         for src_str, dst_str in data.get("mappedVerses", {}).items():
             src_m = _VERSE_RE.match(src_str)
             dst_m = _VERSE_RE.match(dst_str)
@@ -129,11 +173,20 @@ class Versification:
                 for i in range(src_count):
                     src_loc = (src_book, src_ch, src_v1 + i, "")
                     map_to_org[src_loc] = (dst_start, dst_end)
+                    multi_to_org.add(src_loc)
                 for i in range(dst_count):
                     dst_loc = (dst_book, dst_ch, dst_v1 + i, "")
                     map_from_org[dst_loc] = (src_start, src_end)
+                    multi_from_org.add(dst_loc)
 
-        return cls(max_verses, identifier, map_to_org, map_from_org)
+        return cls(
+            max_verses,
+            identifier,
+            map_to_org,
+            map_from_org,
+            multi_to_org,
+            multi_from_org,
+        )
 
     @classmethod
     def named(cls, identifier: str) -> "Versification":
@@ -270,6 +323,13 @@ class Versification:
         across versifications. Returns None if the mapped verse does not
         exist in the target versification.
 
+        A subverse letter can mean either a deuterocanonical verse inserted
+        into a chapter (represented in the versification's mapping data) or a
+        portion of a verse such as a line of a Psalm (never in the mapping
+        data). An exact subverse match is treated as the former. Otherwise the
+        base verse is mapped: a portion subverse is carried through a 1:1
+        mapping and discarded across a 1:N or N:1 mapping.
+
         Args:
             book: The book ID in this versification
             chapter: The chapter number in this versification
@@ -286,12 +346,15 @@ class Versification:
         if self is target:
             return (book, chapter, verse, subverse)
 
-        loc = (book, chapter, verse, subverse)
         idx = 1 if end else 0
-        org_range = self._map_to_org.get(loc)
-        org_loc = org_range[idx] if org_range else loc
-        target_range = target._map_from_org.get(org_loc)
-        result = target_range[idx] if target_range else org_loc
+        org_loc, one_to_one = _map_stage(
+            self._map_to_org, self._multi_to_org, (book, chapter, verse, subverse), idx
+        )
+        result, stage_one_to_one = _map_stage(
+            target._map_from_org, target._multi_from_org, org_loc, idx
+        )
+        if not (one_to_one and stage_one_to_one):
+            result = (result[0], result[1], result[2], "")
 
         if target.last_verse(result[0], result[1]) < result[2]:
             return None

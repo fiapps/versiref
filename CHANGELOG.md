@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Fixed
+
+- `Versification.map_verse` now handles a subverse that denotes a portion of a verse (e.g. a line of a Psalm) rather than a deuterocanonical insertion. Previously such a subverse defeated the verse lookup and the reference fell through to an identity mapping, so `versiref convert -f eng -t vulgata 'Ps 45:15b'` failed instead of yielding `Ps 44:16b`. When no mapping matches the subverse exactly, the base verse is mapped and the subverse is carried through a 1:1 mapping or discarded across a 1:N or N:1 mapping. Deuterocanonical subverse mappings (e.g. Greek Esther) are unchanged.
+
 ## 0.7.2 - 2026-07-01
 
 ### Fixed
