@@ -915,3 +915,56 @@ def test_parse_chapter_verse_separator_without_space() -> None:
     assert ref is not None
     assert ref.ranges[0].start_chapter == 1
     assert ref.ranges[0].start_verse == 35
+
+
+def test_reference_wraps_across_single_newline() -> None:
+    """Test that a hard-wrapped reference still parses across one newline."""
+    parser = RefParser(
+        RefStyle(names=standard_names("en-sbl_abbreviations")),
+        Versification.named("eng"),
+    )
+    ref = parser.parse_simple("Mark 4:3-9,\n13-20")
+    assert ref is not None
+    assert len(ref.ranges) == 2
+    assert ref.ranges[1].start_verse == 13
+    ref = parser.parse_simple("Luke 23:50-\n24:12")
+    assert ref is not None
+    assert ref.ranges[0].end_chapter == 24
+
+
+def test_reference_stops_at_blank_line() -> None:
+    """Test that a reference does not continue across a blank line."""
+    style = RefStyle.named("la-vetus")
+    parser = RefParser(style, Versification.named("vulgata"))
+    text = "ut dicitur Gen. XXII, 18.\n\n2 Deinde considerandum est."
+    refs = list(parser.scan_string_simple(text))
+    assert len(refs) == 1
+    ref, start, end = refs[0]
+    assert ref.format(style) == "Gen. XXII, 18"
+    assert text[start:end] == "Gen. XXII, 18"
+
+
+def test_reference_stops_at_blank_line_with_spaces() -> None:
+    """Test that a blank line containing spaces also ends a reference."""
+    parser = RefParser(
+        RefStyle(names=standard_names("en-sbl_abbreviations")),
+        Versification.named("eng"),
+    )
+    text = "See Mark 4:3-9,  \n  \n13 is the footnote."
+    refs = list(parser.scan_string_simple(text))
+    assert len(refs) == 1
+    ref, start, end = refs[0]
+    assert text[start:end] == "Mark 4:3-9"
+
+
+def test_chapter_separator_stops_at_blank_line() -> None:
+    """Test that the chapter separator does not reach across a blank line."""
+    parser = RefParser(
+        RefStyle(names=standard_names("en-sbl_abbreviations")),
+        Versification.named("eng"),
+    )
+    text = "Heb 7:3;\n\n9:4 begins a new paragraph."
+    refs = list(parser.scan_string_simple(text))
+    assert refs[0][0].format(
+        RefStyle(names=standard_names("en-sbl_abbreviations"))
+    ) == ("Heb 7:3")

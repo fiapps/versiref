@@ -113,13 +113,30 @@ class RefParser:
             lambda t: t[0] if t else ""
         )
         subverse.set_parse_action(lambda t: t[0] if t else "")
+        # A reference never continues across a blank line. Without this check,
+        # a citation-ending period followed by a footnote or paragraph number
+        # would extend the reference ("Gen. XXII, 18.\n\n2" scanning as verses
+        # 18 and 2). leave_whitespace makes the NotAny inspect the raw text on
+        # either side of the separator instead of skipping past it.
+        paragraph_boundary = pp.NotAny(
+            pp.Regex(r"[^\S\n]*\n[^\S\n]*\n")
+        ).leave_whitespace()
+
+        def separator(literal: pp.ParserElement | str) -> pp.ParserElement:
+            """Suppress a separator that must not sit next to a blank line."""
+            return (
+                paragraph_boundary.copy()
+                + pp.Suppress(literal)
+                + paragraph_boundary.copy()
+            )
+
         if self.strict:
-            range_separator = pp.Suppress(self.style.range_separator)
+            range_separator = separator(self.style.range_separator)
         else:
             range_separators = ["-", "\N{EN DASH}"]
             if self.style.range_separator not in range_separators:
                 range_separators.append(self.style.range_separator)
-            range_separator = pp.Suppress(pp.one_of(range_separators))
+            range_separator = separator(pp.one_of(range_separators))
         # Empty marker to record location
         location_marker = pp.Empty().set_parse_action(lambda s, loc, t: loc)
         # A boundary that fails if the marker is glued to a longer word (e.g. the
@@ -151,9 +168,7 @@ class RefParser:
                         (
                             pp.Opt(
                                 chapter.copy().set_results_name("end_chapter")
-                                + pp.Suppress(
-                                    self.style.chapter_verse_separator.strip()
-                                )
+                                + separator(self.style.chapter_verse_separator.strip())
                             )
                             + verse.copy().set_results_name("end_verse")
                             + optional_subverse.copy().set_results_name("end_subverse")
@@ -167,18 +182,18 @@ class RefParser:
         ).set_parse_action(self._make_verse_range)
 
         verse_ranges = pp.DelimitedList(
-            verse_range, delim=pp.Suppress(self.style.verse_range_separator.strip())
+            verse_range, delim=separator(self.style.verse_range_separator.strip())
         ).set_results_name("verse_ranges")
 
         chapter_range = (
             chapter.copy().set_results_name("start_chapter")
-            + pp.Suppress(self.style.chapter_verse_separator.strip())
+            + separator(self.style.chapter_verse_separator.strip())
             + location_marker.copy().set_results_name("verse_ranges_location")
             + verse_ranges
         ).set_parse_action(self._make_chapter_range)
 
         chapter_ranges = pp.DelimitedList(
-            chapter_range, delim=pp.Suppress(self.style.chapter_separator.strip())
+            chapter_range, delim=separator(self.style.chapter_separator.strip())
         ).set_results_name("chapter_ranges")
 
         book_chapter_verse_ranges = (
@@ -227,7 +242,7 @@ class RefParser:
         ).set_parse_action(self._make_sc_verse_range)
 
         sc_verse_ranges = pp.DelimitedList(
-            sc_verse_range, delim=pp.Suppress(self.style.verse_range_separator.strip())
+            sc_verse_range, delim=separator(self.style.verse_range_separator.strip())
         ).set_results_name("chapter_ranges")
 
         sc_book_verse_ranges = (
@@ -245,7 +260,7 @@ class RefParser:
         ).set_parse_action(self._make_chapter_only_range)
 
         chapter_only_ranges = pp.DelimitedList(
-            chapter_only_range, delim=pp.Suppress(self.style.chapter_separator.strip())
+            chapter_only_range, delim=separator(self.style.chapter_separator.strip())
         ).set_results_name("chapter_ranges")
 
         book_chapter_only_ranges = (
@@ -298,7 +313,7 @@ class RefParser:
         # Now it's simple to build a parser for BibleRef. A designator at the end
         # of the whole reference applies to every book in it.
         bible_ref_body: pp.ParserElement = pp.DelimitedList(
-            self.simple_ref_parser, self.style.chapter_separator
+            self.simple_ref_parser, separator(self.style.chapter_separator.strip())
         )
         if designator is not None:
             bible_ref_body = bible_ref_body + pp.Opt(

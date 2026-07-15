@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A reference no longer continues across a blank line. Previously a separator could reach past a paragraph break, so a citation-ending period followed by a footnote or paragraph number (e.g. `Gen. XXII, 18.` at the end of a paragraph, with `2` starting the next) was scanned as additional verses. A single newline inside a reference — as produced by word-wrapping — still parses as before.
 - The Italian name of the book of Habakkuk has been corrected. It incorrectly had an "H" at the beginning.
 
 ## 0.7.3 - 2026-07-09
