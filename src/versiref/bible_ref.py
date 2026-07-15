@@ -10,6 +10,39 @@ from versiref.ref_style import RefStyle, standard_names
 from versiref.versification import Versification
 
 
+def _count(n: int, noun: str) -> str:
+    """Return ``n`` followed by ``noun``, pluralized with a trailing 's'."""
+    return f"{n} {noun}" if n == 1 else f"{n} {noun}s"
+
+
+def _chapter_verse_reason(
+    label: str, chapters: list[int], chapter: int, verse: int
+) -> str | None:
+    """Explain why a (chapter, verse) is out of range, or None if it is in range.
+
+    Args:
+        label: Reader-facing book name to name in the message.
+        chapters: The book's last-verse-per-chapter list (from the versification).
+        chapter: The chapter number to check.
+        verse: The verse number to check, or a value < 0 for an unspecified verse.
+
+    Returns:
+        An explanatory string, or None if the chapter (and verse, if specified)
+        exist in the book.
+
+    """
+    if chapter < 1 or chapter > len(chapters):
+        return f"{label} has no chapter {chapter} (only {_count(len(chapters), 'chapter')})"
+    if verse >= 0:
+        max_verse = chapters[chapter - 1]
+        if verse < 1 or verse > max_verse:
+            return (
+                f"{label} {chapter} has no verse {verse} "
+                f"(only {_count(max_verse, 'verse')})"
+            )
+    return None
+
+
 @dataclass
 class VerseRange:
     """Represents a range of verses within a single book of the Bible.
@@ -42,44 +75,56 @@ class VerseRange:
         """Return True if this range does not specify verse limits."""
         return self.start_verse < 0 and self.end_verse < 0
 
-    def is_valid(self) -> bool:
-        """Check if this verse range has valid values.
+    def invalid_reason(self) -> str | None:
+        """Explain why this verse range is structurally invalid.
 
-        Returns False if any of these conditions are met:
-        - start_verse >= 0 and end_verse < 0 (ff notation) but start_chapter != end_chapter
-        - start_verse < 0 and end_verse >= 0
-        - start_chapter == end_chapter and start_verse > end_verse
-        - start_chapter > end_chapter
+        This checks the internal consistency of the range only; it says nothing
+        about whether the chapters and verses exist in any versification.
 
         Returns:
-            bool: True if the verse range has valid values, False otherwise
+            An explanatory string if any of these conditions are met, or None
+            if the range is structurally valid:
+
+            - start_chapter > end_chapter
+            - start_verse >= 0 and end_verse < 0 ("ff") but start_chapter != end_chapter
+            - start_verse < 0 and end_verse >= 0
+            - start_chapter == end_chapter and start_verse > end_verse
 
         """
-        # Check for invalid "ff" notation (must be in same chapter)
+        # Cannot have start chapter greater than end chapter
+        if self.start_chapter > self.end_chapter:
+            return "range ends in an earlier chapter than it starts"
+
+        # "ff" notation must stay within a single chapter
         if (
             self.start_verse >= 0
             and self.end_verse < 0
             and self.start_chapter != self.end_chapter
         ):
-            return False
+            return "'ff' range spans more than one chapter"
 
         # Cannot have unspecified start verse but specified end verse
         if self.start_verse < 0 and self.end_verse >= 0:
-            return False
+            return "unspecified start verse with a specified end verse"
 
         # Cannot have start verse greater than end verse in same chapter
         if (
             self.start_chapter == self.end_chapter
-            and self.start_verse > self.end_verse
             and self.end_verse >= 0
+            and self.start_verse > self.end_verse
         ):
-            return False
+            return "range ends at an earlier verse than it starts"
 
-        # Cannot have start chapter greater than end chapter
-        if self.start_chapter > self.end_chapter:
-            return False
+        return None
 
-        return True
+    def is_valid(self) -> bool:
+        """Check if this verse range has structurally valid values.
+
+        Returns:
+            bool: True if the verse range has valid values, False otherwise
+
+        """
+        return self.invalid_reason() is None
 
 
 @dataclass
@@ -181,6 +226,58 @@ class SimpleBibleRef:
                 return False
         return True
 
+    def invalid_reason(
+        self, versification: Versification, style: RefStyle | None = None
+    ) -> str | None:
+        """Explain why this reference is invalid under the given versification.
+
+        A reference is invalid if its book is not in the versification, if any
+        verse range is structurally inconsistent, or if any chapter or verse it
+        names does not exist in the book. When more than one verse range is
+        invalid, each reason is reported, joined by "; ".
+
+        Args:
+            versification: The Versification to check against.
+            style: Optional RefStyle whose book names are used to name the book
+                in the message. Without it, the Paratext book ID is used.
+
+        Returns:
+            An explanatory string, or None if the reference is valid.
+
+        """
+        label = (
+            self.book_id
+            if style is None
+            else style.names.get(self.book_id, self.book_id)
+        )
+
+        if not versification.includes(self.book_id):
+            named = f" {versification.identifier!r}" if versification.identifier else ""
+            return f"{label} is not in versification{named}"
+
+        book_id = "PSA" if self.book_id == "PSAS" else self.book_id
+        chapters = versification.max_verses.get(book_id, [])
+
+        reasons: list[str] = []
+        for verse_range in self.ranges:
+            # A structurally inconsistent range (one that ends before it starts,
+            # etc.) is reported on its own terms.
+            structural = verse_range.invalid_reason()
+            if structural is not None:
+                reasons.append(f"{label}: {structural}")
+                continue
+
+            # Otherwise check that its chapters and verses exist in the book.
+            reason = _chapter_verse_reason(
+                label, chapters, verse_range.start_chapter, verse_range.start_verse
+            ) or _chapter_verse_reason(
+                label, chapters, verse_range.end_chapter, verse_range.end_verse
+            )
+            if reason is not None:
+                reasons.append(reason)
+
+        return "; ".join(reasons) if reasons else None
+
     def is_valid(self, versification: Versification) -> bool:
         """Check if this Bible reference is valid according to the given versification.
 
@@ -191,37 +288,7 @@ class SimpleBibleRef:
             bool: True if the reference is valid, False otherwise
 
         """
-        # Check if the book ID is included in the versification
-        if not versification.includes(self.book_id):
-            return False
-
-        # Check each verse range
-        for verse_range in self.ranges:
-            # Check if the verse range itself is valid.
-            # This will catch ranges that end before they start.
-            if not verse_range.is_valid():
-                return False
-
-            # Check if the chapters and verses are within the limits of the versification.
-            if versification.last_verse(self.book_id, verse_range.end_chapter) < 0:
-                return False
-
-            # We only need to check the start if it's in a different chapter or the end is indefinite.
-            if (
-                verse_range.start_chapter != verse_range.end_chapter
-                or verse_range.end_verse < 0
-            ) and verse_range.start_verse > versification.last_verse(
-                self.book_id, verse_range.start_chapter
-            ):
-                return False
-
-            # Check end. No special handling is needed if end_verse < 0.
-            if verse_range.end_verse > versification.last_verse(
-                self.book_id, verse_range.end_chapter
-            ):
-                return False
-
-        return True
+        return self.invalid_reason(versification) is None
 
     def range_refs(self) -> Generator["SimpleBibleRef", None, None]:
         """Yield a new SimpleBibleRef for each verse range.
@@ -553,6 +620,34 @@ class BibleRef:
         """
         return all(ref.is_whole_chapters() for ref in self.simple_refs)
 
+    def invalid_reason(self, style: RefStyle | None = None) -> str | None:
+        """Explain why this Bible reference is invalid, or None if it is valid.
+
+        The reference is invalid if it has no versification, or if any of its
+        single-book references is invalid under that versification. When more
+        than one is invalid, each reason is reported, joined by "; ".
+
+        An empty BibleRef with a versification is vacuously valid.
+
+        Args:
+            style: Optional RefStyle whose book names are used to name books in
+                the message. Without it, Paratext book IDs are used.
+
+        Returns:
+            An explanatory string, or None if the reference is valid.
+
+        """
+        if self.versification is None:
+            return "no versification is set"
+
+        reasons: list[str] = []
+        for ref in self.simple_refs:
+            reason = ref.invalid_reason(self.versification, style)
+            if reason is not None:
+                reasons.append(reason)
+
+        return "; ".join(reasons) if reasons else None
+
     def is_valid(self) -> bool:
         """Check if this Bible reference is valid according to its versification.
 
@@ -562,9 +657,7 @@ class BibleRef:
             bool: True if the reference is valid, False otherwise
 
         """
-        if self.versification is None:
-            return False
-        return all(ref.is_valid(self.versification) for ref in self.simple_refs)
+        return self.invalid_reason() is None
 
     def range_keys(self) -> Generator[tuple[int, int], None, None]:
         """Yield an integer key range for each verse range in the ref.

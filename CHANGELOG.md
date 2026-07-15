@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.8.1 - 2026-07-15
+
+### Added
+
+- `invalid_reason()` methods on `VerseRange`, `SimpleBibleRef`, and `BibleRef`, each returning a human-readable explanation of why a reference is invalid, or `None` if it is valid. Messages name the offending part (e.g. `John has no chapter 30 (only 21 chapters)`, `Ps 2 has no verse 99 (only 12 verses)`); an optional `RefStyle` supplies reader-facing book names. The existing `is_valid()` methods now delegate to these, so a boolean check and its explanation cannot diverge.
+
 ## 0.8.0 - 2026-07-15
 
 ### Added

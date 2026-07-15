@@ -74,6 +74,32 @@ def test_verse_range_is_valid_with_subverses() -> None:
     )  # Start verse > end verse
 
 
+def test_verse_range_invalid_reason() -> None:
+    """Test the invalid_reason method of VerseRange."""
+    # Valid ranges have no reason.
+    assert VerseRange(1, 1, "", 1, 5, "").invalid_reason() is None
+    assert VerseRange(1, -1, "", 1, -1, "").invalid_reason() is None
+    assert VerseRange(1, 5, "", 1, -1, "").invalid_reason() is None
+
+    # Each structural failure returns an explanatory string.
+    assert (
+        VerseRange(2, 1, "", 1, 5, "").invalid_reason()
+        == "range ends in an earlier chapter than it starts"
+    )
+    assert (
+        VerseRange(1, 5, "", 2, -1, "").invalid_reason()
+        == "'ff' range spans more than one chapter"
+    )
+    assert (
+        VerseRange(1, -1, "", 1, 5, "").invalid_reason()
+        == "unspecified start verse with a specified end verse"
+    )
+    assert (
+        VerseRange(1, 5, "", 1, 3, "").invalid_reason()
+        == "range ends at an earlier verse than it starts"
+    )
+
+
 def test_simple_bible_ref() -> None:
     """Test that SimpleBibleRef initializes correctly."""
     # Reference to entire book
@@ -210,6 +236,68 @@ def test_simple_bible_ref_is_valid() -> None:
     # Invalid verse range structure (end verse before start verse)
     ref = SimpleBibleRef.for_range("JHN", 3, 40, end_verse=10)
     assert ref.is_valid(versification) is False
+
+
+def test_simple_bible_ref_invalid_reason() -> None:
+    """Test the invalid_reason method of SimpleBibleRef."""
+    versification = Versification.named("eng")
+    style = RefStyle(names=standard_names("en-sbl_abbreviations"))
+
+    # Valid references have no reason, whether or not a style is given.
+    assert SimpleBibleRef("GEN").invalid_reason(versification) is None
+    assert SimpleBibleRef.for_range("JHN", 3, 16).invalid_reason(versification) is None
+    assert (
+        SimpleBibleRef.for_range("JHN", 3, 16).invalid_reason(versification, style)
+        is None
+    )
+
+    # Book not in the versification. The message names the versification, and
+    # the book label defaults to its ID but comes from the style when given.
+    assert (
+        SimpleBibleRef("XYZ").invalid_reason(versification)
+        == "XYZ is not in versification 'eng'"
+    )
+
+    # Nonexistent chapter, with and without a style for the book name.
+    ref = SimpleBibleRef.for_range("JHN", 30, 1, end_verse=10)
+    assert (
+        ref.invalid_reason(versification) == "JHN has no chapter 30 (only 21 chapters)"
+    )
+    assert (
+        ref.invalid_reason(versification, style)
+        == "John has no chapter 30 (only 21 chapters)"
+    )
+
+    # Nonexistent verse.
+    ref = SimpleBibleRef.for_range("JHN", 3, 40, end_verse=50)
+    assert (
+        ref.invalid_reason(versification, style)
+        == "John 3 has no verse 40 (only 36 verses)"
+    )
+
+    # A structural problem is reported ahead of any range check.
+    ref = SimpleBibleRef.for_range("JHN", 3, 40, end_verse=10)
+    assert (
+        ref.invalid_reason(versification, style)
+        == "John: range ends at an earlier verse than it starts"
+    )
+
+    # The plural PSA form resolves to PSA for the versification lookup.
+    ref = SimpleBibleRef("PSAS", [VerseRange(200, 1, "", 200, 1, "")])
+    assert "no chapter 200 (only 150 chapters)" in (
+        ref.invalid_reason(versification, style) or ""
+    )
+
+    # Every offending range is reported, joined by "; ".
+    ref = SimpleBibleRef(
+        "PSA",
+        [VerseRange(200, 1, "", 200, 1, ""), VerseRange(2, 99, "", 2, 99, "")],
+    )
+    reason = ref.invalid_reason(versification, style)
+    assert reason == (
+        "Ps has no chapter 200 (only 150 chapters); "
+        "Ps 2 has no verse 99 (only 12 verses)"
+    )
 
 
 def test_simple_bible_ref_is_whole_chapters() -> None:
@@ -796,6 +884,43 @@ def test_bible_ref_is_valid() -> None:
     # Reference without versification
     ref = BibleRef.for_range("JHN", 3, 16, versification=None)
     assert ref.is_valid() is False
+
+
+def test_bible_ref_invalid_reason() -> None:
+    """Test the invalid_reason method of BibleRef."""
+    versification = Versification.named("eng")
+    style = RefStyle(names=standard_names("en-sbl_abbreviations"))
+
+    # An empty BibleRef with a versification is vacuously valid.
+    assert BibleRef(versification=versification).invalid_reason() is None
+
+    # A valid reference has no reason.
+    assert (
+        BibleRef.for_range("JHN", 3, 16, versification=versification).invalid_reason()
+        is None
+    )
+
+    # A missing versification is itself the reason.
+    assert (
+        BibleRef.for_range("JHN", 3, 16, versification=None).invalid_reason()
+        == "no versification is set"
+    )
+
+    # A single invalid reference reports the underlying reason.
+    ref = BibleRef.for_range("JHN", 30, 1, versification=versification)
+    assert ref.invalid_reason(style) == "John has no chapter 30 (only 21 chapters)"
+
+    # Reasons across multiple books are joined by "; "; valid refs contribute none.
+    simple_ref1 = SimpleBibleRef.for_range("JHN", 3, 16)
+    simple_ref2 = SimpleBibleRef.for_range("JHN", 30, 1)
+    simple_ref3 = SimpleBibleRef("XYZ")
+    ref = BibleRef(
+        simple_refs=[simple_ref1, simple_ref2, simple_ref3],
+        versification=versification,
+    )
+    assert ref.invalid_reason(style) == (
+        "John has no chapter 30 (only 21 chapters); XYZ is not in versification 'eng'"
+    )
 
 
 def test_bible_ref_range_refs() -> None:
