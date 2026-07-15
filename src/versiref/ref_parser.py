@@ -13,6 +13,7 @@ from pyparsing import common
 
 from versiref.bible_ref import BibleRef, SimpleBibleRef, VerseRange
 from versiref.ref_style import RefStyle
+from versiref.roman import roman_to_int
 from versiref.versification import Versification
 
 
@@ -92,7 +93,18 @@ class RefParser:
         book = pp.one_of(list(self.style.recognized_names.keys()))
         # Parse name to book ID.
         book.set_parse_action(lambda t: self.style.recognized_names[t[0]])
-        chapter = common.integer
+        # The lookahead keeps a Roman numeral from matching the start of a
+        # longer word ("Cl" in "Clemens"); it counts the æ/œ ligatures common
+        # in Latin text as word characters ("Cœna", "Lætitia").
+        chapter: pp.ParserElement
+        if self.style.chapter_number_style == "roman":
+            chapter = pp.Regex(r"[CLXVI]+(?![0-9A-Za-zÆæŒœ])")
+            chapter.set_parse_action(lambda t: roman_to_int(t[0]))
+        elif self.style.chapter_number_style == "roman-lower":
+            chapter = pp.Regex(r"[clxvi]+(?![0-9A-Za-zÆæŒœ])")
+            chapter.set_parse_action(lambda t: roman_to_int(t[0]))
+        else:
+            chapter = common.integer
         verse = common.integer
         subverse = pp.Word(pp.alphas.lower(), max=2).leave_whitespace() + pp.WordEnd(
             pp.alphas.lower()
@@ -139,7 +151,9 @@ class RefParser:
                         (
                             pp.Opt(
                                 chapter.copy().set_results_name("end_chapter")
-                                + self.style.chapter_verse_separator
+                                + pp.Suppress(
+                                    self.style.chapter_verse_separator.strip()
+                                )
                             )
                             + verse.copy().set_results_name("end_verse")
                             + optional_subverse.copy().set_results_name("end_subverse")
@@ -158,7 +172,7 @@ class RefParser:
 
         chapter_range = (
             chapter.copy().set_results_name("start_chapter")
-            + pp.Suppress(self.style.chapter_verse_separator)
+            + pp.Suppress(self.style.chapter_verse_separator.strip())
             + location_marker.copy().set_results_name("verse_ranges_location")
             + verse_ranges
         ).set_parse_action(self._make_chapter_range)

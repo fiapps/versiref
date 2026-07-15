@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Added
+
+- Latin support. Two new bundled styles: `la-cce`, using the abbreviations of the Latin editio typica of the Catechismus Catholicae Ecclesiae with Arabic chapter numbers (e.g. `Io 3, 16`), and `la-vetus`, using the traditional abbreviations of the Patrologia Latina era with uppercase Roman-numeral chapters (e.g. `Joan. III, 16`) and recognizing many variant spellings (`Ioan.`, `Io.`, `Ps.`, `Psalm.`, `Matt.`, …). Three new book-name sets back them: `la-cce_abbreviationes`, `la-vetus_abbreviationes`, and `la-nomina` (full Latin names).
+- A new `RefStyle` option, `chapter_number_style`, controls how chapter numbers are parsed and formatted: `"arabic"` (default), `"roman"` (uppercase, e.g. `XLIV`), or `"roman-lower"` (e.g. `xliv`). Verse numbers are always Arabic.
+
 ### Fixed
 
 - The Italian name of the book of Habakkuk has been corrected. It incorrectly had an "H" at the beginning.

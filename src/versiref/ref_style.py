@@ -9,6 +9,10 @@ import json
 from dataclasses import dataclass, field
 from importlib import resources
 
+from versiref.roman import int_to_roman
+
+_CHAPTER_NUMBER_STYLES = ("arabic", "roman", "roman-lower")
+
 
 def _invert(d: dict[str, str]) -> dict[str, str]:
     """Invert an ID->name dictionary, resolving conflicts if possible.
@@ -46,6 +50,10 @@ class RefStyle:
         following_verses: indicates the range continues for an unspecified number of verses
         verse_range_separator: Separates ranges of verses in a single chapter
         chapter_separator: Separates ranges of verses in different chapters
+        chapter_number_style: How chapter numbers are written: "arabic"
+            (default), "roman" (uppercase Roman numerals, e.g. "XLIV"), or
+            "roman-lower" (lowercase, e.g. "xliv"). Verse numbers are always
+            Arabic.
         recognized_names: Maps abbreviations/names to Bible book IDs for parsing
         versification_identifiers: Maps a trailing designator (e.g. "Vulg.",
             "(LXX)") to a versification id string (e.g. "vulgata", "lxx"). A
@@ -62,6 +70,7 @@ class RefStyle:
     following_verses: str = "ff"
     verse_range_separator: str = ", "
     chapter_separator: str = "; "
+    chapter_number_style: str = "arabic"
     recognized_names: dict[str, str] = field(default_factory=dict)
     versification_identifiers: dict[str, str] = field(default_factory=dict)
     identifier: str | None = None
@@ -71,7 +80,17 @@ class RefStyle:
 
         By default, recognized_names is the inverse of names, allowing
         parsing of the same abbreviations used for formatting.
+
+        Raises:
+            ValueError: If chapter_number_style is not one of the allowed
+                values.
+
         """
+        if self.chapter_number_style not in _CHAPTER_NUMBER_STYLES:
+            raise ValueError(
+                f"Invalid chapter_number_style: {self.chapter_number_style!r} "
+                f"(expected one of {', '.join(_CHAPTER_NUMBER_STYLES)})"
+            )
         if not self.recognized_names:
             self.recognized_names = _invert(self.names)
 
@@ -88,6 +107,23 @@ class RefStyle:
         if self.identifier:
             return f'RefStyle.named("{self.identifier}")'
         return object.__str__(self)
+
+    def format_chapter(self, chapter: int) -> str:
+        """Render a chapter number according to chapter_number_style.
+
+        Args:
+            chapter: The chapter number to render.
+
+        Returns:
+            The chapter number as a string.
+
+        """
+        if self.chapter_number_style == "roman":
+            return int_to_roman(chapter)
+        elif self.chapter_number_style == "roman-lower":
+            return int_to_roman(chapter).lower()
+        else:
+            return str(chapter)
 
     def also_recognize(self, names: dict[str, str] | str) -> None:
         """Add a set of book names to the recognized_names mapping.
@@ -164,6 +200,7 @@ class RefStyle:
             "following_verses",
             "verse_range_separator",
             "chapter_separator",
+            "chapter_number_style",
         )
 
         if has_base:
@@ -199,6 +236,7 @@ class RefStyle:
                 following_verses=_str("following_verses", "ff"),
                 verse_range_separator=_str("verse_range_separator", ", "),
                 chapter_separator=_str("chapter_separator", "; "),
+                chapter_number_style=_str("chapter_number_style", "arabic"),
             )
 
         also_recognize = data.get("also_recognize")
@@ -257,6 +295,9 @@ class RefStyle:
                 - "en-cmos_short" — Chicago Manual of Style, short abbreviations
                 - "en-cmos_long" — Chicago Manual of Style, long abbreviations
                 - "it-cei" — Italian CEI (Conferenza Episcopale Italiana)
+                - "la-cce" — Latin, Catechismus Catholicae Ecclesiae abbreviations
+                - "la-vetus" — Latin, traditional abbreviations with Roman-numeral
+                  chapters (as in the Patrologia Latina and similar editions)
 
                 Call :meth:`available_names` for the full list of bundled
                 identifiers.
@@ -322,6 +363,12 @@ def standard_names(identifier: str) -> dict[str, str]:
             - "en-douay-rheims_names" — Douay-Rheims names (e.g., "Josue", "3 Kings")
             - "it-cei_abbreviazioni" — Italian CEI abbreviations (e.g., "Gs", "1Re")
             - "it-cei_nomi" — Italian CEI full names (e.g., "Giosuè", "1 Re")
+            - "la-cce_abbreviationes" — Latin abbreviations of the Catechismus
+              Catholicae Ecclesiae (e.g., "Ios", "1 Reg")
+            - "la-vetus_abbreviationes" — traditional Latin abbreviations
+              (e.g., "Judic.", "III Reg.")
+            - "la-nomina" — full Latin book names (e.g., "Iosue", "Canticum
+              Canticorum")
 
             Call :func:`available_standard_names` for the full list of
             bundled identifiers.

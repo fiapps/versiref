@@ -780,3 +780,138 @@ def test_default_verse_range_separator_unchanged() -> None:
     ranges = ref.simple_refs[0].ranges
     assert len(ranges) == 2
     assert (ranges[0].start_verse, ranges[1].start_verse) == (3, 5)
+
+
+def _la_vetus_parser() -> RefParser:
+    return RefParser(RefStyle.named("la-vetus"), Versification.named("vulgata"))
+
+
+def test_parse_roman_chapter() -> None:
+    """Test parsing a reference with an uppercase Roman numeral chapter."""
+    parser = _la_vetus_parser()
+    ref = parser.parse_simple("Lc. I, 35")
+    assert ref is not None
+    assert ref.book_id == "LUK"
+    assert ref.ranges[0].start_chapter == 1
+    assert ref.ranges[0].start_verse == 35
+
+
+@pytest.mark.parametrize(
+    "text,book_id,chapter,verse",
+    [
+        ("Eccli. XXIV, 5", "SIR", 24, 5),
+        ("I Cor. XV, 3", "1CO", 15, 3),
+        ("Ps. CIX, 1", "PSA", 109, 1),
+        ("Psal. XLIV, 2", "PSA", 44, 2),
+        ("Joan. III, 16", "JHN", 3, 16),
+        ("Ioan. III, 16", "JHN", 3, 16),
+        ("Matth. I, 20", "MAT", 1, 20),
+        ("IV Reg. II, 11", "2KI", 2, 11),
+        ("Canticum Canticorum IV, 7", "SNG", 4, 7),
+    ],
+)
+def test_parse_la_vetus_forms(
+    text: str, book_id: str, chapter: int, verse: int
+) -> None:
+    """Test parsing traditional Latin abbreviations and variants."""
+    parser = _la_vetus_parser()
+    ref = parser.parse_simple(text)
+    assert ref is not None
+    assert ref.book_id == book_id
+    assert ref.ranges[0].start_chapter == chapter
+    assert ref.ranges[0].start_verse == verse
+
+
+def test_parse_roman_verse_range() -> None:
+    """Test parsing a verse range with a Roman chapter; verses stay Arabic."""
+    parser = _la_vetus_parser()
+    ref = parser.parse_simple("Io. XIX, 26-27")
+    assert ref is not None
+    assert ref.book_id == "JHN"
+    assert ref.ranges[0].start_chapter == 19
+    assert ref.ranges[0].start_verse == 26
+    assert ref.ranges[0].end_verse == 27
+
+
+def test_parse_roman_cross_chapter_range() -> None:
+    """Test parsing a range that crosses a chapter boundary."""
+    parser = _la_vetus_parser()
+    ref = parser.parse_simple("Luc. XXIII, 50-XXIV, 12")
+    assert ref is not None
+    assert ref.ranges[0].start_chapter == 23
+    assert ref.ranges[0].start_verse == 50
+    assert ref.ranges[0].end_chapter == 24
+    assert ref.ranges[0].end_verse == 12
+
+
+def test_parse_roman_whole_chapter() -> None:
+    """Test parsing a whole-chapter reference with a Roman numeral."""
+    parser = _la_vetus_parser()
+    ref = parser.parse_simple("Cant. IV")
+    assert ref is not None
+    assert ref.book_id == "SNG"
+    assert ref.ranges[0].start_chapter == 4
+    assert ref.ranges[0].start_verse < 0
+
+
+def test_roman_parser_rejects_arabic_chapter() -> None:
+    """Test that a Roman-numeral style does not accept Arabic chapters."""
+    parser = _la_vetus_parser()
+    assert parser.parse_simple("Lc. 1, 35", silent=True) is None
+
+
+def test_arabic_parser_rejects_roman_chapter() -> None:
+    """Test that an Arabic-numeral style does not accept Roman chapters."""
+    parser = RefParser(RefStyle.named("la-cce"), Versification.named("vulgata"))
+    assert parser.parse_simple("Lc I, 35", silent=True) is None
+    ref = parser.parse_simple("Lc 1, 35")
+    assert ref is not None
+    assert ref.book_id == "LUK"
+    assert ref.ranges[0].start_chapter == 1
+    assert ref.ranges[0].start_verse == 35
+
+
+def test_roman_chapter_not_start_of_word() -> None:
+    """Test that a Roman numeral glued to a longer word is not a chapter."""
+    parser = _la_vetus_parser()
+    assert parser.parse_simple("Psal. Clementis, 3", silent=True) is None
+    # The æ/œ ligatures count as word characters
+    assert parser.parse_simple("Psal. Lætitia, 3", silent=True) is None
+    assert parser.parse_simple("Psal. Cœna, 3", silent=True) is None
+
+
+def test_parse_roman_lowercase_style() -> None:
+    """Test a style with lowercase Roman numeral chapters."""
+    style = RefStyle.from_dict(
+        {"base": "la-vetus", "chapter_number_style": "roman-lower"}
+    )
+    parser = RefParser(style, Versification.named("vulgata"))
+    ref = parser.parse_simple("Lc. i, 35")
+    assert ref is not None
+    assert ref.ranges[0].start_chapter == 1
+    assert ref.ranges[0].start_verse == 35
+    assert parser.parse_simple("Lc. I, 35", silent=True) is None
+
+
+def test_scan_string_la_vetus() -> None:
+    """Test scanning Latin text for references."""
+    style = RefStyle.named("la-vetus")
+    parser = RefParser(style, Versification.named("vulgata"))
+    text = "Angelus ait (Lc. I, 35), et propheta praedixit (Isa. VII, 14)."
+    refs = list(parser.scan_string_simple(text))
+    assert len(refs) == 2
+    ref1, start1, end1 = refs[0]
+    assert ref1.format(style) == "Luc. I, 35"
+    assert text[start1:end1] == ref1.original_text
+    ref2, start2, end2 = refs[1]
+    assert ref2.format(style) == "Isa. VII, 14"
+    assert text[start2:end2] == ref2.original_text
+
+
+def test_parse_chapter_verse_separator_without_space() -> None:
+    """Test that a ", " separator style also parses references without the space."""
+    parser = _la_vetus_parser()
+    ref = parser.parse_simple("Lc. I,35")
+    assert ref is not None
+    assert ref.ranges[0].start_chapter == 1
+    assert ref.ranges[0].start_verse == 35

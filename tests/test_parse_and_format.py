@@ -305,3 +305,75 @@ def test_sub_refs_simple_no_change() -> None:
     expected = "See John 13:16 and Mk 28:1–15."
 
     assert result == expected
+
+
+@pytest.mark.parametrize(
+    "sbl_ref,expected_latin_ref",
+    [
+        ("Luke 1:35", "Luc. I, 35"),
+        ("Isa 7:14", "Isa. VII, 14"),
+        ("Ps 109:1", "Psal. CIX, 1"),
+        ("Sir 24:5", "Eccli. XXIV, 5"),
+        ("1 Cor 15:3-8", "I Cor. XV, 3-8"),
+        ("2 Kgs 2:11", "IV Reg. II, 11"),
+        ("Matt 5:3-12", "Matth. V, 3-12"),
+        ("Luke 23:50-24:12", "Luc. XXIII, 50-XXIV, 12"),
+        ("Acts 1:8-11; 2:1-4", "Act. I, 8-11; II, 1-4"),
+        ("Rom 1:16ff", "Rom. I, 16ss"),
+        ("Song 4:7", "Cant. IV, 7"),
+    ],
+)
+def test_parse_sbl_and_format_la_vetus(sbl_ref: str, expected_latin_ref: str) -> None:
+    """Test parsing SBL references and formatting them in traditional Latin style."""
+    sbl_style = RefStyle(names=standard_names("en-sbl_abbreviations"))
+    vetus_style = RefStyle.named("la-vetus")
+    parser = RefParser(sbl_style, Versification.named("eng"))
+
+    bible_ref = parser.parse_simple(sbl_ref)
+    assert bible_ref is not None, f"Failed to parse: {sbl_ref}"
+    assert bible_ref.format(vetus_style) == expected_latin_ref
+
+
+@pytest.mark.parametrize(
+    "latin_ref,expected_sbl_ref",
+    [
+        ("Lc. I, 35", "Luke 1:35"),
+        ("Ioan. III, 16", "John 3:16"),
+        ("Psalm. XLIV, 2", "Ps 44:2"),
+        ("Ezech. XLIV, 1-2", "Ezek 44:1–2"),
+        ("Gal. IV, 4", "Gal 4:4"),
+        ("Matth. I, 18. 20. 23", "Matt 1:18, 20, 23"),
+        ("Hebr. VII, 3; IX, 4", "Heb 7:3; 9:4"),
+    ],
+)
+def test_parse_la_vetus_and_format_sbl(latin_ref: str, expected_sbl_ref: str) -> None:
+    """Test parsing traditional Latin references and formatting them in SBL style."""
+    vetus_style = RefStyle.named("la-vetus")
+    sbl_style = RefStyle(names=standard_names("en-sbl_abbreviations"))
+    parser = RefParser(vetus_style, Versification.named("vulgata"))
+
+    bible_ref = parser.parse_simple(latin_ref)
+    assert bible_ref is not None, f"Failed to parse: {latin_ref}"
+    assert bible_ref.format(sbl_style) == expected_sbl_ref
+
+
+@pytest.mark.parametrize(
+    "cce_ref,expected_sbl_ref",
+    [
+        ("Io 3, 16", "John 3:16"),
+        ("Gn 1, 26-28", "Gen 1:26–28"),
+        ("Mt 5, 3-12", "Matt 5:3–12"),
+        ("1 Cor 13, 4-7. 13", "1 Cor 13:4–7, 13"),
+        ("Ct 4, 7", "Song 4:7"),
+        ("Eccle 3, 1", "Eccl 3:1"),
+    ],
+)
+def test_parse_la_cce_and_format_sbl(cce_ref: str, expected_sbl_ref: str) -> None:
+    """Test parsing Catechism-style Latin references and formatting them in SBL style."""
+    cce_style = RefStyle.named("la-cce")
+    sbl_style = RefStyle(names=standard_names("en-sbl_abbreviations"))
+    parser = RefParser(cce_style, Versification.named("vulgata"))
+
+    bible_ref = parser.parse_simple(cce_ref)
+    assert bible_ref is not None, f"Failed to parse: {cce_ref}"
+    assert bible_ref.format(sbl_style) == expected_sbl_ref

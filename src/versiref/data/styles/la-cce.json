@@ -1,0 +1,11 @@
+{
+  "names": "la-cce_abbreviationes",
+  "chapter_verse_separator": ", ",
+  "verse_range_separator": ".",
+  "range_separator": "-",
+  "following_verse": "s",
+  "following_verses": "ss",
+  "also_recognize": [
+    "la-nomina"
+  ]
+}

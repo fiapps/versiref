@@ -345,3 +345,61 @@ def test_from_dict_versification_identifiers_base_form() -> None:
         }
     )
     assert style.versification_identifiers == {"Vulg.": "vulgata"}
+
+
+def test_named_la_cce() -> None:
+    """Test loading the Latin Catechism style."""
+    style = RefStyle.named("la-cce")
+    assert style.identifier == "la-cce"
+    assert style.names["JHN"] == "Io"
+    assert style.names["JDG"] == "Idc"
+    assert style.chapter_number_style == "arabic"
+    assert style.chapter_verse_separator == ", "
+    # Full Latin names are recognized for parsing
+    assert style.recognized_names["Canticum Canticorum"] == "SNG"
+
+
+def test_named_la_vetus() -> None:
+    """Test loading the traditional Latin style."""
+    style = RefStyle.named("la-vetus")
+    assert style.identifier == "la-vetus"
+    assert style.names["MAT"] == "Matth."
+    assert style.names["1KI"] == "III Reg."
+    assert style.chapter_number_style == "roman"
+    # Variant spellings are recognized for parsing
+    assert style.recognized_names["Joan."] == "JHN"
+    assert style.recognized_names["Ioan."] == "JHN"
+    assert style.recognized_names["Ps."] == "PSA"
+    assert style.recognized_names["Isaias"] == "ISA"
+
+
+def test_invalid_chapter_number_style() -> None:
+    """Test that an invalid chapter_number_style raises ValueError."""
+    with pytest.raises(ValueError, match="chapter_number_style"):
+        RefStyle(names={"GEN": "Gen"}, chapter_number_style="Roman")
+
+
+def test_format_chapter() -> None:
+    """Test rendering chapter numbers in all three styles."""
+    arabic = RefStyle(names={"GEN": "Gen"})
+    roman = RefStyle(names={"GEN": "Gen"}, chapter_number_style="roman")
+    lower = RefStyle(names={"GEN": "Gen"}, chapter_number_style="roman-lower")
+    assert arabic.format_chapter(44) == "44"
+    assert roman.format_chapter(44) == "XLIV"
+    assert lower.format_chapter(44) == "xliv"
+
+
+def test_from_dict_chapter_number_style_with_base() -> None:
+    """Test overriding chapter_number_style when deriving from a base style."""
+    style = RefStyle.from_dict(
+        {"base": "la-vetus", "chapter_number_style": "roman-lower"}
+    )
+    assert style.chapter_number_style == "roman-lower"
+
+
+def test_available_standard_names_latin() -> None:
+    """Test that the Latin book name sets are discoverable."""
+    latin = available_standard_names("la-*")
+    assert "la-cce_abbreviationes" in latin
+    assert "la-vetus_abbreviationes" in latin
+    assert "la-nomina" in latin

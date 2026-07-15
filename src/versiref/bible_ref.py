@@ -318,10 +318,12 @@ class SimpleBibleRef:
                 ):
                     states_chapter = False
                 else:
-                    result += str(range.start_chapter)
+                    result += style.format_chapter(range.start_chapter)
                     states_chapter = True
             elif last_range.end_chapter != range.start_chapter:
-                result += f"{style.chapter_separator}{range.start_chapter}"
+                result += style.chapter_separator + style.format_chapter(
+                    range.start_chapter
+                )
                 states_chapter = True
             else:
                 result += style.verse_range_separator
@@ -341,7 +343,7 @@ class SimpleBibleRef:
             ):
                 result += style.range_separator
                 if range.end_chapter != range.start_chapter:
-                    result += str(range.end_chapter)
+                    result += style.format_chapter(range.end_chapter)
                     if range.end_verse >= 0:
                         result += f"{style.chapter_verse_separator}{range.end_verse}"
                 elif range.end_verse != range.start_verse:
