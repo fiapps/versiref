@@ -40,9 +40,6 @@ Issues = "https://github.com/fiapps/versiref/issues"
 requires = ["uv_build>=0.9.28,<0.10.0"]
 build-backend = "uv_build"
 
-[tool.uv.build-backend]
-source-exclude = ["/src/versiref/data/versifications/ethiopian_custom.json"]
-
 [tool.mypy]
 strict = true
 exclude = [

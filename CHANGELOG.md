@@ -22,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `lxx` versification did not map the Greek Esther additions. Its `ESG` numbered verses (the Hebrew-parallel narrative) map to `org`'s Hebrew `EST`, but the additions — carried as subverses on anchor verses (`1:1b`–`1:1s`, `3:13a`–`g`, `4:17a`–`z`, `5:1a`–`f` and `5:2a`–`b`, `8:12a`–`x`, `10:3a`–`l`) — had no mapping, so a reference such as the start of Mordecai's prayer at LXX `Esther 4:17a` fell through to a spurious `EST 4:17a` instead of the integrated `ESG 4:18`. Each addition subverse now maps to its integrated `org` `ESG` position, so `4:17a` ↔ `org ESG 4:18` ↔ `vulgata Esther 13:8` ↔ `nabre C:1`, interoperating with the other versifications. Where the continuous `ESG` numbering subdivides a single Greek subverse into several verses, the subverse maps to the first; the Hebrew-parallel numbered verses are unchanged.
 - The `cei` versification carried no Greek Esther additions at all: it declared no `ESG` subverses and no `ESG` mappings, and its `ESG` chapter 3 was stored with 13 verses where the CEI text has 15 (verses 14–15 follow the Addition B subverses `3,13a`–`g`). The seven addition anchors are now declared as partial verses and mapped exactly as in `lxx` — the Hebrew-parallel numbered verses to `org`'s `EST` and each addition subverse to its integrated `ESG` position — and the chapter-3 count is corrected, so a CEI reference such as `Est 4,17a` resolves like the others.
 
+### Removed
+
+- The `ethiopian_custom` versification data file, whose upstream JSON conversion was malformed. It was already excluded from the built package (#27); the file, its build exclusion in `pyproject.toml`, and its README attribution are now removed.
+
 ## 0.8.1 - 2026-07-15
 
 ### Added

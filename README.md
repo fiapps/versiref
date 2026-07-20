@@ -24,7 +24,7 @@ VersiRef is a Python package for sophisticated parsing, manipulation, and printi
 ## License
 
 - Files in `src/versiref/data` are supplied under the [CC BY-SA 4.0 license](LICENSE-DATA).
-    - Data files defining these versifications were [created by the Copenhagen Alliance](https://github.com/Copenhagen-Alliance/versification-specification): eng, ethiopian_custom, lxx, nova_vulgata, org, rsc, rso, and vulgata.
+    - Data files defining these versifications were [created by the Copenhagen Alliance](https://github.com/Copenhagen-Alliance/versification-specification): eng, lxx, nova_vulgata, org, rsc, rso, and vulgata.
 - All other files are supplied under an [MIT License](LICENSE).
 
 ## Examples
