@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Fixed
+
+- Vulgate Esther references to the Greek additions now map to their correct integrated Greek Esther (`ESG`) positions. The printed Vulgate gathers the additions at the end as chapters 10:4-16, but the mapping data placed them naively (e.g. `EST 13:1-18` → `ESG 4:1-18`), so `map_verse` sent them — and the Hebrew verses they displace — to the wrong verses (`vulgata` `Esther 13:8` resolved to Hebrew Esther 4:8 instead of the start of Mordecai's prayer at `ESG 4:18`). Each addition (A–F), its colophon, and the displaced Hebrew tails of chapters 1, 3, 5, and 8 now map to the correct `ESG` verse. The `org` and `eng` `ESG` maxVerses were extended to 41 (ch. 8) and 14 (ch. 10) to accommodate the tails, reconciling the `eng` counts with the `eng.vrs` mapping lines that already referenced them.
+
 ## 0.8.1 - 2026-07-15
 
 ### Added

@@ -182,6 +182,49 @@ def test_map_verse_subverse_roundtrip() -> None:
     assert back == ("ESG", 8, 32, "")
 
 
+def test_map_verse_vulgate_esther_additions() -> None:
+    """Vulgate Esther's 16-chapter numbering maps to integrated Greek Esther.
+
+    The printed Vulgate gathers the Greek additions at the end as chapters
+    10:4-16; they belong at their integrated ESG positions, not at the naive
+    identity locations the old data assumed. Regression for a mapping that sent
+    the additions (and the Hebrew verses they displace) to the wrong verses.
+    """
+    vul = Versification.named("vulgata")
+    eng = Versification.named("eng")
+    # Addition A, B, C, D, E, F respectively.
+    assert vul.map_verse("EST", 11, 2, eng) == ("ESG", 1, 1, "")
+    assert vul.map_verse("EST", 13, 8, eng) == ("ESG", 4, 18, "")
+    assert vul.map_verse("EST", 14, 3, eng) == ("ESG", 4, 31, "")
+    assert vul.map_verse("EST", 15, 1, eng) == ("ESG", 5, 1, "")
+    assert vul.map_verse("EST", 16, 24, eng) == ("ESG", 8, 36, "")
+    assert vul.map_verse("EST", 10, 4, eng) == ("ESG", 10, 4, "")
+
+
+def test_map_verse_vulgate_esther_displaced_hebrew() -> None:
+    """Hebrew verses displaced by an inserted addition map past the addition.
+
+    The Hebrew text of Esther 1 follows Addition A, so it lands at ESG 1:18-39;
+    the tails of chapters 8 and 10 (and the 11:1 colophon) likewise shift.
+    """
+    vul = Versification.named("vulgata")
+    org = Versification.named("org")
+    assert vul.map_verse("EST", 1, 1, org) == ("ESG", 1, 18, "")
+    assert vul.map_verse("EST", 8, 17, org) == ("ESG", 8, 41, "")
+    assert vul.map_verse("EST", 11, 1, org) == ("ESG", 10, 14, "")
+
+
+def test_map_verse_vulgate_esther_roundtrip() -> None:
+    """Vulgate Esther additions round-trip cleanly through org."""
+    vul = Versification.named("vulgata")
+    org = Versification.named("org")
+    for chapter, verse in [(11, 2), (13, 8), (14, 19), (15, 16), (16, 24), (10, 4)]:
+        mapped = vul.map_verse("EST", chapter, verse, org)
+        assert mapped is not None
+        back = org.map_verse(mapped[0], mapped[1], mapped[2], vul, subverse=mapped[3])
+        assert back == ("EST", chapter, verse, "")
+
+
 def test_map_verse_portion_subverse_carried_through_1_to_1() -> None:
     """A portion-of-verse subverse survives a 1:1 mapping (case 2)."""
     eng = Versification.named("eng")
