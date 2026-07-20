@@ -1,5 +1,7 @@
 """Tests for the bible_ref module."""
 
+import pathlib
+
 import pytest
 from versiref.bible_ref import BibleRef, SimpleBibleRef, VerseRange
 from versiref.ref_style import RefStyle, standard_names
@@ -1331,13 +1333,23 @@ def test_map_to_whole_chapter() -> None:
     assert vr.end_verse == -1
 
 
-def test_simple_map_with_subverse() -> None:
+def _subverse_versification(tmp_path: pathlib.Path) -> Versification:
+    """Build a Versification that maps a plain verse to a subverse location."""
+    path = tmp_path / "sub.json"
+    path.write_text(
+        '{"maxVerses": {"ESG": [39, 23, 22, 47, 28, 14, 10, 41, 32, 14]},'
+        ' "mappedVerses": {"ESG 8:13": "ESG 8:12a"}}'
+    )
+    return Versification.from_file(str(path), "sub")
+
+
+def test_simple_map_with_subverse(tmp_path: pathlib.Path) -> None:
     """Test mapping a SimpleBibleRef that maps to a subverse location."""
-    eng = Versification.named("eng")
+    sub = _subverse_versification(tmp_path)
     org = Versification.named("org")
-    # eng ESG 8:13 maps to org ESG 8:12a (single verse)
+    # sub ESG 8:13 maps to org ESG 8:12a (single verse)
     ref = SimpleBibleRef("ESG", [VerseRange(8, 13, "", 8, 13, "")])
-    mapped = ref.map(eng, org)
+    mapped = ref.map(sub, org)
     assert mapped is not None
     assert mapped.book_id == "ESG"
     vr = mapped.ranges[0]
@@ -1346,14 +1358,14 @@ def test_simple_map_with_subverse() -> None:
     assert vr.start_subverse == "a"
 
 
-def test_simple_map_subverse_roundtrip() -> None:
+def test_simple_map_subverse_roundtrip(tmp_path: pathlib.Path) -> None:
     """Test round-tripping a subverse mapping through SimpleBibleRef.map()."""
-    eng = Versification.named("eng")
+    sub = _subverse_versification(tmp_path)
     org = Versification.named("org")
     ref = SimpleBibleRef("ESG", [VerseRange(8, 13, "", 8, 13, "")])
-    mapped = ref.map(eng, org)
+    mapped = ref.map(sub, org)
     assert mapped is not None
-    back = mapped.map(org, eng)
+    back = mapped.map(org, sub)
     assert back is not None
     assert back.book_id == "ESG"
     vr = back.ranges[0]

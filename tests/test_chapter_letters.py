@@ -135,3 +135,62 @@ def test_letters_without_est_name() -> None:
     assert ref.ranges[0].start_chapter == 4
     # With no EST name to borrow, ESG formats with its own name
     assert ref.format(style) == "Greek Esther D:5"
+
+
+@pytest.mark.parametrize(
+    "chapter,verse,target,expected",
+    [
+        # A maps in place: org integrates Addition A at the head of chapter 1
+        (1, 1, "eng", ("ESG", 1, 1, "")),
+        # eng gives Addition A 18 verses (LXX's 1:1a-1:1s), so its last verse
+        # merges with A:17
+        (1, 17, "eng", ("ESG", 1, 18, "")),
+        # B: the first royal letter
+        (2, 1, "eng", ("ESG", 3, 14, "")),
+        (2, 1, "vulgata", ("EST", 13, 1, "")),
+        # C: the prayers of Mordecai (1-11) and Esther (12-30)
+        (3, 12, "eng", ("ESG", 4, 29, "")),
+        (3, 12, "vulgata", ("EST", 14, 1, "")),
+        # D: Esther before the king
+        (4, 16, "eng", ("ESG", 5, 16, "")),
+        (4, 16, "vulgata", ("EST", 15, 16, "")),
+        # E: the second royal letter
+        (5, 24, "vulgata", ("EST", 16, 24, "")),
+        # F: the interpretation of the dream (1-10) and colophon (11)
+        (6, 10, "vulgata", ("EST", 10, 13, "")),
+        (6, 11, "eng", ("ESG", 10, 14, "")),
+        (6, 11, "vulgata", ("EST", 11, 1, "")),
+    ],
+)
+def test_map_lettered_chapters(
+    chapter: int, verse: int, target: str, expected: tuple[str, int, int, str]
+) -> None:
+    """NABRE lettered chapters map to their integrated ESG positions."""
+    nabre = Versification.named("nabre")
+    target_vers = Versification.named(target)
+    assert nabre.map_verse("ESG", chapter, verse, target_vers) == expected
+    # And back again
+    book, t_chapter, t_verse, _ = expected
+    assert target_vers.map_verse(book, t_chapter, t_verse, nabre) == (
+        "ESG",
+        chapter,
+        verse,
+        "",
+    )
+
+
+def test_map_esg_between_eng_and_vulgata() -> None:
+    """The eng integrated Greek Esther interoperates with the Vulgate's additions."""
+    eng = Versification.named("eng")
+    vulgata = Versification.named("vulgata")
+    # B:1, the start of the first royal letter
+    assert vulgata.map_verse("EST", 13, 1, eng) == ("ESG", 3, 14, "")
+    assert eng.map_verse("ESG", 3, 14, vulgata) == ("EST", 13, 1, "")
+    # The colophon
+    assert vulgata.map_verse("EST", 11, 1, eng) == ("ESG", 10, 14, "")
+
+
+def test_nabre_esg_verse_counts() -> None:
+    """The nabre ESG chapters match the NABRE text (A=17 ... F=11)."""
+    nabre = Versification.named("nabre")
+    assert nabre.max_verses["ESG"] == [17, 7, 30, 16, 24, 11]

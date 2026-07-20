@@ -1,6 +1,7 @@
 """Tests for the Versification class."""
 
 import logging
+import pathlib
 
 import pytest  # noqa: F401
 from versiref.versification import Versification
@@ -154,31 +155,48 @@ def test_includes() -> None:
     assert v.includes("REV") is True
 
 
-def test_subverse_mapping_data_loaded() -> None:
+# A versification that maps plain verses to structural subverse locations in
+# org, in the style the upstream eng data once used for Greek Esther.
+_SUBVERSE_VERSIFICATION = """{
+  "maxVerses": {"ESG": [39, 23, 22, 47, 28, 14, 10, 41, 32, 14]},
+  "mappedVerses": {
+    "ESG 1:1": "ESG 1:1a",
+    "ESG 8:32": "ESG 8:12u"
+  }
+}"""
+
+
+def _subverse_versification(tmp_path: pathlib.Path) -> Versification:
+    """Build a Versification with subverse mapping entries from a temp file."""
+    path = tmp_path / "sub.json"
+    path.write_text(_SUBVERSE_VERSIFICATION)
+    return Versification.from_file(str(path), "sub")
+
+
+def test_subverse_mapping_data_loaded(tmp_path: pathlib.Path) -> None:
     """Test that subverse mapping entries are parsed correctly."""
-    eng = Versification.named("eng")
-    # ESG 1:1 in eng maps to ESG 1:1a in org
-    assert ("ESG", 1, 1, "") in eng._map_to_org
-    assert eng._map_to_org[("ESG", 1, 1, "")] == (
+    sub = _subverse_versification(tmp_path)
+    assert ("ESG", 1, 1, "") in sub._map_to_org
+    assert sub._map_to_org[("ESG", 1, 1, "")] == (
         ("ESG", 1, 1, "a"),
         ("ESG", 1, 1, "a"),
     )
 
 
-def test_map_verse_with_subverse() -> None:
+def test_map_verse_with_subverse(tmp_path: pathlib.Path) -> None:
     """Test mapping a verse that maps to a subverse location."""
-    eng = Versification.named("eng")
+    sub = _subverse_versification(tmp_path)
     org = Versification.named("org")
-    assert eng.map_verse("ESG", 8, 32, org) == ("ESG", 8, 12, "u")
+    assert sub.map_verse("ESG", 8, 32, org) == ("ESG", 8, 12, "u")
 
 
-def test_map_verse_subverse_roundtrip() -> None:
-    """Test round-tripping a subverse mapping eng -> org -> eng."""
-    eng = Versification.named("eng")
+def test_map_verse_subverse_roundtrip(tmp_path: pathlib.Path) -> None:
+    """Test round-tripping a subverse mapping sub -> org -> sub."""
+    sub = _subverse_versification(tmp_path)
     org = Versification.named("org")
-    result = eng.map_verse("ESG", 8, 32, org)
-    assert result is not None
-    back = org.map_verse(result[0], result[1], result[2], eng, subverse=result[3])
+    result = sub.map_verse("ESG", 8, 32, org)
+    assert result == ("ESG", 8, 12, "u")
+    back = org.map_verse(result[0], result[1], result[2], sub, subverse=result[3])
     assert back == ("ESG", 8, 32, "")
 
 
