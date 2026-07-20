@@ -370,12 +370,8 @@ class SimpleBibleRef:
             A formatted string representation of this Bible reference
 
         """
-        # Get the book name according to the style
-        if self.book_id not in style.names:
-            raise ValueError(f"Unknown book ID: {self.book_id}")
-
         # We start with the book name and then add ranges incrementally.
-        result = style.names[self.book_id]
+        result = style.book_name(self.book_id)
         last_range = None
         for range in self.ranges:
             if last_range is None:
@@ -385,11 +381,11 @@ class SimpleBibleRef:
                 ):
                     states_chapter = False
                 else:
-                    result += style.format_chapter(range.start_chapter)
+                    result += style.format_chapter(range.start_chapter, self.book_id)
                     states_chapter = True
             elif last_range.end_chapter != range.start_chapter:
                 result += style.chapter_separator + style.format_chapter(
-                    range.start_chapter
+                    range.start_chapter, self.book_id
                 )
                 states_chapter = True
             else:
@@ -410,7 +406,7 @@ class SimpleBibleRef:
             ):
                 result += style.range_separator
                 if range.end_chapter != range.start_chapter:
-                    result += style.format_chapter(range.end_chapter)
+                    result += style.format_chapter(range.end_chapter, self.book_id)
                     if range.end_verse >= 0:
                         result += f"{style.chapter_verse_separator}{range.end_verse}"
                 elif range.end_verse != range.start_verse:

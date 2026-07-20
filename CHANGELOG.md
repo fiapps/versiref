@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Added
+
+- A new `RefStyle` option, `chapter_letters`, maps a book ID to the letters that serve as its chapter numbers, as the NABRE prints the Additions to Esther (`Est A` through `Est F`, chapters 1–6 of `ESG` in the `nabre` versification). A lettered book takes the name of the book it may share a name with (`ESG` takes `EST`'s name, via the new `RefStyle.book_name()` method), so parsers resolve any recognized Esther name followed by a letter chapter to `ESG` while numeric chapters keep resolving to `EST`; `format_chapter()` accepts an optional book ID and renders letters for a lettered book, raising `ValueError` for a chapter beyond the letter list.
+- A new bundled style, `en-nabre`, extends `en-sbl` with the NABRE's Esther chapter letters and also recognizes the CMOS name sets.
+
 ### Fixed
 
 - Vulgate Esther references to the Greek additions now map to their correct integrated Greek Esther (`ESG`) positions. The printed Vulgate gathers the additions at the end as chapters 10:4-16, but the mapping data placed them naively (e.g. `EST 13:1-18` → `ESG 4:1-18`), so `map_verse` sent them — and the Hebrew verses they displace — to the wrong verses (`vulgata` `Esther 13:8` resolved to Hebrew Esther 4:8 instead of the start of Mordecai's prayer at `ESG 4:18`). Each addition (A–F), its colophon, and the displaced Hebrew tails of chapters 1, 3, 5, and 8 now map to the correct `ESG` verse. The `org` and `eng` `ESG` maxVerses were extended to 41 (ch. 8) and 14 (ch. 10) to accommodate the tails, reconciling the `eng` counts with the `eng.vrs` mapping lines that already referenced them.

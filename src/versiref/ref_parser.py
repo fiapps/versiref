@@ -5,6 +5,7 @@ This module provides the RefParser class for parsing Bible references from strin
 We don't call pp.ParserElement.enablePackrat() because it made parsing slower.
 """
 
+import re
 from enum import Enum
 from typing import Callable, Generator
 
@@ -12,7 +13,7 @@ import pyparsing as pp
 from pyparsing import common
 
 from versiref.bible_ref import BibleRef, SimpleBibleRef, VerseRange
-from versiref.ref_style import RefStyle
+from versiref.ref_style import SHARED_NAME_PARTNER, RefStyle
 from versiref.roman import roman_to_int
 from versiref.versification import Versification
 
@@ -145,63 +146,150 @@ class RefParser:
         # right after the marker.
         word_boundary = pp.NotAny(pp.Char(pp.identbodychars)).leave_whitespace()
 
-        # For now, we only parse ranges of a single verse.
-        verse_range = (
-            verse.copy().set_results_name("start_verse")
-            + optional_subverse.set_results_name("start_subverse")
-            + pp.Opt(
-                (
+        def build_book_branches(
+            book_elem: pp.ParserElement, chapter_elem: pp.ParserElement
+        ) -> tuple[pp.ParserElement, pp.ParserElement]:
+            """Build the book grammar branches for a book and chapter element.
+
+            Returns the chapter:verse branch and the whole-chapter branch
+            (e.g. "John 3", "John 3–5", "John 3; 5; 7").
+            """
+            # For now, we only parse ranges of a single verse.
+            verse_range = (
+                verse.copy().set_results_name("start_verse")
+                + optional_subverse.set_results_name("start_subverse")
+                + pp.Opt(
                     (
-                        pp.Literal(self.style.following_verses).set_results_name(
-                            "following_verses"
-                        )
-                        | pp.Literal(self.style.following_verse).set_results_name(
-                            "following_verse"
-                        )
-                    )
-                    + word_boundary.copy()
-                )
-                | (
-                    range_separator
-                    + (
-                        # Either a full chapter:verse reference
                         (
-                            pp.Opt(
-                                chapter.copy().set_results_name("end_chapter")
-                                + separator(self.style.chapter_verse_separator.strip())
+                            pp.Literal(self.style.following_verses).set_results_name(
+                                "following_verses"
                             )
-                            + verse.copy().set_results_name("end_verse")
-                            + optional_subverse.copy().set_results_name("end_subverse")
+                            | pp.Literal(self.style.following_verse).set_results_name(
+                                "following_verse"
+                            )
                         )
-                        # Or just a subverse of the same verse
-                        | subverse.copy().set_results_name("end_subverse")
+                        + word_boundary.copy()
+                    )
+                    | (
+                        range_separator
+                        + (
+                            # Either a full chapter:verse reference
+                            (
+                                pp.Opt(
+                                    chapter_elem.copy().set_results_name("end_chapter")
+                                    + separator(
+                                        self.style.chapter_verse_separator.strip()
+                                    )
+                                )
+                                + verse.copy().set_results_name("end_verse")
+                                + optional_subverse.copy().set_results_name(
+                                    "end_subverse"
+                                )
+                            )
+                            # Or just a subverse of the same verse
+                            | subverse.copy().set_results_name("end_subverse")
+                        )
                     )
                 )
+                + location_marker.copy().set_results_name("end_location")
+            ).set_parse_action(self._make_verse_range)
+
+            verse_ranges = pp.DelimitedList(
+                verse_range, delim=separator(self.style.verse_range_separator.strip())
+            ).set_results_name("verse_ranges")
+
+            chapter_range = (
+                chapter_elem.copy().set_results_name("start_chapter")
+                + separator(self.style.chapter_verse_separator.strip())
+                + location_marker.copy().set_results_name("verse_ranges_location")
+                + verse_ranges
+            ).set_parse_action(self._make_chapter_range)
+
+            chapter_ranges = pp.DelimitedList(
+                chapter_range, delim=separator(self.style.chapter_separator.strip())
+            ).set_results_name("chapter_ranges")
+
+            book_chapter_verse_ranges = (
+                book_elem.copy().set_results_name("book")
+                + location_marker.copy().set_results_name("chapter_ranges_location")
+                + chapter_ranges
+                + location_marker.copy().set_results_name("end_location")
+            ).set_parse_action(self._make_simple_ref)
+
+            chapter_only_range = (
+                chapter_elem.copy().set_results_name("start_chapter")
+                + pp.Opt(
+                    range_separator
+                    + chapter_elem.copy().set_results_name("end_chapter")
+                )
+                + location_marker.copy().set_results_name("end_location")
+            ).set_parse_action(self._make_chapter_only_range)
+
+            chapter_only_ranges = pp.DelimitedList(
+                chapter_only_range,
+                delim=separator(self.style.chapter_separator.strip()),
+            ).set_results_name("chapter_ranges")
+
+            book_chapter_only_ranges = (
+                book_elem.copy().set_results_name("book")
+                + location_marker.copy().set_results_name("chapter_ranges_location")
+                + chapter_only_ranges
+                + location_marker.copy().set_results_name("end_location")
+            ).set_parse_action(self._make_simple_ref)
+
+            return book_chapter_verse_ranges, book_chapter_only_ranges
+
+        book_chapter_verse_ranges, book_chapter_only_ranges = build_book_branches(
+            book, chapter
+        )
+
+        # A book with chapter letters (e.g. the NABRE's Esther A–F) gets its
+        # own branches whose chapter element matches the letters. The branches
+        # also claim the names of the book it may share a name with (ESG with
+        # EST, PSAS with PSA), so that "Esther C:12" parses as ESG even though
+        # "Esther" alone resolves to EST.
+        lettered_verse_branches: list[pp.ParserElement] = []
+        lettered_chapter_branches: list[pp.ParserElement] = []
+        for lettered_id, letters in self.style.chapter_letters.items():
+            partner = SHARED_NAME_PARTNER.get(lettered_id)
+            names = [
+                name
+                for name, book_id in self.style.recognized_names.items()
+                if book_id == lettered_id or book_id == partner
+            ]
+            if not names or not letters:
+                continue
+            # Factory functions give the parse actions a single-argument
+            # signature (pyparsing dispatches on arity) with the loop
+            # variables bound at definition time.
+
+            def make_book_action(book_id: str) -> Callable[[pp.ParseResults], str]:
+                """Return a parse action that yields a fixed book ID."""
+                return lambda t: book_id
+
+            def make_letter_action(
+                letters: list[str],
+            ) -> Callable[[pp.ParseResults], int]:
+                """Return a parse action mapping a chapter letter to its number."""
+                letter_list = list(letters)
+                return lambda t: letter_list.index(str(t[0])) + 1
+
+            lettered_book = pp.one_of(names)
+            lettered_book.set_parse_action(make_book_action(lettered_id))
+            # The lookahead keeps a letter from matching the start of a longer
+            # word, as with Roman-numeral chapters above.
+            letter_chapter = pp.Regex(
+                "(?:"
+                + "|".join(
+                    re.escape(letter)
+                    for letter in sorted(letters, key=len, reverse=True)
+                )
+                + r")(?![0-9A-Za-zÆæŒœ])"
             )
-            + location_marker.copy().set_results_name("end_location")
-        ).set_parse_action(self._make_verse_range)
-
-        verse_ranges = pp.DelimitedList(
-            verse_range, delim=separator(self.style.verse_range_separator.strip())
-        ).set_results_name("verse_ranges")
-
-        chapter_range = (
-            chapter.copy().set_results_name("start_chapter")
-            + separator(self.style.chapter_verse_separator.strip())
-            + location_marker.copy().set_results_name("verse_ranges_location")
-            + verse_ranges
-        ).set_parse_action(self._make_chapter_range)
-
-        chapter_ranges = pp.DelimitedList(
-            chapter_range, delim=separator(self.style.chapter_separator.strip())
-        ).set_results_name("chapter_ranges")
-
-        book_chapter_verse_ranges = (
-            book.copy().set_results_name("book")
-            + location_marker.copy().set_results_name("chapter_ranges_location")
-            + chapter_ranges
-            + location_marker.copy().set_results_name("end_location")
-        ).set_parse_action(self._make_simple_ref)
+            letter_chapter.set_parse_action(make_letter_action(letters))
+            lettered_cv, lettered_c = build_book_branches(lettered_book, letter_chapter)
+            lettered_verse_branches.append(lettered_cv)
+            lettered_chapter_branches.append(lettered_c)
 
         # The chapter can be omitted for single-chapter (sc) books
         sc_books = [
@@ -252,24 +340,6 @@ class RefParser:
             + location_marker.copy().set_results_name("end_location")
         ).set_parse_action(self._make_simple_ref)
 
-        # Whole-chapter references: "John 3", "John 3–5", "John 3; 5; 7"
-        chapter_only_range = (
-            chapter.copy().set_results_name("start_chapter")
-            + pp.Opt(range_separator + chapter.copy().set_results_name("end_chapter"))
-            + location_marker.copy().set_results_name("end_location")
-        ).set_parse_action(self._make_chapter_only_range)
-
-        chapter_only_ranges = pp.DelimitedList(
-            chapter_only_range, delim=separator(self.style.chapter_separator.strip())
-        ).set_results_name("chapter_ranges")
-
-        book_chapter_only_ranges = (
-            book.copy().set_results_name("book")
-            + location_marker.copy().set_results_name("chapter_ranges_location")
-            + chapter_only_ranges
-            + location_marker.copy().set_results_name("end_location")
-        ).set_parse_action(self._make_simple_ref)
-
         # Whole-book references: bare book name
         book_only = (
             book.copy().set_results_name("book")
@@ -287,12 +357,18 @@ class RefParser:
         leading_word_boundary = pp.Suppress(pp.Regex(r"(?<![^\W\d_])"))
 
         # Try the parser with longer matches first, lest Jude 1:5 parse as
-        # Jude 1 or "John 3:16" parse as "John 3".
-        self.simple_ref_parser = leading_word_boundary + (
-            book_chapter_verse_ranges
-            | sc_book_verse_ranges
-            | book_chapter_only_ranges
-            | book_only
+        # Jude 1 or "John 3:16" parse as "John 3". The lettered branches come
+        # before their numeric counterparts so that a letter chapter is tried
+        # before the fallbacks that would match less of the text.
+        self.simple_ref_parser = leading_word_boundary + pp.MatchFirst(
+            [
+                *lettered_verse_branches,
+                book_chapter_verse_ranges,
+                sc_book_verse_ranges,
+                *lettered_chapter_branches,
+                book_chapter_only_ranges,
+                book_only,
+            ]
         )
 
         # A trailing versification designator (e.g. "Vulg.", "(LXX)"). one_of

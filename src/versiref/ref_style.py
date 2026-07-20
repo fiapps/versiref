@@ -13,6 +13,10 @@ from versiref.roman import int_to_roman
 
 _CHAPTER_NUMBER_STYLES = ("arabic", "roman", "roman-lower")
 
+# The pairs of book IDs that may share a name, mapping each to the book whose
+# name wins (the same preference _invert applies).
+SHARED_NAME_PARTNER = {"ESG": "EST", "PSAS": "PSA"}
+
 
 def _invert(d: dict[str, str]) -> dict[str, str]:
     """Invert an ID->name dictionary, resolving conflicts if possible.
@@ -54,6 +58,12 @@ class RefStyle:
             (default), "roman" (uppercase Roman numerals, e.g. "XLIV"), or
             "roman-lower" (lowercase, e.g. "xliv"). Verse numbers are always
             Arabic.
+        chapter_letters: Maps a book ID to the letters that serve as its
+            chapter numbers, e.g. {"ESG": ["A", "B", "C", "D", "E", "F"]} for
+            the way the NABRE prints the Additions to Esther. Chapter n of
+            the book formats as the nth letter, and parsers accept the
+            letters as chapters of that book — even when it shares a name
+            with another book (as ESG may with EST).
         recognized_names: Maps abbreviations/names to Bible book IDs for parsing
         versification_identifiers: Maps a trailing designator (e.g. "Vulg.",
             "(LXX)") to a versification id string (e.g. "vulgata", "lxx"). A
@@ -71,6 +81,7 @@ class RefStyle:
     verse_range_separator: str = ", "
     chapter_separator: str = "; "
     chapter_number_style: str = "arabic"
+    chapter_letters: dict[str, list[str]] = field(default_factory=dict)
     recognized_names: dict[str, str] = field(default_factory=dict)
     versification_identifiers: dict[str, str] = field(default_factory=dict)
     identifier: str | None = None
@@ -108,16 +119,57 @@ class RefStyle:
             return f'RefStyle.named("{self.identifier}")'
         return object.__str__(self)
 
-    def format_chapter(self, chapter: int) -> str:
-        """Render a chapter number according to chapter_number_style.
+    def book_name(self, book_id: str) -> str:
+        """Return the name used to format a book.
+
+        A book with chapter letters takes the name of the book it shares a
+        name with (ESG takes EST's name), ignoring any name of its own: the
+        letters alone distinguish its references, as when the NABRE cites
+        the Additions to Esther as "Est A" through "Est F".
+
+        Args:
+            book_id: The book to name.
+
+        Returns:
+            The book's name in this style.
+
+        Raises:
+            ValueError: If the style has no name for the book.
+
+        """
+        if book_id in self.chapter_letters:
+            partner = SHARED_NAME_PARTNER.get(book_id)
+            if partner is not None and partner in self.names:
+                return self.names[partner]
+        if book_id not in self.names:
+            raise ValueError(f"Unknown book ID: {book_id}")
+        return self.names[book_id]
+
+    def format_chapter(self, chapter: int, book_id: str | None = None) -> str:
+        """Render a chapter number according to the style.
 
         Args:
             chapter: The chapter number to render.
+            book_id: The book the chapter belongs to. When the book has an
+                entry in chapter_letters, the chapter renders as its letter;
+                otherwise chapter_number_style governs.
 
         Returns:
             The chapter number as a string.
 
+        Raises:
+            ValueError: If the book uses chapter letters but has no letter
+                for this chapter number.
+
         """
+        if book_id is not None and book_id in self.chapter_letters:
+            letters = self.chapter_letters[book_id]
+            if 1 <= chapter <= len(letters):
+                return letters[chapter - 1]
+            raise ValueError(
+                f"No chapter letter for {book_id} {chapter}: "
+                f"the style defines letters for {len(letters)} chapters"
+            )
         if self.chapter_number_style == "roman":
             return int_to_roman(chapter)
         elif self.chapter_number_style == "roman-lower":
@@ -175,7 +227,9 @@ class RefStyle:
                 dict mapping book IDs to names) or a "base" key (identifier of a
                 standard style to inherit from), but not both. Optional separator
                 fields override the defaults (or the base style's values), an
-                optional "also_recognize" list adds extra recognized names, and an
+                optional "also_recognize" list adds extra recognized names, an
+                optional "chapter_letters" dict maps book IDs to their chapter
+                letters (replacing any inherited from a base style), and an
                 optional "versification_identifiers" dict maps trailing
                 designators to versification id strings (existing entries win, so
                 a base style's designators are preserved).
@@ -239,6 +293,14 @@ class RefStyle:
                 chapter_number_style=_str("chapter_number_style", "arabic"),
             )
 
+        chapter_letters = data.get("chapter_letters")
+        if isinstance(chapter_letters, dict):
+            style.chapter_letters = {
+                str(book): [str(letter) for letter in letters]
+                for book, letters in chapter_letters.items()
+                if isinstance(letters, list)
+            }
+
         also_recognize = data.get("also_recognize")
         if isinstance(also_recognize, list):
             for entry in also_recognize:
@@ -292,6 +354,8 @@ class RefStyle:
             identifier: Standard style identifier. Some common values:
 
                 - "en-sbl" — SBL (Society of Biblical Literature)
+                - "en-nabre" — SBL extended with the NABRE's Esther chapter
+                  letters (Est A–F)
                 - "en-cmos_short" — Chicago Manual of Style, short abbreviations
                 - "en-cmos_long" — Chicago Manual of Style, long abbreviations
                 - "it-cei" — Italian CEI (Conferenza Episcopale Italiana)
