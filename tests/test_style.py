@@ -236,7 +236,7 @@ def test_named_en_bibleworks() -> None:
     style = RefStyle.named("en-bibleworks")
     assert style.identifier == "en-bibleworks"
     assert style.recognized_names["Esg"] == "ESG"
-    assert style.recognized_names["Tbs"] == "TOB"
+    assert style.recognized_names["Jda"] == "JDG"
 
 
 def test_named_it_cei() -> None:
