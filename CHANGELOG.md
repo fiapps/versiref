@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.10.0 - 2026-07-20
+
+### Changed
+
+- `SimpleBibleRef.range_keys` and `BibleRef.range_keys` now give an inserted verse — such as a Greek addition to Esther (`ESG 4:17k`, which follows but is not part of `ESG 4:17`) — an integer key distinct from, and correctly ordered against, its base verse. Each key gains a two-digit least-significant field for the subverse ordinal, so the layout is now `BB CCC VVV SS` (ten digits instead of eight); the ordinal comes from a new `Versification.partial_ordinal()`, which reads the versification's `partialVerses` table. Because the ordinal is driven by that table, a subverse cited on a verse that is *not* followed by inserted verses — a portion of a single verse, such as a scholarly `Rom 8:1a` — collapses to the base verse's key rather than being mistaken for an insertion. A range end that spreads to a whole verse (a whole chapter or book, or `ff`) carries the maximal ordinal so that it includes that verse's inserted verses. Widening every key by two digits is a breaking change for any index built on the previous eight-digit keys.
+- The `en-bibleworks` style now gives the LXX alternate-version books — the alternate Greek translations, such as Theodotion's — their own BibleWorks abbreviations in its book-name set: `Dng` (`DAG`), `Jsa` (`JSA`), `Tbs` (`TBS`), `Sut` (`SST`), `Dat` (`DNT`), and `Bet` (`BLT`). These replace the style's `also_recognize` aliases that had folded those abbreviations into the common books they parallel. As a result `Jsa`, `Tbs`, `Sut`, `Dat`, and `Bet` now resolve to the alternate-version book IDs (`JSA`, `TBS`, `SST`, `DNT`, `BLT`) instead of `JOS`, `TOB`, `SUS`, `DAG`, and `BEL`; only `Jda` (`JDG`) remains an alias.
+
 ## 0.9.0 - 2026-07-20
 
 ### Added
