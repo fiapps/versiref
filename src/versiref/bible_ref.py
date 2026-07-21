@@ -9,6 +9,46 @@ from typing import Generator
 from versiref.ref_style import RefStyle, standard_names
 from versiref.versification import Versification
 
+# Integer verse keys pack a location as BB CCC VVV SS (book, chapter, verse,
+# subverse ordinal). The trailing subverse field gives inserted verses such as
+# the Greek additions to Esther (ESG 4:17a-z, which follow but are not part of
+# ESG 4:17) a key distinct from, and correctly ordered against, their base
+# verse. The ordinal comes from the versification (Versification.partial_ordinal)
+# so that a subverse cited on a verse with no inserted verses (a mere portion of
+# a single verse) collapses to the base verse's key rather than being mistaken
+# for an insertion. Widths: 3 chapter digits, 3 verse digits, 2 ordinal digits.
+_BOOK_KEY_FACTOR = 100_000_000
+_CHAPTER_KEY_FACTOR = 100_000
+_VERSE_KEY_FACTOR = 100
+
+# Inclusive subverse ordinal for a range end that spreads to a whole verse
+# (a whole chapter, whole book, or "ff"): large enough to include every
+# inserted verse yet below the next verse's base (which starts a new hundred).
+_MAX_SUBVERSE_ORDINAL = 99
+
+
+def _verse_key(book_num: int, chapter: int, verse: int, subverse_ordinal: int) -> int:
+    """Pack a verse location into a single sortable integer key.
+
+    Args:
+        book_num: 1-based position of the book in the versification.
+        chapter: Chapter number.
+        verse: Verse number.
+        subverse_ordinal: Result of :meth:`Versification.partial_ordinal`, or
+            :data:`_MAX_SUBVERSE_ORDINAL` for a range end that spreads to
+            include a verse's inserted verses.
+
+    Returns:
+        The packed BB CCC VVV SS integer key.
+
+    """
+    return (
+        book_num * _BOOK_KEY_FACTOR
+        + chapter * _CHAPTER_KEY_FACTOR
+        + verse * _VERSE_KEY_FACTOR
+        + subverse_ordinal
+    )
+
 
 def _count(n: int, noun: str) -> str:
     """Return ``n`` followed by ``noun``, pluralized with a trailing 's'."""
@@ -328,7 +368,11 @@ class SimpleBibleRef:
 
         Yields:
             (start_key, end_key): integer keys for the start and end of a range.
-                Each key has 2 book digits, 3 chapter digits, and 3 verse digits.
+                Each key has 2 book digits, 3 chapter digits, 3 verse digits, and
+                2 subverse-ordinal digits (0 for the base verse; nonzero for an
+                inserted verse such as ESG 4:17k). A range end that spreads to a
+                whole verse carries the maximal subverse ordinal so that it
+                includes that verse's inserted verses.
 
         """
         if self.book_id not in versification.max_verses:
@@ -340,19 +384,29 @@ class SimpleBibleRef:
             last_chapter = len(versification.max_verses[self.book_id])
             last_verse = versification.last_verse(self.book_id, last_chapter)
             yield (
-                book_num * 1000000 + 1 * 1000 + 1,
-                book_num * 1000000 + last_chapter * 1000 + last_verse,
+                _verse_key(book_num, 1, 1, 0),
+                _verse_key(book_num, last_chapter, last_verse, _MAX_SUBVERSE_ORDINAL),
             )
             return
 
         for range_ref in self.range_refs():
             range = range_ref.ranges[0]
             start_verse = 0 if range.start_verse < 0 else range.start_verse
+            start_ord = versification.partial_ordinal(
+                self.book_id, range.start_chapter, start_verse, range.start_subverse
+            )
             end_verse = range.end_verse
             if end_verse < 0:
                 end_verse = versification.last_verse(self.book_id, range.end_chapter)
-            start_key = book_num * 1000000 + range.start_chapter * 1000 + start_verse
-            end_key = book_num * 1000000 + range.end_chapter * 1000 + end_verse
+                end_ord = _MAX_SUBVERSE_ORDINAL
+            else:
+                end_ord = versification.partial_ordinal(
+                    self.book_id, range.end_chapter, end_verse, range.end_subverse
+                )
+            start_key = _verse_key(
+                book_num, range.start_chapter, start_verse, start_ord
+            )
+            end_key = _verse_key(book_num, range.end_chapter, end_verse, end_ord)
             yield (start_key, end_key)
 
     def format(
@@ -668,7 +722,9 @@ class BibleRef:
 
         Yields:
             (start_key, end_key): integer keys for the start and end of a range in the ref
-                Each key has 2 book digits, 3 chapter digits, and 3 verse digits.
+                Each key has 2 book digits, 3 chapter digits, 3 verse digits, and
+                2 subverse-ordinal digits (0 for the base verse; nonzero for an
+                inserted verse such as ESG 4:17k).
 
         """
         if self.versification is None:

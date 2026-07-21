@@ -9,6 +9,7 @@ from importlib import resources
 logger = logging.getLogger(__name__)
 
 _VERSE_RE = re.compile(r"^([A-Z0-9]{3}) (\d+):(\d+)([a-z])?(?:-(\d+)([a-z])?)?$")
+_PARTIAL_VERSE_RE = re.compile(r"^([A-Z0-9]{3}) (\d+):(\d+)$")
 
 _VerseLoc = tuple[str, int, int, str]
 _VerseLocRange = tuple[_VerseLoc, _VerseLoc]
@@ -79,6 +80,14 @@ class Versification:
     # such a mapping and must be discarded.
     _multi_to_org: set[_VerseLoc] = field(default_factory=set, repr=False)
     _multi_from_org: set[_VerseLoc] = field(default_factory=set, repr=False)
+    # For each verse that is followed by inserted or partial verses (e.g. the
+    # Greek additions to Esther), maps each inserted subverse letter to its
+    # ordinal within the verse (the base verse being 0). Verses absent here have
+    # no inserted verses; a subverse cited on them is a portion of a single
+    # verse, not an insertion. Loaded from the data's ``partialVerses``.
+    _partial_verses: dict[tuple[str, int, int], dict[str, int]] = field(
+        default_factory=dict, repr=False
+    )
 
     def __str__(self) -> str:
         """Return a string representation of this versification.
@@ -179,6 +188,19 @@ class Versification:
                     map_from_org[dst_loc] = (src_start, src_end)
                     multi_from_org.add(dst_loc)
 
+        partial_verses: dict[tuple[str, int, int], dict[str, int]] = {}
+        for ref_str, parts in data.get("partialVerses", {}).items():
+            m = _PARTIAL_VERSE_RE.match(ref_str)
+            if not m:
+                logger.warning("Skipping malformed partialVerses entry: %r", ref_str)
+                continue
+            loc = (m.group(1), int(m.group(2)), int(m.group(3)))
+            partial_verses[loc] = {
+                stripped: idx
+                for idx, part in enumerate(parts)
+                if (stripped := part.strip()) and stripped != "-"
+            }
+
         return cls(
             max_verses,
             identifier,
@@ -186,6 +208,7 @@ class Versification:
             map_from_org,
             multi_to_org,
             multi_from_org,
+            partial_verses,
         )
 
     @classmethod
@@ -305,6 +328,42 @@ class Versification:
 
         # Return the verse count as an integer
         return self.max_verses[book][chapter - 1]
+
+    def partial_ordinal(
+        self, book: str, chapter: int, verse: int, subverse: str
+    ) -> int:
+        """Return the sort ordinal of a subverse within its verse.
+
+        A verse listed in the versification's ``partialVerses`` is followed by
+        inserted or partial verses (for example the Greek additions to Esther,
+        ESG 4:17a-z, which follow but are not part of ESG 4:17). Each such part
+        is numbered by its position in that verse's part list, the base
+        (unlettered) verse being 0, so that an inserted verse sorts after its
+        base verse and before the next verse.
+
+        A subverse cited on a verse that is *not* so listed is a mere portion of
+        a single verse (for example a scholarly "8:1a"); it shares the base
+        verse's ordinal, 0, so that it is not mistaken for an inserted verse.
+
+        Args:
+            book: The book ID (using Paratext three-letter codes)
+            chapter: The chapter number
+            verse: The verse number
+            subverse: The subverse string ("" for the base verse)
+
+        Returns:
+            The subverse's ordinal within the verse: 0 for the base verse, or for
+            a portion of a verse that has no inserted verses.
+
+        """
+        if not subverse:
+            return 0
+        if book == "PSAS":  # plural of PSA
+            book = "PSA"
+        parts = self._partial_verses.get((book, chapter, verse))
+        if parts is None:
+            return 0
+        return parts.get(subverse, 0)
 
     def map_verse(
         self,

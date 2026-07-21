@@ -1036,8 +1036,9 @@ def test_bible_ref_range_keys_single_verse() -> None:
     keys = list(ref.range_keys())
     assert len(keys) == 1
     start_key, end_key = keys[0]
-    assert start_key == 43003016  # 43 (John) | 003 (chapter 3) | 016 (verse 16)
-    assert end_key == 43003016
+    # 43 (John) | 003 (chapter 3) | 016 (verse 16) | 00 (base verse)
+    assert start_key == 4300301600
+    assert end_key == 4300301600
 
 
 def test_bible_ref_range_keys_verse_range() -> None:
@@ -1049,8 +1050,8 @@ def test_bible_ref_range_keys_verse_range() -> None:
     keys = list(ref.range_keys())
     assert len(keys) == 1
     start_key, end_key = keys[0]
-    assert start_key == 1001001  # 01 (Genesis) | 001 (chapter 1) | 001 (verse 1)
-    assert end_key == 1001005  # 01 (Genesis) | 001 (chapter 1) | 005 (verse 5)
+    assert start_key == 100100100  # 01 (Genesis) | 001 (ch 1) | 001 (v 1) | 00
+    assert end_key == 100100500  # 01 (Genesis) | 001 (ch 1) | 005 (v 5) | 00
 
 
 def test_bible_ref_range_keys_cross_chapter() -> None:
@@ -1064,8 +1065,8 @@ def test_bible_ref_range_keys_cross_chapter() -> None:
     keys = list(ref.range_keys())
     assert len(keys) == 1
     start_key, end_key = keys[0]
-    assert start_key == 43007053  # John 7:53
-    assert end_key == 43008011  # John 8:11
+    assert start_key == 4300705300  # John 7:53
+    assert end_key == 4300801100  # John 8:11
 
 
 def test_bible_ref_range_keys_isaiah() -> None:
@@ -1077,8 +1078,9 @@ def test_bible_ref_range_keys_isaiah() -> None:
     keys = list(ref.range_keys())
     assert len(keys) == 1
     start_key, end_key = keys[0]
-    assert start_key == 23007014  # 23 (Isaiah) | 007 (chapter 7) | 014 (verse 14)
-    assert end_key == 23007014
+    # 23 (Isaiah) | 007 (chapter 7) | 014 (verse 14) | 00 (base verse)
+    assert start_key == 2300701400
+    assert end_key == 2300701400
 
 
 def test_bible_ref_range_keys_multiple_ranges() -> None:
@@ -1093,8 +1095,8 @@ def test_bible_ref_range_keys_multiple_ranges() -> None:
 
     keys = list(ref.range_keys())
     assert len(keys) == 2
-    assert keys[0] == (43003016, 43003016)
-    assert keys[1] == (43003018, 43003020)
+    assert keys[0] == (4300301600, 4300301600)
+    assert keys[1] == (4300301800, 4300302000)
 
 
 def test_bible_ref_range_keys_multiple_books() -> None:
@@ -1108,8 +1110,8 @@ def test_bible_ref_range_keys_multiple_books() -> None:
 
     keys = list(ref.range_keys())
     assert len(keys) == 2
-    assert keys[0] == (43003016, 43003016)  # John 3:16
-    assert keys[1] == (45008028, 45008039)  # Romans 8:28-39
+    assert keys[0] == (4300301600, 4300301600)  # John 3:16
+    assert keys[1] == (4500802800, 4500803900)  # Romans 8:28-39
 
 
 def test_bible_ref_range_keys_whole_chapter() -> None:
@@ -1122,8 +1124,9 @@ def test_bible_ref_range_keys_whole_chapter() -> None:
     assert len(keys) == 1
     start_key, end_key = keys[0]
     # -1 verses should resolve to the first and last verses of the chapter
-    assert start_key == 43006000  # first verse assumed to be 0
-    assert end_key == 43006071  # last verse of John 6 is 71
+    assert start_key == 4300600000  # first verse assumed to be 0
+    # last verse of John 6 is 71; a whole-chapter end spreads to ordinal 99
+    assert end_key == 4300607199
 
 
 def test_bible_ref_range_keys_without_versification() -> None:
@@ -1157,7 +1160,7 @@ def test_bible_ref_range_keys_mixed_known_unknown() -> None:
     keys = list(ref.range_keys())
     # Only the John reference should be yielded
     assert len(keys) == 1
-    assert keys[0] == (43003016, 43003016)
+    assert keys[0] == (4300301600, 4300301600)
 
 
 def test_bible_ref_range_keys_empty_reference() -> None:
@@ -1180,8 +1183,9 @@ def test_bible_ref_range_keys_ff_notation() -> None:
     assert len(keys) == 1
     start_key, end_key = keys[0]
     # Matthew is book 40
-    assert start_key == 40012046  # Matthew 12:46
-    assert end_key == 40012050  # last verse of Matthew 12 is 50
+    assert start_key == 4001204600  # Matthew 12:46
+    # last verse of Matthew 12 is 50; an "ff" end spreads to ordinal 99
+    assert end_key == 4001205099
 
 
 def test_simple_bible_ref_range_keys_single_verse() -> None:
@@ -1191,8 +1195,8 @@ def test_simple_bible_ref_range_keys_single_verse() -> None:
     keys = list(ref.range_keys(versification))
     assert len(keys) == 1
     start_key, end_key = keys[0]
-    assert start_key == 43003016
-    assert end_key == 43003016
+    assert start_key == 4300301600
+    assert end_key == 4300301600
 
 
 def test_simple_bible_ref_range_keys_whole_book() -> None:
@@ -1202,9 +1206,10 @@ def test_simple_bible_ref_range_keys_whole_book() -> None:
     keys = list(ref.range_keys(versification))
     assert len(keys) == 1
     start_key, end_key = keys[0]
-    # John is book 43; first verse is 43001001; last chapter of John is 21, last verse is 25
-    assert start_key == 43001001
-    assert end_key == 43021025
+    # John is book 43; first verse 43 001 001 00; last chapter 21, last verse 25,
+    # a whole-book end spreading to ordinal 99
+    assert start_key == 4300100100
+    assert end_key == 4302102599
 
 
 def test_simple_bible_ref_range_keys_whole_book_genesis() -> None:
@@ -1214,9 +1219,10 @@ def test_simple_bible_ref_range_keys_whole_book_genesis() -> None:
     keys = list(ref.range_keys(versification))
     assert len(keys) == 1
     start_key, end_key = keys[0]
-    # Genesis is book 1; first verse is 1001001; last chapter is 50, last verse is 26
-    assert start_key == 1001001
-    assert end_key == 1050026
+    # Genesis is book 1; first verse 1 001 001 00; last chapter 50, last verse 26,
+    # a whole-book end spreading to ordinal 99
+    assert start_key == 100100100
+    assert end_key == 105002699
 
 
 def test_simple_bible_ref_range_keys_unknown_book() -> None:
@@ -1234,8 +1240,8 @@ def test_bible_ref_range_keys_whole_book() -> None:
     keys = list(ref.range_keys())
     assert len(keys) == 1
     start_key, end_key = keys[0]
-    assert start_key == 43001001
-    assert end_key == 43021025
+    assert start_key == 4300100100
+    assert end_key == 4302102599
 
 
 def test_bible_ref_range_keys_whole_books_multi() -> None:
@@ -1248,9 +1254,126 @@ def test_bible_ref_range_keys_whole_books_multi() -> None:
     keys = list(ref.range_keys())
     assert len(keys) == 2
     # Genesis: book 1, 50 chapters, last verse Gen 50:26
-    assert keys[0] == (1001001, 1050026)
+    assert keys[0] == (100100100, 105002699)
     # Revelation: book 66, 22 chapters, last verse Rev 22:21
-    assert keys[1] == (66001001, 66022021)
+    assert keys[1] == (6600100100, 6602202199)
+
+
+def test_range_keys_inserted_verse_distinct_from_base() -> None:
+    """An inserted verse (ESG 4:17k) keys distinctly from its base verse.
+
+    The Greek additions to Esther follow but are not part of ESG 4:17, so
+    4:17k must not collide with 4:17, and must sort between 4:17 and 4:18.
+    """
+    lxx = Versification.named("lxx")
+
+    def start(subverse: str, verse: int = 17) -> int:
+        ref = BibleRef.for_range(
+            "ESG",
+            4,
+            verse,
+            start_subverse=subverse,
+            end_subverse=subverse,
+            versification=lxx,
+        )
+        return list(ref.range_keys())[0][0]
+
+    base = start("")  # ESG 4:17
+    ins_k = start("k")  # ESG 4:17k (tenth insertion, j skipped)
+    following = start("", 18)  # ESG 4:18
+
+    assert ins_k != base
+    # 'k' is the 10th insertion letter (a=1..i=9, k=10)
+    assert ins_k - base == 10
+    assert base < ins_k < following
+
+
+def test_range_keys_inserted_verses_sort_in_reading_order() -> None:
+    """The additions to Esther (ESG 4:17...) key in ascending order, all distinct.
+
+    The letters are taken from those the versification actually treats as
+    insertions (the Esther additions skip both 'j' and 'v'), so the test does
+    not assume a particular alphabet.
+    """
+    import string
+
+    lxx = Versification.named("lxx")
+    letters = [
+        c for c in string.ascii_lowercase if lxx.partial_ordinal("ESG", 4, 17, c) > 0
+    ]
+    assert "k" in letters and "j" not in letters and "v" not in letters
+
+    def start(subverse: str) -> int:
+        ref = BibleRef.for_range(
+            "ESG",
+            4,
+            17,
+            start_subverse=subverse,
+            end_subverse=subverse,
+            versification=lxx,
+        )
+        return list(ref.range_keys())[0][0]
+
+    keys = [start("")] + [start(c) for c in letters]
+    assert keys == sorted(keys)
+    assert len(set(keys)) == len(keys)
+    # Ordinals are contiguous from 1: base then each insertion in turn.
+    assert [k - keys[0] for k in keys] == list(range(len(keys)))
+
+
+def test_range_keys_portion_of_uninserted_verse_collapses() -> None:
+    """A subverse on a verse with no inserted verses shares the base key.
+
+    A scholarly "8:1a" cites part of a single verse; it is not an inserted
+    verse and must map to the same key as 8:1 rather than a distinct one.
+    """
+    eng = Versification.named("eng")
+
+    def key(subverse: str) -> tuple[int, int]:
+        ref = BibleRef.for_range(
+            "ROM",
+            8,
+            1,
+            start_subverse=subverse,
+            end_subverse=subverse,
+            versification=eng,
+        )
+        return list(ref.range_keys())[0]
+
+    assert key("a") == key("")
+    assert key("b") == key("")
+
+
+def test_range_keys_inserted_verse_range() -> None:
+    """A range across insertions (ESG 4:17a-4:17e) keys start-to-end correctly."""
+    lxx = Versification.named("lxx")
+    ref = BibleRef.for_range(
+        "ESG",
+        4,
+        17,
+        end_verse=17,
+        start_subverse="a",
+        end_subverse="e",
+        versification=lxx,
+    )
+    (start_key, end_key) = list(ref.range_keys())[0]
+    assert end_key - start_key == 4  # a=1 .. e=5
+    assert start_key % 100 == 1
+    assert end_key % 100 == 5
+
+
+def test_partial_ordinal_direct() -> None:
+    """Versification.partial_ordinal reflects partialVerses membership."""
+    lxx = Versification.named("lxx")
+    assert lxx.partial_ordinal("ESG", 4, 17, "") == 0
+    assert lxx.partial_ordinal("ESG", 4, 17, "a") == 1
+    assert lxx.partial_ordinal("ESG", 4, 17, "i") == 9
+    assert lxx.partial_ordinal("ESG", 4, 17, "k") == 10
+    assert lxx.partial_ordinal("ESG", 4, 17, "z") == 24
+    # A verse with no inserted verses: any subverse collapses to the base.
+    assert lxx.partial_ordinal("ROM", 8, 1, "a") == 0
+    # A verse absent from this versification's partialVerses.
+    assert Versification.named("eng").partial_ordinal("ESG", 4, 17, "k") == 0
 
 
 def test_map_to_with_mapping() -> None:
