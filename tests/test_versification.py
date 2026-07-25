@@ -337,3 +337,38 @@ def test_available_names_round_trip_through_named() -> None:
     """Every identifier from available_names() must load via named()."""
     for ident in Versification.available_names():
         Versification.named(ident)
+
+
+def test_map_verse_inserted_verse_answering_to_two() -> None:
+    """An inserted verse mapping to two verses must not capture its base verse.
+
+    Swete divides Addition E where Rahlfs does not, so the CEI's ESG 8:12u is
+    org's ESG 8:34-35. A one-to-many entry used to drop the source's subverse
+    and key itself on the base verse, which sent plain ESG 8:12 to 8:34-35 as
+    well; it belongs at 8:12.
+    """
+    cei = Versification.named("cei")
+    org = Versification.named("org")
+    assert cei.map_verse("ESG", 8, 12, org, "u") == ("ESG", 8, 34, "")
+    assert cei.map_verse("ESG", 8, 12, org, "u", end=True) == ("ESG", 8, 35, "")
+    assert cei.map_verse("ESG", 8, 12, org) == ("ESG", 8, 12, "")
+    assert org.map_verse("ESG", 8, 34, cei) == ("ESG", 8, 12, "")
+
+
+def test_cei_greek_esther_covers_org_chapter_eight() -> None:
+    """The CEI's Greek Esther 8 accounts for every verse of org's, exactly once.
+
+    Swete's 8:1-12 + E:1-24 + 8:13-17 is org's 41 verses, so the additions fill
+    org 8:13-36 and the verses after them org 8:37-41.
+    """
+    cei = Versification.named("cei")
+    org = Versification.named("org")
+    covered: list[int] = []
+    for verse in range(1, cei.last_verse("ESG", 8) + 1):
+        ordinals = cei._partial_verses.get(("ESG", 8, verse), {})
+        for subverse in [""] + sorted(ordinals, key=lambda s: ordinals[s]):
+            start = cei.map_verse("ESG", 8, verse, org, subverse)
+            end = cei.map_verse("ESG", 8, verse, org, subverse, end=True)
+            assert start is not None and end is not None
+            covered.extend(range(start[2], end[2] + 1))
+    assert sorted(covered) == list(range(1, org.last_verse("ESG", 8) + 1))

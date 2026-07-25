@@ -175,16 +175,23 @@ class Versification:
                     map_to_org[src_loc] = (dst_loc, dst_loc)
                     map_from_org[dst_loc] = (src_loc, src_loc)
             else:
+                # A side that is a single verse keeps its subverse, as in the
+                # one-to-one branch above. Dropping it would key the entry on
+                # the base verse and hijack it: an inserted verse that answers
+                # to two verses of the other text (cei's ESG 8:12u, which is
+                # org's ESG 8:34-35) would capture plain ESG 8:12.
+                src_sv = src_sv1 if src_count == 1 else ""
+                dst_sv = dst_sv1 if dst_count == 1 else ""
                 dst_start: _VerseLoc = (dst_book, dst_ch, dst_v1, dst_sv1)
-                dst_end: _VerseLoc = (dst_book, dst_ch, dst_v2, "")
+                dst_end: _VerseLoc = (dst_book, dst_ch, dst_v2, dst_sv)
                 src_start: _VerseLoc = (src_book, src_ch, src_v1, src_sv1)
-                src_end: _VerseLoc = (src_book, src_ch, src_v2, "")
+                src_end: _VerseLoc = (src_book, src_ch, src_v2, src_sv)
                 for i in range(src_count):
-                    src_loc = (src_book, src_ch, src_v1 + i, "")
+                    src_loc = (src_book, src_ch, src_v1 + i, src_sv)
                     map_to_org[src_loc] = (dst_start, dst_end)
                     multi_to_org.add(src_loc)
                 for i in range(dst_count):
-                    dst_loc = (dst_book, dst_ch, dst_v1 + i, "")
+                    dst_loc = (dst_book, dst_ch, dst_v1 + i, dst_sv)
                     map_from_org[dst_loc] = (src_start, src_end)
                     multi_from_org.add(dst_loc)
 
