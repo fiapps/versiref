@@ -355,20 +355,52 @@ def test_map_verse_inserted_verse_answering_to_two() -> None:
     assert org.map_verse("ESG", 8, 34, cei) == ("ESG", 8, 12, "")
 
 
-def test_cei_greek_esther_covers_org_chapter_eight() -> None:
-    """The CEI's Greek Esther 8 accounts for every verse of org's, exactly once.
+def test_cei_greek_esther_covers_org_exactly_once() -> None:
+    """The CEI's Greek Esther accounts for every verse of org's, exactly once.
 
-    Swete's 8:1-12 + E:1-24 + 8:13-17 is org's 41 verses, so the additions fill
-    org 8:13-36 and the verses after them org 8:37-41.
+    org numbers the additions as Swete divides them, which is finer than Rahlfs
+    (whose numbering the CEI follows) in Additions C, D and E: six of Rahlfs'
+    verses answer to two or three of org's in chapter 4, six in chapter 5, and
+    three in chapter 8. Every chapter must still tile org's exactly, with no
+    verse left uncovered and none claimed twice.
     """
     cei = Versification.named("cei")
     org = Versification.named("org")
-    covered: list[int] = []
-    for verse in range(1, cei.last_verse("ESG", 8) + 1):
-        ordinals = cei._partial_verses.get(("ESG", 8, verse), {})
-        for subverse in [""] + sorted(ordinals, key=lambda s: ordinals[s]):
-            start = cei.map_verse("ESG", 8, verse, org, subverse)
-            end = cei.map_verse("ESG", 8, verse, org, subverse, end=True)
-            assert start is not None and end is not None
-            covered.extend(range(start[2], end[2] + 1))
-    assert sorted(covered) == list(range(1, org.last_verse("ESG", 8) + 1))
+    for chapter in range(1, len(cei.max_verses["ESG"]) + 1):
+        covered: list[int] = []
+        for verse in range(1, cei.last_verse("ESG", chapter) + 1):
+            ordinals = cei._partial_verses.get(("ESG", chapter, verse), {})
+            for subverse in [""] + sorted(ordinals, key=lambda s: ordinals[s]):
+                start = cei.map_verse("ESG", chapter, verse, org, subverse)
+                end = cei.map_verse("ESG", chapter, verse, org, subverse, end=True)
+                assert start is not None and end is not None
+                covered.extend(range(start[2], end[2] + 1))
+        expected = list(range(1, org.last_verse("ESG", chapter) + 1))
+        assert sorted(covered) == expected, f"ESG {chapter} does not tile org's"
+
+
+def test_map_verse_greek_esther_additions_c_and_d() -> None:
+    """Rahlfs' verses that Swete divides map to ranges, aligned to the Greek.
+
+    Rahlfs 4:17c is Swete C:3-4 (org 4:20-21) and 5:1a is D:2-4 (org 5:2-4);
+    the verses around them stay one-to-one. The Hebrew text after Addition D
+    follows it, so 5:3-14 lands at org 5:17-28.
+    """
+    cei = Versification.named("cei")
+    org = Versification.named("org")
+
+    def span(chapter: int, verse: int, subverse: str = "") -> tuple[int, int]:
+        start = cei.map_verse("ESG", chapter, verse, org, subverse)
+        end = cei.map_verse("ESG", chapter, verse, org, subverse, end=True)
+        assert start is not None and end is not None
+        return start[2], end[2]
+
+    assert span(4, 17, "b") == (19, 19)
+    assert span(4, 17, "c") == (20, 21)
+    assert span(4, 17, "d") == (22, 23)
+    assert span(4, 17, "e") == (24, 24)
+    assert span(5, 1, "a") == (2, 4)
+    assert span(5, 1, "b") == (5, 5)
+    assert span(5, 2) == (12, 12)
+    assert span(5, 3) == (17, 17)
+    assert span(5, 14) == (28, 28)
