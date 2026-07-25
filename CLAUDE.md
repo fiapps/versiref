@@ -103,6 +103,8 @@ The package has a layered architecture with five main classes:
 - **`src/versiref/data/versifications/`** - JSON files defining chapter/verse divisions for different Bible texts (from UBSCAP GitHub repo, MIT licensed)
 - **`src/versiref/data/book_names/`** - JSON files mapping book IDs to names/abbreviations in different languages and styles (e.g., "en-sbl_abbreviations.json", "it-cei_nomi.json")
 
+`VERSIFICATIONS.md` (not packaged) records how the versification JSON is interpreted — notably that an unmapped location maps to itself, which makes a missing entry an assertion rather than a gap — and what the harder texts actually look like. Read it before editing versification data, especially for Greek Esther.
+
 ### Special Book ID Handling
 
 - **PSA/PSAS**: Psalm vs Psalms (singular/plural). PSAS is used in book name dictionaries for plural form.

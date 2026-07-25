@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Fixed
+
+- The `cei` versification's Greek Esther (`ESG`) mappings were copied from `lxx`, which has no `EST` book: there, routing `ESG`'s Hebrew-parallel verses to `org`'s `EST` is sound because nothing else claims them, but `cei` has both books, so `cei` `ESG 1:1` and `cei` `EST 1:1` both mapped to `org` `EST 1:1` while `org`'s own `ESG` went entirely unused. `ESG` now maps to `org`'s `ESG`: Addition A to `ESG 1:1-17` and the Hebrew narrative it displaces to `ESG 1:18-39`, and likewise for the displaced tails of chapters 3, 5, and 8 (`ESG 3:14-15` → `3:21-22`, `5:3-14` → `5:17-28`, `8:13-17` → `8:37-41`). The copied Addition A letters began at `1:1b` and ran one place long, ending in an `ESG 1:1s` that is `1:1r` under another name; they now begin at `1:1a`, and `partialVerses` gains the `a` they imply. Chapters 2, 6, 7, 9, and 10 match `org` verse for verse and need no entries at all.
+- `org` numbers the additions to Esther as Swete divides them, which is finer than Rahlfs, whose numbering the `cei` and `lxx` data follow, so fifteen of Rahlfs' verses answer to two or three of `org`'s. Six of them in Addition C (`4:17c`, `d`, `k`, `l`, `n`, `o`), six in Addition D (`5:1a` and `5:1f`, to three verses apiece, plus `5:2a`, `5:2b`, and Addition D's own `5:2`, which is `org` `5:12`), and three in Addition E (`8:12r`, `s`, `u`) now map to ranges instead of to their first verse alone, which had left the rest of each divided verse unmapped. Every verse of `org`'s Greek Esther is now accounted for exactly once in all ten chapters. Two letters were also keyed by Rahlfs' alphabet rather than the CEI's, which skips only `j`: `cei`'s `ESG 4:17w` and `ESG 8:12x` are renamed `4:17v` and `8:12v`.
+- Loading a `mappedVerses` entry whose source and target ranges differ in length dropped the subverse from a side that is a single verse, so the entry was keyed on the base verse and captured it: `"ESG 8:12u": "ESG 8:34-35"` sent plain `ESG 8:12` to `8:34-35` instead of leaving it at `8:12`. A side that is a single verse now keeps its subverse, as the equal-length branch already did.
+
 ## 0.10.0 - 2026-07-20
 
 ### Changed
