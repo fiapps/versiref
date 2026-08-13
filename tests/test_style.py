@@ -378,8 +378,9 @@ def test_named_en_douay_rheims() -> None:
     style = RefStyle.named("en-douay-rheims")
     assert style.identifier == "en-douay-rheims"
     assert style.names["JOS"] == "Jos."
-    assert style.names["1KI"] == "3 Kgs."
     assert style.names["REV"] == "Apoc."
+    # The books of Kings go unabbreviated, as the Douay editions leave them
+    assert style.names["1KI"] == "3 Kings"
     # The full Douay-Rheims names are recognized for parsing
     assert style.recognized_names["Josue"] == "JOS"
     assert style.recognized_names["Apocalypse"] == "REV"
@@ -390,6 +391,15 @@ def test_named_en_douay_rheims() -> None:
     # Modern names are recognized too
     assert style.recognized_names["Song of Songs"] == "SNG"
     assert style.recognized_names["Nehemiah"] == "NEH"
+    # Variant abbreviations attested in the Douay editions and their era
+    assert style.recognized_names["Psal."] == "PSA"
+    assert style.recognized_names["Eccli."] == "SIR"
+    assert style.recognized_names["Ezec."] == "EZK"
+    assert style.recognized_names["1 Mac."] == "1MA"
+    # Numbered books are recognized with Roman numerals, as that era wrote them
+    assert style.recognized_names["III Kings"] == "1KI"
+    assert style.recognized_names["I Cor."] == "1CO"
+    assert style.recognized_names["IV Esd."] == "2ES"
 
 
 def test_invalid_chapter_number_style() -> None:
