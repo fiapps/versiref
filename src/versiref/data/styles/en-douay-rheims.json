@@ -1,0 +1,9 @@
+{
+  "names": "en-douay-rheims_abbreviations",
+  "also_recognize": [
+    "en-douay-rheims_names",
+    {"Ex.": "EXO", "Isa.": "ISA", "2 Esd.": "NEH", "Canticles": "SNG",
+     "Wisd.": "WIS", "Ecclesiasticus": "SIR", "Apocalypse": "REV"},
+    "en-sbl_names"
+  ]
+}

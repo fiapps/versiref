@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Added
+
+- A new book-name set, `en-douay-rheims_abbreviations` (`Jos.`, `1 Par.`, `Ecclus.`, `Apoc.`, …), joins the `en-douay-rheims_names` full names that shipped without any style to reach them.
+- A new bundled style, `en-douay-rheims`, formats with those abbreviations and recognizes the full names, as `en-sbl` does (`Jos. 1:1`, `3 Kgs. 18:20`, `Apoc. 21:1`). It is meant for the `vulgata` versification, whose Esther has no separate `ESG`. It also recognizes `en-sbl_names`, so modern names parse too; where the two disagree the Douay-Rheims reading wins, since that is the text being cited: `1 Kings` and `2 Kings` are Samuel, `3 Kings` and `4 Kings` are Kings, and `1 Esdras` and `2 Esdras` are Ezra and Nehemias rather than the apocrypha SBL gives those names to. The SBL abbreviations are deliberately not recognized: `1 Kgs` and `1 Esd` mean different books there than the nearly identical `1 Kgs.` and `1 Esd.` mean here, and a style in which the period decides the book would be a trap.
+
 ## 0.10.1 - 2026-07-25
 
 ### Fixed

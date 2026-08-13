@@ -358,6 +358,8 @@ class RefStyle:
                   letters (Est A–F)
                 - "en-cmos_short" — Chicago Manual of Style, short abbreviations
                 - "en-cmos_long" — Chicago Manual of Style, long abbreviations
+                - "en-douay-rheims" — Douay-Rheims abbreviations (Jos.,
+                  3 Kgs., Apoc.), for use with the "vulgata" versification
                 - "it-cei" — Italian CEI (Conferenza Episcopale Italiana)
                 - "la-cce" — Latin, Catechismus Catholicae Ecclesiae abbreviations
                 - "la-vetus" — Latin, traditional abbreviations with Roman-numeral
@@ -425,6 +427,8 @@ def standard_names(identifier: str) -> dict[str, str]:
             - "en-cmos_short" — Chicago Manual of Style short forms (e.g., "Jo", "1 Kgs")
             - "en-cmos_long" — Chicago Manual of Style long forms (e.g., "Josh.", "1 Kings")
             - "en-douay-rheims_names" — Douay-Rheims names (e.g., "Josue", "3 Kings")
+            - "en-douay-rheims_abbreviations" — Douay-Rheims abbreviations
+              (e.g., "Jos.", "3 Kgs.")
             - "it-cei_abbreviazioni" — Italian CEI abbreviations (e.g., "Gs", "1Re")
             - "it-cei_nomi" — Italian CEI full names (e.g., "Giosuè", "1 Re")
             - "la-cce_abbreviationes" — Latin abbreviations of the Catechismus

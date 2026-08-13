@@ -373,6 +373,25 @@ def test_named_la_vetus() -> None:
     assert style.recognized_names["Isaias"] == "ISA"
 
 
+def test_named_en_douay_rheims() -> None:
+    """Test loading the Douay-Rheims style."""
+    style = RefStyle.named("en-douay-rheims")
+    assert style.identifier == "en-douay-rheims"
+    assert style.names["JOS"] == "Jos."
+    assert style.names["1KI"] == "3 Kgs."
+    assert style.names["REV"] == "Apoc."
+    # The full Douay-Rheims names are recognized for parsing
+    assert style.recognized_names["Josue"] == "JOS"
+    assert style.recognized_names["Apocalypse"] == "REV"
+    # Douay-Rheims names win over the SBL names where the two disagree
+    assert style.recognized_names["1 Kings"] == "1SA"
+    assert style.recognized_names["4 Kings"] == "2KI"
+    assert style.recognized_names["1 Esdras"] == "EZR"
+    # Modern names are recognized too
+    assert style.recognized_names["Song of Songs"] == "SNG"
+    assert style.recognized_names["Nehemiah"] == "NEH"
+
+
 def test_invalid_chapter_number_style() -> None:
     """Test that an invalid chapter_number_style raises ValueError."""
     with pytest.raises(ValueError, match="chapter_number_style"):
