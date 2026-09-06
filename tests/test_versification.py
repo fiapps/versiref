@@ -404,3 +404,210 @@ def test_map_verse_greek_esther_additions_c_and_d() -> None:
     assert span(5, 2) == (12, 12)
     assert span(5, 3) == (17, 17)
     assert span(5, 14) == (28, 28)
+
+
+def test_vulgate_daniel_deuterocanonical_chapter_lengths() -> None:
+    """The Clementine has Dan 13:65 and 14:42; the Nova Vulgata has 13:64 and 14:42.
+
+    Weber's Dan 13:65 is the Nova Vulgata's 14:1, so the Nova Vulgata's chapter
+    14 runs one verse longer and its chapter 13 one verse shorter. The
+    Clementine follows Weber and adds a further 14:42 that neither of the
+    others prints.
+    """
+    vul = Versification.named("vulgata")
+    nov = Versification.named("nova_vulgata")
+    assert vul.last_verse("DAN", 13) == 65
+    assert vul.last_verse("DAN", 14) == 42
+    assert nov.last_verse("DAN", 13) == 64
+    assert nov.last_verse("DAN", 14) == 42
+
+
+def test_map_verse_vulgate_daniel_bel() -> None:
+    """The Clementine's Bel runs from Dan 13:65, one verse ahead of the Greek."""
+    vul = Versification.named("vulgata")
+    org = Versification.named("org")
+    assert vul.map_verse("DAN", 13, 64, org) == ("SUS", 1, 64, "")
+    assert vul.map_verse("DAN", 13, 65, org) == ("BEL", 1, 1, "")
+    assert vul.map_verse("DAN", 14, 1, org) == ("BEL", 1, 2, "")
+    assert vul.map_verse("DAN", 14, 41, org) == ("BEL", 1, 42, "")
+    # The Clementine's extra closing verse has no Greek counterpart of its own.
+    assert vul.map_verse("DAN", 14, 42, org) == ("BEL", 1, 42, "")
+    assert org.map_verse("BEL", 1, 1, vul) == ("DAN", 13, 65, "")
+    assert org.map_verse("BEL", 1, 42, vul) == ("DAN", 14, 41, "")
+
+
+def test_map_verse_nova_vulgata_daniel_bel() -> None:
+    """The Nova Vulgata's chapter 14 is Bel verse for verse."""
+    nov = Versification.named("nova_vulgata")
+    org = Versification.named("org")
+    assert nov.map_verse("DAN", 13, 64, org) == ("SUS", 1, 64, "")
+    assert nov.map_verse("DAN", 14, 1, org) == ("BEL", 1, 1, "")
+    assert nov.map_verse("DAN", 14, 42, org) == ("BEL", 1, 42, "")
+    assert org.map_verse("BEL", 1, 1, nov) == ("DAN", 14, 1, "")
+
+
+def test_map_verse_daniel_between_vulgates() -> None:
+    """The Vulgates differ by one verse from Bel onward."""
+    vul = Versification.named("vulgata")
+    nov = Versification.named("nova_vulgata")
+    assert vul.map_verse("DAN", 13, 64, nov) == ("DAN", 13, 64, "")
+    assert vul.map_verse("DAN", 13, 65, nov) == ("DAN", 14, 1, "")
+    assert vul.map_verse("DAN", 14, 41, nov) == ("DAN", 14, 42, "")
+    assert nov.map_verse("DAN", 14, 1, vul) == ("DAN", 13, 65, "")
+
+
+def test_map_from_org_ignores_parallel_greek_daniel() -> None:
+    """DAG does not claim org's Daniel deuterocanon on the way back.
+
+    DAG numbers Susanna, the Song of the Three and Bel continuously alongside
+    DAN, and its entries would otherwise capture the inverse mapping, so that
+    org's BEL and SUS returned as a DAG reference no style can name.
+    """
+    org = Versification.named("org")
+    for name, expected in [
+        ("vulgata", ("DAN", 13, 65, "")),
+        ("nova_vulgata", ("DAN", 14, 1, "")),
+        ("eng", ("BEL", 1, 1, "")),
+        ("lxx", ("BEL", 1, 1, "")),
+    ]:
+        target = Versification.named(name)
+        assert org.map_verse("BEL", 1, 1, target) == expected
+    assert org.map_verse("SUS", 1, 1, Versification.named("eng")) == ("SUS", 1, 1, "")
+
+
+def test_sirach_has_fifty_one_chapters_in_both_vulgates() -> None:
+    """Neither Vulgate prints the Oratio Salomonis as a chapter 52 of Sirach."""
+    for name in ("vulgata", "nova_vulgata"):
+        assert Versification.named(name).last_verse("SIR", 52) == -1
+        assert Versification.named(name).last_verse("SIR", 51) == 38
+
+
+def test_nova_vulgata_psalter_follows_the_hebrew_numbering() -> None:
+    """The Nova Vulgata numbers the psalms as the Hebrew does, not as the Vulgate.
+
+    Its data had been copied wholesale from `vulgata`, which numbers them as
+    the Greek does: Psalm 9 ran to 39 verses (the Hebrew 9 and 10 together) and
+    the Miserere was Psalm 50. The headings of the printed text give the Hebrew
+    number first and the Vulgate's in parentheses ("PSALMUS 51 (50)").
+    """
+    nov = Versification.named("nova_vulgata")
+    vul = Versification.named("vulgata")
+    assert nov.last_verse("PSA", 9) == 21
+    assert nov.last_verse("PSA", 10) == 18
+    assert nov.last_verse("PSA", 51) == 21
+    assert nov.last_verse("PSA", 116) == 19
+    assert nov.last_verse("PSA", 119) == 176
+    # The Vulgate's own numbering, for contrast.
+    assert vul.last_verse("PSA", 9) == 39
+    assert vul.last_verse("PSA", 50) == 21
+
+
+def test_nova_vulgata_psalter_titles_are_verses() -> None:
+    """Psalm titles count as verses, as in the Hebrew and in the Vulgate."""
+    nov = Versification.named("nova_vulgata")
+    org = Versification.named("org")
+    # Ps 51:1-2 is the title; the Miserere itself begins at verse 3.
+    assert nov.map_verse("PSA", 51, 1, org) == ("PSA", 51, 1, "")
+    assert nov.map_verse("PSA", 51, 3, org) == ("PSA", 51, 3, "")
+
+
+def test_map_verse_nova_vulgata_psalms_to_vulgate() -> None:
+    """A Nova Vulgata psalm maps to the Vulgate's number for it."""
+    nov = Versification.named("nova_vulgata")
+    vul = Versification.named("vulgata")
+    assert nov.map_verse("PSA", 51, 3, vul) == ("PSA", 50, 3, "")
+    assert vul.map_verse("PSA", 50, 3, nov) == ("PSA", 51, 3, "")
+    assert nov.map_verse("PSA", 23, 1, vul) == ("PSA", 22, 1, "")
+    # The Hebrew 9 and 10 are the Vulgate's single Psalm 9.
+    assert nov.map_verse("PSA", 10, 1, vul) == ("PSA", 9, 22, "")
+    # Psalms the two number alike.
+    assert nov.map_verse("PSA", 119, 1, vul) == ("PSA", 118, 1, "")
+    assert nov.map_verse("PSA", 148, 1, vul) == ("PSA", 148, 1, "")
+
+
+def test_nova_vulgata_psalms_divided_differently_from_the_hebrew() -> None:
+    """Six psalms divide their verses differently from the Hebrew.
+
+    Five join a pair the Hebrew keeps apart — always the closing verse, except
+    in Psalm 60, where the join falls at verse 12 and the last verse shifts —
+    and Psalm 94 splits the Hebrew's final verse in two.
+    """
+    nov = Versification.named("nova_vulgata")
+    org = Versification.named("org")
+
+    def span(chapter: int, verse: int) -> tuple[int, int]:
+        start = nov.map_verse("PSA", chapter, verse, org)
+        end = nov.map_verse("PSA", chapter, verse, org, end=True)
+        assert start is not None and end is not None
+        return start[2], end[2]
+
+    assert span(12, 8) == (8, 9)
+    assert span(44, 26) == (26, 27)
+    assert span(60, 12) == (12, 13)
+    assert span(60, 13) == (14, 14)
+    assert span(150, 5) == (5, 6)
+    assert nov.map_verse("PSA", 94, 23, org) == ("PSA", 94, 23, "")
+    assert nov.map_verse("PSA", 94, 24, org) == ("PSA", 94, 23, "")
+    assert org.map_verse("PSA", 94, 23, nov, end=True) == ("PSA", 94, 24, "")
+    # The colophon closing Book II is not printed as a verse.
+    assert nov.last_verse("PSA", 72) == 19
+    assert org.map_verse("PSA", 72, 20, nov) is None
+
+
+def test_nova_vulgata_psalms_otherwise_agree_with_org() -> None:
+    """Every other psalm matches org verse for verse, so it needs no mapping."""
+    nov = Versification.named("nova_vulgata")
+    org = Versification.named("org")
+    divergent = {12, 44, 60, 72, 94, 150}
+    for chapter in range(1, 151):
+        last = nov.last_verse("PSA", chapter)
+        assert last == org.last_verse("PSA", chapter) or chapter in divergent
+        if chapter in divergent:
+            continue
+        for verse in (1, last):
+            assert nov.map_verse("PSA", chapter, verse, org) == (
+                "PSA",
+                chapter,
+                verse,
+                "",
+            )
+
+
+def test_clementine_merged_closing_verses() -> None:
+    """The Clementine merges four closing verses that the Greek keeps apart.
+
+    Genesis 5:31 carries Noah's begetting of Shem, Ham and Japheth, John 11:56
+    carries the chief priests' order, and the Clementine ends 2 Corinthians 1
+    and 3 John a verse earlier than the Greek. The Nova Vulgata keeps all four
+    apart.
+    """
+    vul = Versification.named("vulgata")
+    org = Versification.named("org")
+
+    def span(book: str, chapter: int, verse: int) -> tuple[int, int]:
+        start = vul.map_verse(book, chapter, verse, org)
+        end = vul.map_verse(book, chapter, verse, org, end=True)
+        assert start is not None and end is not None
+        return start[2], end[2]
+
+    assert vul.last_verse("GEN", 5) == 31
+    assert vul.last_verse("JHN", 11) == 56
+    assert vul.last_verse("2CO", 1) == 23
+    assert vul.last_verse("3JN", 1) == 14
+    assert span("GEN", 5, 31) == (31, 32)
+    assert span("JHN", 11, 56) == (56, 57)
+    assert span("2CO", 1, 23) == (23, 24)
+    assert span("3JN", 1, 14) == (14, 15)
+    assert org.map_verse("GEN", 5, 32, vul) == ("GEN", 5, 31, "")
+    assert org.map_verse("JHN", 11, 57, vul) == ("JHN", 11, 56, "")
+    assert org.map_verse("2CO", 1, 24, vul) == ("2CO", 1, 23, "")
+    assert org.map_verse("3JN", 1, 15, vul) == ("3JN", 1, 14, "")
+
+
+def test_nova_vulgata_keeps_the_verses_the_clementine_merges() -> None:
+    """The Nova Vulgata divides all four as the Greek does."""
+    nov = Versification.named("nova_vulgata")
+    assert nov.last_verse("GEN", 5) == 32
+    assert nov.last_verse("JHN", 11) == 57
+    assert nov.last_verse("2CO", 1) == 24
+    assert nov.last_verse("3JN", 1) == 15

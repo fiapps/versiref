@@ -15,6 +15,16 @@ _VerseLoc = tuple[str, int, int, str]
 _VerseLocRange = tuple[_VerseLoc, _VerseLoc]
 
 
+# Books that hold a second, parallel arrangement of material another book of the
+# same versification already carries: ``DAG`` (Greek Daniel) numbers Susanna,
+# the Song of the Three and Bel continuously alongside ``DAN``. Their entries
+# map into org like any other, but they are not org's way back: an org verse's
+# inverse belongs to the book that references actually name, so ``BEL 1:1``
+# returns to the Vulgate's ``DAN 13:65`` and to ``BEL 1:1`` in versifications
+# that keep Bel as its own book, never to the unnameable ``DAG 14:1``.
+_PARALLEL_BOOKS = frozenset({"DAG"})
+
+
 def _map_stage(
     mapping: dict[_VerseLoc, _VerseLocRange],
     multi: set[_VerseLoc],
@@ -173,7 +183,8 @@ class Versification:
                     src_loc = (src_book, src_ch, src_v1 + i, src_sv)
                     dst_loc = (dst_book, dst_ch, dst_v1 + i, dst_sv)
                     map_to_org[src_loc] = (dst_loc, dst_loc)
-                    map_from_org[dst_loc] = (src_loc, src_loc)
+                    if src_book not in _PARALLEL_BOOKS:
+                        map_from_org[dst_loc] = (src_loc, src_loc)
             else:
                 # A side that is a single verse keeps its subverse, as in the
                 # one-to-one branch above. Dropping it would key the entry on
@@ -192,6 +203,8 @@ class Versification:
                     multi_to_org.add(src_loc)
                 for i in range(dst_count):
                     dst_loc = (dst_book, dst_ch, dst_v1 + i, dst_sv)
+                    if src_book in _PARALLEL_BOOKS:
+                        continue
                     map_from_org[dst_loc] = (src_start, src_end)
                     multi_from_org.add(dst_loc)
 

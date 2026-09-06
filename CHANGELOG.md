@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Fixed
+
+- The `nova_vulgata` Psalter carried the Vulgate's psalm numbering, having been copied from `vulgata` wholesale: Psalm 9 ran to 39 verses (the Hebrew 9 and 10 together), Psalm 22 was *Dominus pascit me*, the Miserere was Psalm 50, and every psalm between 10 and 147 was off by one or two. The Nova Vulgata numbers the psalms as the Hebrew does, printing the Vulgate's number in parentheses (`PSALMUS 51 (50)`), and counts titles as verses, so it now agrees with `org` verse for verse and its 174 psalm mappings are gone. Six psalms genuinely divide their verses differently and keep an entry: `12:8`, `44:26` and `150:5` each hold two verses of `org` (its closing pair), `60:12` holds `org` `60:12-13` so that `60:13` is `org` `60:14`, `94:23-24` split `org` `94:23` in two, and Psalm 72 stops at verse 19 because the Nova Vulgata does not print the colophon the Clementine has at 71:20, leaving `org` `72:20` with no Nova Vulgata verse. Counts were taken from the official Latin text at vatican.va; any index built on the old psalm keys is invalidated.
+- The `vulgata` and `nova_vulgata` versifications both gave Daniel Weber's chapter lengths (13:65, 14:41) and mapped `DAN 13:65` and `DAN 14:1` alike to `BEL 1:1`, which left every verse of chapter 14 a place behind the Greek and `BEL 1:42` with no Vulgate verse at all. `vulgata` now follows the Clementine, whose chapter 14 has 42 verses: `13:65` is `BEL 1:1`, `14:1-41` are `BEL 1:2-42`, and the Clementine's closing `14:42` ("Tunc rex ait: Paveant omnes...") — which neither Weber nor the Nova Vulgata prints, and which has no Greek counterpart — maps onto `BEL 1:42` beside `14:41`. `nova_vulgata` gets the Nova Vulgata's own division, which moves Weber's `13:65` to the head of chapter 14: Daniel 13 has 64 verses and 14 has 42, answering to Bel verse for verse.
+- Susanna and Bel came back from `org` as references to `DAG`, the parallel Greek Daniel that numbers them continuously, rather than to the book a reference would name. Because `DAG` has an abbreviation in only one bundled style, converting `org` `Bel 1:1` into `eng`, `lxx`, `vulgata`, or `nova_vulgata` raised `ValueError: Unknown book ID: DAG` when the result was formatted. A book carrying such a parallel arrangement no longer claims the inverse mapping, so `org` `Bel 1:1` now returns as `Bel 1:1` in `eng` and `lxx`, `Dan 13:65` in `vulgata`, and `Dan 14:1` in `nova_vulgata`.
+- The `vulgata` versification gave Genesis 5, John 11, 2 Corinthians 1, and 3 John the Greek's verse counts (32, 57, 24, and 15). The Clementine merges each of those closing verses into the one before, so Genesis 5:31 carries Noah's begetting of Shem, Ham and Japheth, John 11:56 carries the chief priests' order to report where Jesus was, and the two epistles end at 1:23 and 1:14; the chapters now hold 31, 56, 23, and 14 verses and map their last verse to the pair in `org`. `nova_vulgata` divides all four as the Greek does and is unchanged.
+
+- Both Vulgate versifications gave Sirach a 52nd chapter of 13 verses, the *Oratio Salomonis* that the Stuttgart edition appends. Neither the Clementine nor the Nova Vulgata prints it, and Sirach now ends at chapter 51 in both.
+
 ## 0.11.0 - 2026-08-13
 
 ### Added

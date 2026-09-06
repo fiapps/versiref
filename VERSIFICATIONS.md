@@ -135,10 +135,72 @@ For each chapter, map every slot the versification declares — each base verse 
 A collision means two slots claim one verse; a gap means real text has nowhere to go.
 Both are the signature of an incomplete mapping rather than a merely inaccurate one.
 
+## The Nova Vulgata's Psalter
+
+The Nova Vulgata numbers the psalms as the Hebrew does, not as the Greek and the old Vulgate do.
+Its headings print the Hebrew number and the Vulgate's in parentheses — `PSALMUS 51 (50)`, `PSALMUS 10 (Vg 9, 22-39)`, `PSALMUS 116 (114, 1-9; 115)` — so the Miserere is Psalm 51, the Hebrew 9 and 10 stand apart, and 114/115 and 146/147 are not joined the way the Vulgate joins them.
+Titles count as verses, as they do in the Hebrew and in the Vulgate, so `nova_vulgata` and `org` agree verse for verse and the Psalter needs almost no `mappedVerses` at all.
+There are 150 of them: the Nova Vulgata's [appendix](https://www.vatican.va/archive/bible/nova_vulgata/documents/nova-vulgata_appendix_lt.html) holds only the Tridentine decrees and the Clementine preface, so it has no Psalm 151.
+
+The data shipped here was copied from `vulgata` wholesale, which gave the Nova Vulgata the Greek numbering throughout: Psalm 9 ran to 39 verses, Psalm 22 was *Dominus pascit me*, and every psalm from 10 to 147 was off by one or two.
+Because absence means identity, the fix was mostly deletion: the 174 psalm entries went, and only the six psalms below need to say anything.
+
+### The six psalms that divide their verses differently
+
+| Psalm | Nova Vulgata | `org` | |
+| --- | --- | --- | --- |
+| 12 | 8 | 9 | `12:8` is `org` `12:8-9` |
+| 44 | 26 | 27 | `44:26` is `org` `44:26-27` |
+| 60 | 13 | 14 | `60:12` is `org` `60:12-13`, and `60:13` is `org` `60:14` |
+| 72 | 19 | 20 | the colophon `org` `72:20` is not printed |
+| 94 | 24 | 23 | `org` `94:23` is split into `94:23-24` |
+| 150 | 5 | 6 | `150:5` is `org` `150:5-6` |
+
+Five of the six join a pair of Hebrew verses; only Psalm 94 goes the other way.
+The joins fall at the end of the psalm except in Psalm 60, where the join is at verse 12 and the last verse shifts.
+Psalm 72 is the one that is neither a join nor a split: the Nova Vulgata simply does not print "Defecerunt laudes David filii Iesse", which the Clementine has at 71:20, so `org` `72:20` has nowhere to go and `map_verse` returns `None` for it.
+
+Counts alone were not enough to establish this: they say a psalm differs, not where.
+Each join was located by reading the Latin of the divergent verse and finding both Hebrew verses inside it.
+`vulgata` is a useful second witness, since it reaches the same psalms by the Vulgate's numbers, and it agrees at 44 and 150.
+
+## The Vulgates' Daniel
+
+The Vulgate tradition puts Susanna and Bel inside Daniel as chapters 13 and 14, and the editions do not agree on where the seam falls.
+
+| | Dan 13 | Dan 14 | Bel 1 is |
+| --- | --- | --- | --- |
+| Weber (Stuttgart) | 65 | 41 | `DAN 13:65` |
+| Clementine (`vulgata`) | 65 | 42 | `DAN 13:65` |
+| Nova Vulgata (`nova_vulgata`) | 64 | 42 | `DAN 14:1` |
+
+Weber closes chapter 13 with the verse the Greek counts as `BEL 1:1` ("Et rex Astyages appositus est ad patres suos"), so his chapter 14 runs a verse behind the Greek throughout.
+The Nova Vulgata moves that verse to the head of chapter 14, which makes its chapter 14 answer to Bel verse for verse and its chapter 13 one verse shorter.
+The Clementine follows Weber and adds a closing `14:42` ("Tunc rex ait: Paveant omnes habitantes in universa terra Deum Danielis") that neither of the others prints; having no Greek counterpart, it is mapped onto `BEL 1:42` alongside `14:41`, and is listed *before* the range entry so that the range keeps the way back.
+
+The upstream UBSCAP data gave both files Weber's chapter lengths and mapped `DAN 13:65` and `DAN 14:1` alike to `BEL 1:1`, which left everything after it a verse out and `BEL 1:42` unreachable.
+
+### `DAG` is not org's way back
+
+Several versifications carry `DAG`, a parallel Greek Daniel that numbers Susanna, the Song of the Three and Bel continuously, beside their ordinary `DAN`.
+Its entries reach the same `org` verses as `DAN`'s, so on the inverse mapping it would capture them, and `org` `BEL 1:1` came back as `DAG 14:1` — a reference almost no style can even name.
+`_PARALLEL_BOOKS` in `versification.py` keeps such a book out of the inverse mapping entirely: it maps into `org` like any other, but an `org` verse returns to the book that references actually name.
+
+## Verses the Clementine merges
+
+The Clementine ends four chapters a verse earlier than the Greek, joining the closing verse to the one before: Genesis 5:31 carries Noah's begetting of Shem, Ham and Japheth (`org` 5:32), John 11:56 carries the chief priests' order (`org` 11:57), 2 Corinthians 1:23 carries `org` 1:24, and 3 John 14 carries `org` 15.
+The Nova Vulgata divides all four as the Greek does, so these are among the few places where the two Vulgate files must differ outside Esther, Daniel, and the Psalter.
+
+John 11 took two passes to settle, and the reason is worth recording.
+A Bible database is a witness to its own digitization as much as to its edition, so a database that disagrees with the printed editions is the thing to doubt — but which database is the outlier is not obvious from inside.
+Here the Latin Clementine and the Douay agreed on the merge against one electronic Vulgate that split the verses; scans of three printed editions settled it for the merge.
+Counting witnesses is not enough when they may descend from one another: prefer a scan of a printed edition, and treat any single electronic text as one witness however authoritative its packaging looks.
+
 ## Sources
 
 - Rahlfs–Hanhart, *Septuaginta* (Deutsche Bibelgesellschaft, 2006) — the numbering most editions follow.
 - H. B. Swete, *The Old Testament in Greek According to the Septuagint* (Cambridge, 1909) — the numbering `org` follows.
 - The `vulgata` data in this package, which is an independent witness to the addition boundaries in `org`.
+- [vatican.va](https://www.vatican.va/archive/bible/nova_vulgata/documents/nova-vulgata_vt_psalmorum_lt.html) for the Nova Vulgata's Psalter, which it carries on one page, verse numbers and all.
 - [bibbiaedu.it](https://www.bibbiaedu.it/) for the CEI 2008 text, which prints the addition letters and the variant markers.
 - The versification files themselves come from the UBSCAP repository (see `LICENSE-DATA`), and reproduce its errors as well as its data.
