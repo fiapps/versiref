@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Added
+
+- `RefStyle.override_names()`, and an `override_names` key in style definitions, replace the names of some books outright, where `also_recognize` could only add names a base style did not already claim. Each new name becomes the book's name for formatting and parses as that book, displacing any book that recognized it before, while the book's previous name stays recognized. A style based on `it-cei` can make "Gn" Genesis rather than Jonah with `{"GEN": "Gn", "JON": "Gio"}`; the overrides are applied together so that books can swap names, and a name left shared by two books raises `ValueError`.
+
 ## 0.12.0 - 2026-09-27
 
 ### Added

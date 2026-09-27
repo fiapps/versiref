@@ -198,6 +198,29 @@ class RefStyle:
             }
         )
 
+    def override_names(self, names: dict[str, str]) -> None:
+        """Replace the names of some books.
+
+        Each new name becomes the book's name for formatting and is recognized
+        as that book when parsing, displacing any book that recognized it
+        before. A book's previous name remains recognized. The overrides are
+        applied together, so two books may swap names.
+
+        Args:
+            names: A dictionary mapping book IDs to their new names or
+                abbreviations.
+
+        Raises:
+            ValueError: If two books would then share a name, apart from
+                PSA/PSAS and EST/ESG. The style is left unchanged.
+
+        """
+        new_names = {**self.names, **names}
+        inverted = _invert(new_names)
+        self.names = new_names
+        for name in names.values():
+            self.recognized_names[name] = inverted[name]
+
     def also_recognize_versifications(self, mapping: dict[str, str]) -> None:
         """Add designators to the versification_identifiers mapping.
 
@@ -227,6 +250,8 @@ class RefStyle:
                 dict mapping book IDs to names) or a "base" key (identifier of a
                 standard style to inherit from), but not both. Optional separator
                 fields override the defaults (or the base style's values), an
+                optional "override_names" dict maps book IDs to names that
+                replace their existing ones (see :meth:`override_names`), an
                 optional "also_recognize" list adds extra recognized names, an
                 optional "chapter_letters" dict maps book IDs to their chapter
                 letters (replacing any inherited from a base style), and an
@@ -235,7 +260,8 @@ class RefStyle:
                 a base style's designators are preserved).
 
         Raises:
-            ValueError: If neither "names" nor "base" is present, or if both are.
+            ValueError: If neither "names" nor "base" is present, if both are,
+                or if "override_names" would give two books the same name.
 
         Returns:
             A newly constructed RefStyle
@@ -300,6 +326,10 @@ class RefStyle:
                 for book, letters in chapter_letters.items()
                 if isinstance(letters, list)
             }
+
+        override_names = data.get("override_names")
+        if isinstance(override_names, dict):
+            style.override_names({str(k): str(v) for k, v in override_names.items()})
 
         also_recognize = data.get("also_recognize")
         if isinstance(also_recognize, list):

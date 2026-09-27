@@ -5,6 +5,7 @@ import tempfile
 from pathlib import Path
 
 import pytest
+from versiref import RefParser, Versification
 from versiref.ref_style import RefStyle, available_standard_names, standard_names
 
 
@@ -148,6 +149,83 @@ def test_from_dict_with_also_recognize_mixed() -> None:
     )
     assert style.recognized_names["Genesis"] == "GEN"
     assert style.recognized_names["Cant"] == "SNG"
+
+
+# --- override_names tests ---
+
+
+def test_override_names_swaps_names() -> None:
+    """Overrides applied together may swap names between books."""
+    style = RefStyle.named("it-cei")
+    assert style.names["JON"] == "Gn"
+    style.override_names({"GEN": "Gn", "JON": "Gio"})
+    assert style.names["GEN"] == "Gn"
+    assert style.names["JON"] == "Gio"
+    assert style.recognized_names["Gn"] == "GEN"
+    assert style.recognized_names["Gio"] == "JON"
+
+
+def test_override_names_keeps_previous_name_recognized() -> None:
+    """A book's previous name still parses as that book."""
+    style = RefStyle.named("it-cei")
+    style.override_names({"GEN": "Gn", "JON": "Gio"})
+    assert style.recognized_names["Gen"] == "GEN"
+    assert style.recognized_names["Giona"] == "JON"
+
+
+def test_override_names_conflict_raises() -> None:
+    """A name still used by another book raises, leaving the style unchanged."""
+    style = RefStyle.named("it-cei")
+    with pytest.raises(ValueError, match="Gn"):
+        style.override_names({"GEN": "Gn"})
+    assert style.names["GEN"] == "Gen"
+    assert style.recognized_names["Gn"] == "JON"
+
+
+def test_override_names_shared_pair() -> None:
+    """PSA and PSAS may share an overridden name, which parses as PSA."""
+    style = RefStyle.named("it-cei")
+    style.override_names({"PSAS": "Sl", "PSA": "Sl"})
+    assert style.names["PSA"] == "Sl"
+    assert style.names["PSAS"] == "Sl"
+    assert style.recognized_names["Sl"] == "PSA"
+    assert style.recognized_names["Sal"] == "PSA"
+
+
+def test_from_dict_with_override_names() -> None:
+    """from_dict applies override_names to a base style."""
+    style = RefStyle.from_dict(
+        {"base": "it-cei", "override_names": {"GEN": "Gn", "JON": "Gio"}}
+    )
+    assert style.names["GEN"] == "Gn"
+    assert style.recognized_names["Gn"] == "GEN"
+
+
+def test_from_dict_override_names_before_also_recognize() -> None:
+    """also_recognize cannot reclaim a name that override_names assigned."""
+    style = RefStyle.from_dict(
+        {
+            "base": "en-sbl",
+            "override_names": {"SNG": "Cant"},
+            "also_recognize": [{"Cant": "ECC"}],
+        }
+    )
+    assert style.recognized_names["Cant"] == "SNG"
+
+
+def test_override_names_parse_and_format() -> None:
+    """An overridden name is used for both parsing and formatting."""
+    style = RefStyle.named("it-cei")
+    style.override_names({"GEN": "Gn", "JON": "Gio"})
+    parser = RefParser(style, Versification.named("cei"))
+    ref = parser.parse_simple("Gn 1,1")
+    assert ref is not None
+    assert ref.book_id == "GEN"
+    assert ref.format(style) == "Gn 1,1"
+    jon = parser.parse_simple("Gio 2,1")
+    assert jon is not None
+    assert jon.book_id == "JON"
+    assert jon.format(style) == "Gio 2,1"
 
 
 # --- from_file tests ---
