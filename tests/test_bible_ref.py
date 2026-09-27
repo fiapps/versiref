@@ -4,6 +4,7 @@ import pathlib
 
 import pytest
 from versiref.bible_ref import BibleRef, SimpleBibleRef, VerseRange
+from versiref.ref_parser import RefParser
 from versiref.ref_style import RefStyle, standard_names
 from versiref.versification import Versification
 
@@ -639,17 +640,86 @@ def test_simple_map_between_non_org() -> None:
 
 
 def test_simple_map_whole_chapter() -> None:
-    """Test that whole-chapter references pass through unchanged."""
+    """A whole chapter that is whole chapters in the target stays so."""
+    eng = Versification.named("eng")
+    org = Versification.named("org")
+    ref = SimpleBibleRef.for_range("GEN", 1, -1)
+    mapped = ref.map(eng, org)
+    assert mapped is not None
+    assert mapped.book_id == "GEN"
+    vr = mapped.ranges[0]
+    assert vr.start_chapter == 1
+    assert vr.start_verse == -1
+    assert vr.end_verse == -1
+
+
+def test_simple_map_whole_chapter_to_verses() -> None:
+    """A whole chapter that is not whole chapters in the target becomes verses.
+
+    eng Gen 31:55 is org Gen 32:1, so eng Gen 32 is org Gen 32:2-33.
+    """
     eng = Versification.named("eng")
     org = Versification.named("org")
     ref = SimpleBibleRef.for_range("GEN", 32, -1)
     mapped = ref.map(eng, org)
     assert mapped is not None
-    assert mapped.book_id == "GEN"
     vr = mapped.ranges[0]
-    assert vr.start_chapter == 32
-    assert vr.start_verse == -1
-    assert vr.end_verse == -1
+    assert (vr.start_chapter, vr.start_verse) == (32, 2)
+    assert (vr.end_chapter, vr.end_verse) == (32, 33)
+
+
+@pytest.mark.parametrize(
+    ("source", "reference", "target", "expected"),
+    [
+        # Renumbered psalms stay whole.
+        ("vulgata", "Ps 50", "org", "Ps 51"),
+        ("org", "Ps 51", "vulgata", "Ps 50"),
+        ("vulgata", "Ps 50-52", "org", "Ps 51–53"),
+        ("org", "Ps 119", "vulgata", "Ps 118"),
+        # One psalm that is two, and two that are one.
+        ("vulgata", "Ps 9", "org", "Ps 9–10"),
+        ("org", "Ps 9-10", "vulgata", "Ps 9"),
+        ("vulgata", "Ps 113", "org", "Ps 114–115"),
+        ("org", "Ps 116", "vulgata", "Ps 114–115"),
+        # Part of a chapter. The Clementine's Ps 115 begins at verse 10, and
+        # its Ps 147 at verse 12, continuing Ps 114 and 146.
+        ("org", "Ps 10", "vulgata", "Ps 9:22–39"),
+        ("vulgata", "Ps 114", "org", "Ps 116:1–9"),
+        ("vulgata", "Ps 115", "org", "Ps 116:10–19"),
+        ("vulgata", "Ps 146", "org", "Ps 147:1–11"),
+        ("vulgata", "Ps 147", "org", "Ps 147:12–20"),
+        ("vulgata", "Mal 3", "org", "Mal 3:1–18"),
+        ("vulgata", "Mal 4", "org", "Mal 3:19–24"),
+        ("org", "Mal 3", "vulgata", "Mal 3–4"),
+        # eng's unnumbered psalm titles are its verse 0, which org counts as
+        # one verse or, in Ps 51, two.
+        ("eng", "Ps 3", "org", "Ps 3"),
+        ("org", "Ps 3", "eng", "Ps 3"),
+        ("eng", "Ps 51", "org", "Ps 51"),
+        ("org", "Ps 51", "eng", "Ps 51"),
+        ("vulgata", "Ps 12", "org", "Ps 13"),
+    ],
+)
+def test_map_whole_chapters(
+    source: str, reference: str, target: str, expected: str
+) -> None:
+    """Whole chapters are mapped through their first and last verses."""
+    style = RefStyle(names=standard_names("en-sbl_abbreviations"))
+    ref = RefParser(style, Versification.named(source)).parse(reference)
+    assert ref is not None
+    mapped = ref.map_to(Versification.named(target))
+    assert mapped is not None
+    assert mapped.format(style) == expected
+
+
+def test_simple_map_whole_book_passes_through() -> None:
+    """A whole-book reference is not mapped."""
+    vul = Versification.named("vulgata")
+    org = Versification.named("org")
+    mapped = SimpleBibleRef("PSA", []).map(vul, org)
+    assert mapped is not None
+    assert mapped.book_id == "PSA"
+    assert mapped.ranges == []
 
 
 def test_simple_map_nonexistent_in_target() -> None:
@@ -1444,7 +1514,7 @@ def test_map_to_between_non_org() -> None:
 
 
 def test_map_to_whole_chapter() -> None:
-    """Test that whole-chapter references pass through unchanged."""
+    """Test that a whole-chapter reference maps to the verses it covers."""
     eng = Versification.named("eng")
     org = Versification.named("org")
     ref = BibleRef.for_range("GEN", 32, -1, versification=eng)
@@ -1452,8 +1522,8 @@ def test_map_to_whole_chapter() -> None:
     assert mapped is not None
     vr = mapped.simple_refs[0].ranges[0]
     assert vr.start_chapter == 32
-    assert vr.start_verse == -1
-    assert vr.end_verse == -1
+    assert vr.start_verse == 2
+    assert vr.end_verse == 33
 
 
 def _subverse_versification(tmp_path: pathlib.Path) -> Versification:
@@ -1534,3 +1604,25 @@ def test_map_to_no_versification() -> None:
     ref = BibleRef.for_range("GEN", 1, 1)
     org = Versification.named("org")
     assert ref.map_to(org) is None
+
+
+def test_invalid_reason_excluded_verses() -> None:
+    """A range may not begin or end on an excluded verse, but may span one."""
+    vul = Versification.named("vulgata")
+    nab = Versification.named("nabre")
+    assert (
+        SimpleBibleRef.for_range("PSA", 147, 1).invalid_reason(vul)
+        == "PSA 147 has no verse 1"
+    )
+    assert (
+        SimpleBibleRef.for_range("PSA", 147, 1, end_verse=20).invalid_reason(vul)
+        == "PSA 147 has no verse 1"
+    )
+    assert SimpleBibleRef.for_range("PSA", 147, 12).invalid_reason(vul) is None
+    assert SimpleBibleRef.for_range("PSA", 114, 9, 115, 10).invalid_reason(vul) is None
+    assert not SimpleBibleRef.for_range("MAT", 17, 21).is_valid(nab)
+    assert SimpleBibleRef.for_range("MAT", 17, 22).is_valid(nab)
+    assert SimpleBibleRef.for_range("TOB", 11, 11, end_verse=13).is_valid(nab)
+    assert not SimpleBibleRef.for_range("TOB", 11, 12, end_verse=13).is_valid(nab)
+    # Whole chapters name no verse.
+    assert SimpleBibleRef.for_range("PSA", 147, -1).is_valid(vul)

@@ -752,3 +752,92 @@ def test_douay_rheims_otherwise_matches_the_clementine() -> None:
                     assert dr.map_verse(
                         book, chapter, verse, org, end=end
                     ) == vul.map_verse(book, chapter, verse, org, end=end)
+
+
+def test_excluded_verses_loaded(
+    tmp_path: pathlib.Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """The excludedVerses list accepts single verses and ranges, not subverses."""
+    path = tmp_path / "ex.json"
+    path.write_text(
+        '{"maxVerses": {"PSA": [6, 12]},'
+        ' "excludedVerses": ["PSA 2:1-3", "PSA 1:4", "PSA 1:5a"]}'
+    )
+    with caplog.at_level(logging.WARNING, logger="versiref.versification"):
+        v = Versification.from_file(str(path))
+    assert [v.is_excluded("PSA", 2, n) for n in range(1, 5)] == [
+        True,
+        True,
+        True,
+        False,
+    ]
+    assert v.is_excluded("PSA", 1, 4)
+    assert v.is_excluded("PSAS", 1, 4)
+    assert not v.is_excluded("PSA", 1, 5)
+    assert "PSA 1:5a" in caplog.text
+
+
+def test_first_verse() -> None:
+    """A chapter begins at its first verse that is not excluded, or a title."""
+    vul = Versification.named("vulgata")
+    eng = Versification.named("eng")
+    org = Versification.named("org")
+    assert vul.first_verse("PSA", 50) == 1
+    # The Clementine continues Ps 114 and 146 into Ps 115 and 147.
+    assert vul.first_verse("PSA", 115) == 10
+    assert vul.first_verse("PSA", 147) == 12
+    # eng's unnumbered title is its verse 0, which is org's verse 1.
+    assert eng.first_verse("PSA", 3) == 0
+    assert eng.first_verse("PSA", 1) == 1
+    assert org.first_verse("PSA", 3) == 1
+
+
+def test_nabre_excludes_the_verses_it_does_not_print() -> None:
+    """The NABRE omits the familiar text-critical verses, not their successors."""
+    nab = Versification.named("nabre")
+    for book, chapter, verse in [
+        ("MAT", 17, 21),
+        ("MRK", 11, 26),
+        ("JHN", 5, 4),
+        ("ACT", 8, 37),
+        ("ROM", 16, 24),
+        ("TOB", 11, 12),
+        ("SIR", 1, 5),
+        ("SIR", 26, 19),
+        ("SIR", 26, 27),
+    ]:
+        assert nab.is_excluded(book, chapter, verse)
+    for book, chapter, verse in [
+        ("MAT", 17, 22),
+        ("JHN", 5, 5),
+        ("ROM", 16, 25),
+        ("JOB", 10, 2),
+        ("SIR", 26, 28),
+    ]:
+        assert not nab.is_excluded(book, chapter, verse)
+
+
+def test_eng_two_verse_psalm_titles() -> None:
+    """The unnumbered eng title is both org title verses in Ps 51, 52, 54, 60."""
+    eng = Versification.named("eng")
+    org = Versification.named("org")
+    for chapter in (51, 52, 54, 60):
+        assert eng.map_verse("PSA", chapter, 0, org) == ("PSA", chapter, 1, "")
+        assert eng.map_verse("PSA", chapter, 0, org, end=True) == (
+            "PSA",
+            chapter,
+            2,
+            "",
+        )
+        assert org.map_verse("PSA", chapter, 1, eng) == ("PSA", chapter, 0, "")
+        assert org.map_verse("PSA", chapter, 3, eng) == ("PSA", chapter, 1, "")
+
+
+def test_clementine_psalm_12_verse_divisions() -> None:
+    """The Clementine's Ps 12:1 is the Hebrew 13:1-2, and its 12:2-3 are 13:3."""
+    vul = Versification.named("vulgata")
+    org = Versification.named("org")
+    assert vul.map_verse("PSA", 12, 1, org) == ("PSA", 13, 1, "")
+    assert vul.map_verse("PSA", 12, 1, org, end=True) == ("PSA", 13, 2, "")
+    assert org.map_verse("PSA", 13, 3, vul) == ("PSA", 12, 2, "")
+    assert org.map_verse("PSA", 13, 3, vul, end=True) == ("PSA", 12, 3, "")

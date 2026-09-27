@@ -98,6 +98,11 @@ class Versification:
     _partial_verses: dict[tuple[str, int, int], dict[str, int]] = field(
         default_factory=dict, repr=False
     )
+    # Verses within a chapter's range that the versification does not have: a
+    # verse omitted for text-critical reasons (the NABRE's Matt 17:21), or a
+    # number never used (the Clementine's Ps 147 begins at verse 12). Loaded
+    # from the data's ``excludedVerses``.
+    _excluded: set[tuple[str, int, int]] = field(default_factory=set, repr=False)
 
     def __str__(self) -> str:
         """Return a string representation of this versification.
@@ -221,6 +226,17 @@ class Versification:
                 if (stripped := part.strip()) and stripped != "-"
             }
 
+        excluded: set[tuple[str, int, int]] = set()
+        for ref_str in data.get("excludedVerses", []):
+            m = _VERSE_RE.match(ref_str)
+            if not m or m.group(4) or m.group(6):
+                logger.warning("Skipping malformed excludedVerses entry: %r", ref_str)
+                continue
+            first = int(m.group(3))
+            last = int(m.group(5)) if m.group(5) else first
+            for verse in range(first, last + 1):
+                excluded.add((m.group(1), int(m.group(2)), verse))
+
         return cls(
             max_verses,
             identifier,
@@ -229,6 +245,7 @@ class Versification:
             multi_to_org,
             multi_from_org,
             partial_verses,
+            excluded,
         )
 
     @classmethod
@@ -349,6 +366,56 @@ class Versification:
 
         # Return the verse count as an integer
         return self.max_verses[book][chapter - 1]
+
+    def is_excluded(self, book: str, chapter: int, verse: int) -> bool:
+        """Check whether a verse within a chapter's range is missing from it.
+
+        A chapter's verses are otherwise assumed to run from 1 to
+        :meth:`last_verse`. An excluded verse is one this versification does
+        not have despite that: a verse omitted for text-critical reasons (the
+        NABRE's Matt 17:21), or a number the numbering never uses (the
+        Clementine's Ps 147 begins at verse 12).
+
+        Args:
+            book: The book ID (using Paratext three-letter codes)
+            chapter: The chapter number
+            verse: The verse number
+
+        Returns:
+            True if the verse is excluded, False otherwise.
+
+        """
+        if book == "PSAS":
+            book = "PSA"
+        return (book, chapter, verse) in self._excluded
+
+    def first_verse(self, book: str, chapter: int) -> int:
+        """Return the verse at which the whole of a chapter begins.
+
+        This is 0 when the versification maps a verse 0 of the chapter to text
+        in org, as ``eng`` does with the unnumbered titles of the Psalms, which
+        org counts as verses. Otherwise it is the lowest verse from 1 that is
+        not excluded.
+
+        Args:
+            book: The book ID (using Paratext three-letter codes)
+            chapter: The chapter number
+
+        Returns:
+            The number of the chapter's first verse.
+
+        """
+        if book == "PSAS":
+            book = "PSA"
+        title = self._map_to_org.get((book, chapter, 0, ""))
+        if title is not None and title[0][2] > 0:
+            return 0
+        verse = 1
+        while verse < self.last_verse(book, chapter) and self.is_excluded(
+            book, chapter, verse
+        ):
+            verse += 1
+        return verse
 
     def partial_ordinal(
         self, book: str, chapter: int, verse: int, subverse: str

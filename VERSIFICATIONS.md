@@ -47,8 +47,46 @@ This is accepted rather than special-cased; `nabre` has related trouble placing 
 
 ### `excludedVerses`
 
-Present in several data files and **not read by the loader**.
-Do not rely on it for anything.
+A list of verses, or ranges of verses (`"PSA 147:1-11"`), that lie within a chapter's `maxVerses` but that the versification does not have.
+Two kinds of verse belong here, and they need not be told apart:
+
+- a verse omitted for text-critical reasons, whose number the edition skips (the NABRE's Matt 17:21);
+- a number the numbering never uses, because a chapter does not begin at verse 1 (the Clementine's Ps 115 begins at verse 10 and Ps 147 at verse 12, continuing Ps 114 and 146).
+
+An excluded verse fails validation when a range begins or ends on it, though a range may span one (the NABRE's Tob 11:11-13).
+A whole chapter is taken to begin at its first verse that is not excluded, which is what lets Vulgate Ps 147 map to `org` 147:12-20 rather than to the whole Hebrew psalm.
+Mapping is not otherwise affected: `map_verse` maps an excluded verse like any other, so that a text can still be shoehorned into the nearest versification the package offers.
+
+#### The NABRE's list
+
+The list first shipped with `nabre` came from the versification sniffer, and was wrong in a way worth knowing about: the sniffer recorded the verse *after* each run of missing verses, not the missing verse.
+Every New Testament entry was one too high (Matt 17:22 for 17:21, John 5:5 for 5:4), a run of two got a single entry (Sir 11:17 for 11:15-16), and a run ending a chapter got none (Sir 26:19-27 was absent).
+It also missed Mark 11:26 and listed Job 10:2 and Sir 41:15, 17, and 21, all of which the NABRE prints; Sirach 41 is a chapter the NABRE rearranges.
+
+The present list was rebuilt from the NABRE Bible database, which stores a verse the edition does not print as an empty row.
+That signal is good but not perfect: Wis 4:15 is empty only because its text was run into 4:14, and Matt 18:11 and Rom 16:24 hold a stray bracket instead of nothing.
+So a verse was admitted only with a second witness:
+the sixteen New Testament verses are the familiar text-critical omissions, which the database reproduces exactly;
+Tob 11:12 and the Sirach verses are empty or missing in at least one of the NETS, NRSV, and RSV-CE databases as well, those editions also treating Sirach's expanded Greek text as secondary.
+Five empty rows have no such witness and are left out: Tob 14:8, 1 Macc 9:34, Wis 4:15 (the artifact above), and Sir 12:7 and 37:21.
+An omission left out costs nothing, since validation then accepts the number as it always did; a wrong entry would reject a real citation.
+
+## Mapping pitfalls from the `.vrs` conversion
+
+The upstream data was converted from Paratext `.vrs` files, whose mapping lines each pair one verse with one verse.
+Where one verse answers to two, the conversion sometimes wrote two separate one-to-one entries rather than one range.
+Both mistakes below are the same shape, and both leave the forward direction looking right.
+
+**Two entries sharing a target.**
+`"PSA 12:2": "PSA 13:3"` and `"PSA 12:3": "PSA 13:3"` map both Vulgate verses to the Hebrew 13:3, but on the way back the later entry overwrites the earlier, so the Hebrew 13:3 returns to 12:3 alone.
+The fix is one entry, `"PSA 12:2-3": "PSA 13:3"`.
+The pattern is easy to find by grouping one-to-one entries by their target, and as of this writing it remains in about fifty places in `vulgata` and `nova_vulgata` (mostly 1 Esdras) and a few in `lxx`, `rsc`, and `rso`.
+The one intended instance is the Clementine's Dan 14:42, described below.
+
+**A verse that is two, mapped to one.**
+`eng` mapped the unnumbered title of Ps 51 (its verse 0) to `org` 51:2, but `org`'s title is two verses, 51:1-2; with no entry of its own, `org` 51:1 fell through to `eng` 51:1, which is `org` 51:3.
+The same held for Ps 52, 54, and 60, the four psalms whose Hebrew title runs to two verses, and for the Clementine's Ps 12:1, which holds the title and the first line and so is the Hebrew 13:1-2.
+Whole-chapter mapping exposes this kind of error, since it maps a chapter through its first verse.
 
 ## Greek Esther
 

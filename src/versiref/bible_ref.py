@@ -83,6 +83,14 @@ def _chapter_verse_reason(
     return None
 
 
+def _last_present_verse(versification: Versification, book: str, chapter: int) -> int:
+    """Return the last verse of a chapter that the versification does not exclude."""
+    last = versification.last_verse(book, chapter)
+    while last > 1 and versification.is_excluded(book, chapter, last):
+        last -= 1
+    return last
+
+
 @dataclass
 class VerseRange:
     """Represents a range of verses within a single book of the Bible.
@@ -273,8 +281,10 @@ class SimpleBibleRef:
 
         A reference is invalid if its book is not in the versification, if any
         verse range is structurally inconsistent, or if any chapter or verse it
-        names does not exist in the book. When more than one verse range is
-        invalid, each reason is reported, joined by "; ".
+        names does not exist in the book. A verse the versification excludes
+        (see :meth:`Versification.is_excluded`) does not exist, though a range
+        may span one. When more than one verse range is invalid, each reason is
+        reported, joined by "; ".
 
         Args:
             versification: The Versification to check against.
@@ -313,6 +323,16 @@ class SimpleBibleRef:
             ) or _chapter_verse_reason(
                 label, chapters, verse_range.end_chapter, verse_range.end_verse
             )
+            # A range may span an excluded verse (the NABRE's Tob 11:12-14),
+            # but may not begin or end on one.
+            if reason is None:
+                for chapter, verse in (
+                    (verse_range.start_chapter, verse_range.start_verse),
+                    (verse_range.end_chapter, verse_range.end_verse),
+                ):
+                    if versification.is_excluded(book_id, chapter, verse):
+                        reason = f"{label} {chapter} has no verse {verse}"
+                        break
             if reason is not None:
                 reasons.append(reason)
 
@@ -477,7 +497,11 @@ class SimpleBibleRef:
 
         Each verse location is mapped from the source versification to the
         target, going through the "org" (original languages) versification as
-        an intermediary. Whole-chapter references pass through unchanged.
+        an intermediary. A whole-chapter range is mapped through its first and
+        last verses, and remains whole chapters if the result covers whole
+        chapters in the target: Vulgate Ps 50 is Ps 51 in org, and Vulgate
+        Ps 9 is org Ps 9-10, but Vulgate Ps 115 is org Ps 116:10-19. A
+        whole-book reference passes through unchanged.
 
         Args:
             source: The Versification this reference is currently in
@@ -489,18 +513,15 @@ class SimpleBibleRef:
 
         """
         new_ranges: list[VerseRange] = []
+        first_book: str | None = None
         for vr in self.ranges:
             if vr.is_whole_chapters():
-                new_ranges.append(
-                    VerseRange(
-                        vr.start_chapter,
-                        vr.start_verse,
-                        vr.start_subverse,
-                        vr.end_chapter,
-                        vr.end_verse,
-                        vr.end_subverse,
-                    )
-                )
+                whole = self._map_whole_chapters(vr, source, target)
+                if whole is None:
+                    return None
+                if not new_ranges:
+                    first_book = whole[0]
+                new_ranges.append(whole[1])
                 continue
 
             start = source.map_verse(
@@ -549,7 +570,9 @@ class SimpleBibleRef:
             )
 
         new_book = self.book_id
-        if new_ranges and not new_ranges[0].is_whole_chapters():
+        if first_book is not None:
+            new_book = first_book
+        elif new_ranges:
             mapped_start = source.map_verse(
                 self.book_id,
                 self.ranges[0].start_chapter,
@@ -561,6 +584,46 @@ class SimpleBibleRef:
                 new_book = mapped_start[0]
 
         return SimpleBibleRef(new_book, new_ranges)
+
+    def _map_whole_chapters(
+        self, vr: VerseRange, source: Versification, target: Versification
+    ) -> tuple[str, VerseRange] | None:
+        """Map a whole-chapter range, as a (book ID, range) pair in the target.
+
+        Returns None if the range's first or last verse does not exist in the
+        target. A chapter the source does not have passes through unchanged.
+        """
+        if (
+            source.last_verse(self.book_id, vr.start_chapter) < 1
+            or source.last_verse(self.book_id, vr.end_chapter) < 1
+        ):
+            return self.book_id, VerseRange(
+                vr.start_chapter, -1, "", vr.end_chapter, -1, ""
+            )
+        start = source.map_verse(
+            self.book_id,
+            vr.start_chapter,
+            source.first_verse(self.book_id, vr.start_chapter),
+            target,
+        )
+        end = source.map_verse(
+            self.book_id,
+            vr.end_chapter,
+            _last_present_verse(source, self.book_id, vr.end_chapter),
+            target,
+            end=True,
+        )
+        if start is None or end is None:
+            return None
+        if start[2] <= target.first_verse(start[0], start[1]) and end[
+            2
+        ] >= _last_present_verse(target, end[0], end[1]):
+            return start[0], VerseRange(start[1], -1, "", end[1], -1, "")
+        # A verse 0 (a psalm title) cannot be cited, so a partial range that
+        # would begin there begins at verse 1.
+        return start[0], VerseRange(
+            start[1], max(start[2], 1), start[3], end[1], end[2], end[3]
+        )
 
     def resolve_following_verses(self, versification: Versification) -> None:
         """Resolve following verses in the verse ranges.
@@ -755,8 +818,9 @@ class BibleRef:
 
         Each verse location is mapped from this reference's versification to
         the target, going through the "org" (original languages) versification
-        as an intermediary. Whole-chapter and whole-book references pass
-        through unchanged.
+        as an intermediary. Whole-chapter references are mapped as described
+        under :meth:`SimpleBibleRef.map`; whole-book references pass through
+        unchanged.
 
         Args:
             target: The target Versification to map into
