@@ -80,8 +80,22 @@ Both mistakes below are the same shape, and both leave the forward direction loo
 **Two entries sharing a target.**
 `"PSA 12:2": "PSA 13:3"` and `"PSA 12:3": "PSA 13:3"` map both Vulgate verses to the Hebrew 13:3, but on the way back the later entry overwrites the earlier, so the Hebrew 13:3 returns to 12:3 alone.
 The fix is one entry, `"PSA 12:2-3": "PSA 13:3"`.
-The pattern is easy to find by grouping one-to-one entries by their target, and as of this writing it remains in about fifty places in `vulgata` and `nova_vulgata` (mostly 1 Esdras) and a few in `lxx`, `rsc`, and `rso`.
-The one intended instance is the Clementine's Dan 14:42, described below.
+The pattern is found by grouping one-to-one entries by their target, and `tests/test_versification.py::test_one_to_one_entries_do_not_share_a_target` keeps it out of the files that have been cleaned.
+About fifty instances were merged, mostly in 1 Esdras, in `vulgata`, `nova_vulgata`, and a few in `rsc` and `rso`; merging changes nothing in the forward direction, only lets the org verse map back to both.
+The same shape also hides at the join of two range entries, where the last verse of one and the first of the next share a target: Vulgate Ps 10:1 (the title alone) and 10:2 are both the Hebrew 11:1, `rso` Ps 89:1-2 are the Hebrew 90:1, and the Song of the Three 1:29-30 are Greek Daniel 3:52 in `eng` and `org`.
+Those ranges were split around the shared verse.
+
+What remains is deliberate or beyond the format:
+
+- The Clementine's Dan 14:42, described below, has no Greek counterpart and shares `BEL 1:42` with 14:41 on purpose.
+- Vulgate Isa 8:22 and 9:1 share the Hebrew 8:23, and Isa 63:19 and 64:1 the Hebrew 63:19, but a range cannot cross a chapter boundary, so each pair stays as two entries and the org verse maps back to the second.
+- In `lxx`, `rsc`, and `rso` a psalm's verse 0 shares a target with its verse 1 (Ps 115 and 147), which is harmless, since verse 0 cannot be cited.
+- `lxx` Jer 25:20 and `rso` Isa 3:19 share targets with a neighbouring range in ways that need the text to sort out; they have not been examined.
+
+One entry was corrected from the text rather than merged.
+The Clementine's Isa 9:20 holds the Hebrew 9:19 and the first half of 9:20 ("Manasses Ephraim, et Ephraim Manassen; simul ipsi contra Judam"), and its 9:21 is the rest of 9:20, so the boundaries cross as in the Douay's Ps 42.
+It is mapped as `"ISA 9:20": "ISA 9:19-20"` followed by `"ISA 9:21": "ISA 9:20"`, which is exact in the forward direction; on the way back the Hebrew 9:20 can return only to 9:21.
+`nova_vulgata` carries the same entries as `vulgata` here, copied from it, and was merged mechanically without checking the Nova Vulgata's text.
 
 **A verse that is two, mapped to one.**
 `eng` mapped the unnumbered title of Ps 51 (its verse 0) to `org` 51:2, but `org`'s title is two verses, 51:1-2; with no entry of its own, `org` 51:1 fell through to `eng` 51:1, which is `org` 51:3.

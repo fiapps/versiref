@@ -841,3 +841,52 @@ def test_clementine_psalm_12_verse_divisions() -> None:
     assert vul.map_verse("PSA", 12, 1, org, end=True) == ("PSA", 13, 2, "")
     assert org.map_verse("PSA", 13, 3, vul) == ("PSA", 12, 2, "")
     assert org.map_verse("PSA", 13, 3, vul, end=True) == ("PSA", 12, 3, "")
+
+
+def _shared_targets(v: Versification) -> set[str]:
+    """Return the org verses that more than one one-to-one entry maps to."""
+    sources: dict[tuple[str, int, int, str], int] = {}
+    for loc, (start, end) in v._map_to_org.items():
+        if start == end and loc not in v._multi_to_org and loc[0] != "DAG":
+            sources[start] = sources.get(start, 0) + 1
+    return {f"{t[0]} {t[1]}:{t[2]}" for t, count in sources.items() if count > 1}
+
+
+@pytest.mark.parametrize(
+    ("name", "expected"),
+    [
+        # The Clementine's Dan 14:42 has no Greek counterpart and deliberately
+        # shares BEL 1:42 with 14:41. The Isaiah pairs straddle a chapter
+        # boundary, which a mappedVerses range cannot.
+        ("vulgata", {"BEL 1:42", "ISA 8:23", "ISA 63:19"}),
+        ("douay-rheims", {"BEL 1:42", "ISA 8:23", "ISA 63:19"}),
+        ("nova_vulgata", {"ISA 8:23", "ISA 63:19"}),
+        ("eng", set()),
+        ("nabre", set()),
+        ("cei", set()),
+    ],
+)
+def test_one_to_one_entries_do_not_share_a_target(
+    name: str, expected: set[str]
+) -> None:
+    """Two verses answering to one are one range entry, not two entries.
+
+    As two entries, the later would overwrite the earlier on the way back, so
+    the org verse would return to only one of them.
+    """
+    assert _shared_targets(Versification.named(name)) == expected
+
+
+def test_merged_entries_map_back_to_both_verses() -> None:
+    """An org verse that two Vulgate verses share maps back to both."""
+    vul = Versification.named("vulgata")
+    org = Versification.named("org")
+    assert org.map_verse("NUM", 20, 28, vul) == ("NUM", 20, 28, "")
+    assert org.map_verse("NUM", 20, 28, vul, end=True) == ("NUM", 20, 29, "")
+    assert org.map_verse("JHN", 6, 51, vul, end=True) == ("JHN", 6, 52, "")
+    # The Clementine's Ps 10:1 is the title alone; with 10:2 it is org 11:1.
+    assert org.map_verse("PSA", 11, 1, vul) == ("PSA", 10, 1, "")
+    assert org.map_verse("PSA", 11, 1, vul, end=True) == ("PSA", 10, 2, "")
+    # The Clementine's Isa 9:20 runs into org 9:20, the rest of which is 9:21.
+    assert vul.map_verse("ISA", 9, 20, org) == ("ISA", 9, 19, "")
+    assert vul.map_verse("ISA", 9, 20, org, end=True) == ("ISA", 9, 20, "")
