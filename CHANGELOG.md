@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Added
+
+- A new versification, `douay-rheims`, for Challoner's Douay-Rheims. It follows the Clementine (`vulgata`) except in fifteen chapters that the printed Douay divides differently. Ten join two Clementine verses into one: 2 Samuel 13:38, Psalms 19:9, 28:10, and 150:5, Isaiah 46:11, Amos 9:14, Judith 4:5, Sirach 29:16, 1 Thessalonians 4:11, and 2 Thessalonians 2:10, most with the rest of the chapter shifting back a verse. Four split one Clementine verse in two: Psalms 15:10, 125:6, and 135:26, and Isaiah 45:23, where the Douay gives "For every knee shall be bowed to me" a number of its own. In Psalm 42 the boundaries cross mid-verse, so Douay 42:4-6 and Clementine 42:4-5 map to each other as a block. The `en-douay-rheims` style is now documented for use with this versification rather than `vulgata`. The divisions were checked against scans of the Benziger (1899) and Murphy (1914) printings, and those in 1 Thessalonians 4, 2 Thessalonians 2, and Amos 9 against a third, the Haydock edition.
+
+### Fixed
+
+- The `vulgata` versification mapped Psalm 15:10 to the Hebrew 16:11 alone, though the Clementine's verse holds both 16:10 and 16:11. The Hebrew 16:10 therefore had no Vulgate verse and fell through to Vulgate 16:10, which is the Hebrew 17:10. It now maps to Psalm 15:10.
+
 ## 0.11.1 - 2026-09-27
 
 ### Fixed

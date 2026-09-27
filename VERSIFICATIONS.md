@@ -196,12 +196,64 @@ A Bible database is a witness to its own digitization as much as to its edition,
 Here the Latin Clementine and the Douay agreed on the merge against one electronic Vulgate that split the verses; scans of three printed editions settled it for the merge.
 Counting witnesses is not enough when they may descend from one another: prefer a scan of a printed edition, and treat any single electronic text as one witness however authoritative its packaging looks.
 
+## The Douay-Rheims
+
+Challoner's Douay-Rheims is translated from the Clementine and follows its chapters, its psalm numbering, its Daniel seam, and the four merged closing verses above.
+It departs from the Clementine's verse divisions in fifteen chapters, so `douay-rheims` is a copy of `vulgata` with those chapters rewritten and nothing else changed.
+
+| Chapter | Clementine | Douay | |
+| --- | --- | --- | --- |
+| 2 Sa 13 | 39 | 38 | `13:38` is Clementine `13:38-39` |
+| Ps 15 | 10 | 11 | Clementine `15:10` is split into `15:10-11` |
+| Ps 19 | 10 | 9 | `19:9` is Clementine `19:9-10` |
+| Ps 28 | 11 | 10 | `28:10` is Clementine `28:10-11` |
+| Ps 42 | 5 | 6 | the boundaries cross; see below |
+| Ps 125 | 6 | 7 | Clementine `125:6` is split into `125:6-7` |
+| Ps 135 | 26 | 27 | Clementine `135:26` is split into `135:26-27` |
+| Ps 150 | 6 | 5 | `150:5` is Clementine `150:5-6` |
+| Isa 45 | 25 | 26 | Clementine `45:23` is split into `45:23-24`, and the rest shift up |
+| Isa 46 | 13 | 12 | `46:11` is Clementine `46:11-12`, and `46:12` is `46:13` |
+| Amos 9 | 15 | 14 | `9:14` is Clementine `9:14-15` |
+| Jdt 4 | 17 | 16 | `4:5` is Clementine `4:5-6`, and the rest shift back |
+| Sir 29 | 35 | 34 | `29:16` is Clementine `29:16-17`, and the rest shift back |
+| 1 Th 4 | 18 | 17 | `4:11` is Clementine `4:11-12`, and the rest shift back |
+| 2 Th 2 | 17 | 16 | `2:10` is Clementine `2:10-11`, and the rest shift back |
+
+The Douay's split of Ps 15 restores the Hebrew division, so its Ps 15 answers to `org`'s Ps 16 verse for verse; it is the Clementine that joins them.
+Its split of Ps 135 does not: the Clementine's 135:26 ends with a line from the Greek ("Confitemini Domino dominorum…") that the Hebrew lacks, and the Douay numbers it 27, so both 26 and 27 map onto `org` 136:26, as the Clementine's extra Dan 14:42 does onto `BEL 1:42`.
+
+In Ps 42 the Douay divides verses 4 and 5 mid-verse: its 42:4 is the first half of the Clementine's 4, its 42:5 is the second half of 4 with the first half of 5 ("To thee, O God my God, I will give praise upon the harp: why art thou sad, O my soul?"), and its 42:6 ("Hope in God") is the rest of 5.
+A mapping cannot end partway through a verse, so Douay `42:4-6` maps to `org` `43:4-5` as a single block: never wrong in either direction, but coarser than the text.
+Finer entries (Douay 4 → `org` 4, 5 → 4-5, 6 → 5) cannot work, because each later entry overwrites the reverse mapping of the verses it shares with an earlier one, so one direction always comes out wrong.
+
+`vulgata` has no Tobit, Judith, or Sirach mappings at all, although the Vulgate's text of these books differs from the Greek and its chapter lengths rarely agree with `org`'s.
+This is deliberate upstream: Paratext's [`vul.vrs`](https://github.com/ubsicap/versification_json/blob/master/examples/vul.vrs), from which `vulgata` was converted, notes at line 12 "No mapping done for TOB, JDT and SIR, since they seem to follow another 'vorlage' than LXX."
+Those books are therefore mapped as identity, and `org`'s coordinates stand in for the Clementine's own.
+The Douay's Jdt 4 and Sir 29 entries accordingly target the Clementine's verse numbers, even where they run past `org`'s last verse (`org` Jdt 4 has 15).
+Douay↔Clementine conversion is exact there, and Douay↔`org` is exactly as good as `vulgata`'s, which is to say not good.
+Fixing it would mean establishing the correspondence verse by verse, by comparing the Vulgate's text of the three books against Swete's, which `org` follows; that would fix both files at once.
+
+The boundaries were found by comparing a BibleWorks export of the 1899 American edition against `vulgata`, then confirmed in the OCR text of two scanned printings (Benziger 1899 and Murphy 1914), which agree with each other and with the export.
+The page images were not consulted.
+1 Th 4, 2 Th 2, and Amos 9 were also checked by hand in a third printing, the Douay-Rheims with Haydock's commentary, which settles that the divergences belong to the Douay and not to any one printing.
+Ps 28 rests on Benziger alone, because Murphy's OCR is unreadable there (as it is at Amos 9, which Haydock now corroborates); the printed 12 of Isa 46 and the printed 5 of Ps 42 were likewise seen only in Benziger, and the printed 27 of Ps 135 only in Murphy.
+
+The export also numbers Ps 115 and Ps 147 differently, but there the export is wrong: both printings number Ps 115 as 10–19 and Ps 147 as 12–20, continuing Ps 114 and Ps 146 exactly as the Clementine does.
+Do not "correct" the Douay's Psalter to match that export.
+
+Comparing the two also exposed an error in `vulgata`'s Ps 15, which the Douay splits: the Clementine's 15:10 holds both `org` 16:10 ("thou wilt not leave my soul in hell") and 16:11 ("thou hast made known to me the ways of life"), but was mapped to 16:11 alone, so `org` 16:10 fell through to Vulgate 16:10, which is the Hebrew 17:10.
+
 ## Sources
 
 - Rahlfs–Hanhart, *Septuaginta* (Deutsche Bibelgesellschaft, 2006) — the numbering most editions follow.
 - H. B. Swete, *The Old Testament in Greek According to the Septuagint* (Cambridge, 1909) — the numbering `org` follows.
 - The `vulgata` data in this package, which is an independent witness to the addition boundaries in `org`.
 - [Scanned pages from various editions](https://sacredbible.org) of the Clementine Vulgate (1914, M. Hetzenauer ed.; 1861, C. Vercellone ed.; 1590–1599 editions compiled by L. van Ess ed.).
+- *The Holy Bible, Translated from the Latin Vulgate* (Douay-Rheims, Challoner revision; New York: Benziger Brothers, 1899), scanned at the Internet Archive as [`holybibletransla00denv`](https://archive.org/details/holybibletransla00denv).
+- The same (Baltimore: John Murphy Co., 1914), the publisher of the 1899 American edition, scanned from a University of Toronto copy as [`holybibletransl00balt`](https://archive.org/details/holybibletransl00balt).
+- The Douay-Rheims with Haydock's commentary, scanned at the Internet Archive as [`douay-rheims-bible-with-haydock-commentary-complete`](https://archive.org/details/douay-rheims-bible-with-haydock-commentary-complete).
+- P. Michael Hetzenauer's 1914 Clementine, pp. 549 and 564, for the Clementine's numbering of Ps 115 and 147, and the Tweedale Clementine text.
 - [vatican.va](https://www.vatican.va/archive/bible/nova_vulgata/documents/nova-vulgata_vt_psalmorum_lt.html) for the Nova Vulgata's Psalter, which it carries on one page, verse numbers and all.
 - [bibbiaedu.it](https://www.bibbiaedu.it/) for the CEI 2008 text, which prints the addition letters and the variant markers.
-- The versification files themselves come from the UBSCAP repository (see `LICENSE-DATA`), and reproduce its errors as well as its data.
+- The versification files began as conversions from the UBSCAP repository (see `LICENSE-DATA`).
+  Many of its errors have since been corrected, as recorded above and in `CHANGELOG.md`, but a book not discussed here should be presumed to be as UBSCAP left it, errors included.

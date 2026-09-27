@@ -359,7 +359,7 @@ class RefStyle:
                 - "en-cmos_short" — Chicago Manual of Style, short abbreviations
                 - "en-cmos_long" — Chicago Manual of Style, long abbreviations
                 - "en-douay-rheims" — Douay-Rheims abbreviations (Jos.,
-                  3 Kgs., Apoc.), for use with the "vulgata" versification
+                  3 Kings, Apoc.), for use with the "douay-rheims" versification
                 - "it-cei" — Italian CEI (Conferenza Episcopale Italiana)
                 - "la-cce" — Latin, Catechismus Catholicae Ecclesiae abbreviations
                 - "la-vetus" — Latin, traditional abbreviations with Roman-numeral

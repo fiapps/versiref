@@ -315,6 +315,7 @@ def test_no_warnings_loading_versifications(caplog: pytest.LogCaptureFixture) ->
         "lxx",
         "vulgata",
         "nova_vulgata",
+        "douay-rheims",
         "nabre",
         "rsc",
         "rso",
@@ -611,3 +612,143 @@ def test_nova_vulgata_keeps_the_verses_the_clementine_merges() -> None:
     assert nov.last_verse("JHN", 11) == 57
     assert nov.last_verse("2CO", 1) == 24
     assert nov.last_verse("3JN", 1) == 15
+
+
+def test_clementine_psalm_15_closing_verse_holds_two_of_the_hebrew() -> None:
+    """The Clementine's Ps 15:10 is the Hebrew 16:10-11.
+
+    The data had mapped it to 16:11 alone, which left the Hebrew 16:10 with no
+    Vulgate verse, so it fell through to Vulgate 16:10 (the Hebrew 17:10).
+    """
+    vul = Versification.named("vulgata")
+    org = Versification.named("org")
+    assert vul.map_verse("PSA", 15, 10, org) == ("PSA", 16, 10, "")
+    assert vul.map_verse("PSA", 15, 10, org, end=True) == ("PSA", 16, 11, "")
+    assert org.map_verse("PSA", 16, 10, vul) == ("PSA", 15, 10, "")
+    assert org.map_verse("PSA", 16, 11, vul) == ("PSA", 15, 10, "")
+
+
+_DOUAY_CHAPTERS = {
+    # (book, chapter): (Clementine verses, Douay verses)
+    ("2SA", 13): (39, 38),
+    ("PSA", 15): (10, 11),
+    ("PSA", 19): (10, 9),
+    ("PSA", 28): (11, 10),
+    ("PSA", 42): (5, 6),
+    ("PSA", 125): (6, 7),
+    ("PSA", 135): (26, 27),
+    ("PSA", 150): (6, 5),
+    ("ISA", 45): (25, 26),
+    ("ISA", 46): (13, 12),
+    ("AMO", 9): (15, 14),
+    ("1TH", 4): (18, 17),
+    ("2TH", 2): (17, 16),
+    ("JDT", 4): (17, 16),
+    ("SIR", 29): (35, 34),
+}
+
+
+def _span(
+    source: Versification, target: Versification, book: str, chapter: int, verse: int
+) -> tuple[int, int]:
+    start = source.map_verse(book, chapter, verse, target)
+    end = source.map_verse(book, chapter, verse, target, end=True)
+    assert start is not None and end is not None
+    assert start[:2] == end[:2] == (book, chapter)
+    return start[2], end[2]
+
+
+@pytest.mark.parametrize(("book", "chapter"), sorted(_DOUAY_CHAPTERS))
+def test_douay_rheims_chapter_lengths(book: str, chapter: int) -> None:
+    """The printed Challoner Douay divides fifteen chapters unlike the Clementine."""
+    clementine, douay = _DOUAY_CHAPTERS[(book, chapter)]
+    assert Versification.named("vulgata").last_verse(book, chapter) == clementine
+    assert Versification.named("douay-rheims").last_verse(book, chapter) == douay
+
+
+@pytest.mark.parametrize(
+    ("book", "chapter", "douay", "clementine"),
+    [
+        # A pair of Clementine verses joined into one Douay verse, with the
+        # rest of the chapter shifting back.
+        ("2SA", 13, 38, (38, 39)),
+        ("PSA", 19, 9, (9, 10)),
+        ("PSA", 28, 10, (10, 11)),
+        ("PSA", 150, 5, (5, 6)),
+        ("AMO", 9, 14, (14, 15)),
+        ("ISA", 46, 11, (11, 12)),
+        ("ISA", 46, 12, (13, 13)),
+        ("1TH", 4, 11, (11, 12)),
+        ("1TH", 4, 12, (13, 13)),
+        ("1TH", 4, 17, (18, 18)),
+        ("2TH", 2, 10, (10, 11)),
+        ("2TH", 2, 16, (17, 17)),
+        ("JDT", 4, 5, (5, 6)),
+        ("JDT", 4, 6, (7, 7)),
+        ("JDT", 4, 16, (17, 17)),
+        ("SIR", 29, 16, (16, 17)),
+        ("SIR", 29, 17, (18, 18)),
+        ("SIR", 29, 34, (35, 35)),
+        # One Clementine verse split into two Douay verses.
+        ("PSA", 15, 10, (10, 10)),
+        ("PSA", 15, 11, (10, 10)),
+        ("PSA", 125, 7, (6, 6)),
+        ("PSA", 135, 27, (26, 26)),
+        ("ISA", 45, 24, (23, 23)),
+        ("ISA", 45, 26, (25, 25)),
+        # Ps 42's boundaries cross mid-verse, so the three Douay verses and the
+        # two Clementine verses map to one another as a block.
+        ("PSA", 42, 3, (3, 3)),
+        ("PSA", 42, 4, (4, 5)),
+        ("PSA", 42, 6, (4, 5)),
+    ],
+)
+def test_map_verse_douay_rheims_to_clementine(
+    book: str, chapter: int, douay: int, clementine: tuple[int, int]
+) -> None:
+    """Each Douay verse maps to the Clementine verses it holds."""
+    dr = Versification.named("douay-rheims")
+    vul = Versification.named("vulgata")
+    assert _span(dr, vul, book, chapter, douay) == clementine
+
+
+@pytest.mark.parametrize(
+    ("book", "chapter", "clementine", "douay"),
+    [
+        ("2SA", 13, 39, (38, 38)),
+        ("PSA", 15, 10, (10, 11)),
+        ("PSA", 42, 5, (4, 6)),
+        ("PSA", 135, 26, (26, 27)),
+        ("ISA", 45, 23, (23, 24)),
+        ("ISA", 45, 25, (26, 26)),
+        ("1TH", 4, 12, (11, 11)),
+        ("1TH", 4, 18, (17, 17)),
+        ("JDT", 4, 17, (16, 16)),
+    ],
+)
+def test_map_verse_clementine_to_douay_rheims(
+    book: str, chapter: int, clementine: int, douay: tuple[int, int]
+) -> None:
+    """Each Clementine verse maps to the Douay verses that hold it."""
+    dr = Versification.named("douay-rheims")
+    vul = Versification.named("vulgata")
+    assert _span(vul, dr, book, chapter, clementine) == douay
+
+
+def test_douay_rheims_otherwise_matches_the_clementine() -> None:
+    """Outside those fifteen chapters the Douay maps to org as the Clementine does."""
+    dr = Versification.named("douay-rheims")
+    vul = Versification.named("vulgata")
+    org = Versification.named("org")
+    assert dr.max_verses.keys() == vul.max_verses.keys()
+    for book, chapters in dr.max_verses.items():
+        for index, last in enumerate(chapters):
+            chapter = index + 1
+            if (book, chapter) in _DOUAY_CHAPTERS:
+                continue
+            assert last == vul.last_verse(book, chapter)
+            for verse in range(last + 1):
+                for end in (False, True):
+                    assert dr.map_verse(
+                        book, chapter, verse, org, end=end
+                    ) == vul.map_verse(book, chapter, verse, org, end=end)
