@@ -201,6 +201,7 @@ Counting witnesses is not enough when they may descend from one another: prefer 
 - Rahlfs–Hanhart, *Septuaginta* (Deutsche Bibelgesellschaft, 2006) — the numbering most editions follow.
 - H. B. Swete, *The Old Testament in Greek According to the Septuagint* (Cambridge, 1909) — the numbering `org` follows.
 - The `vulgata` data in this package, which is an independent witness to the addition boundaries in `org`.
+- [Scanned pages from various editions](https://sacredbible.org) of the Clementine Vulgate (1914, M. Hetzenauer ed.; 1861, C. Vercellone ed.; 1590–1599 editions compiled by L. van Ess ed.).
 - [vatican.va](https://www.vatican.va/archive/bible/nova_vulgata/documents/nova-vulgata_vt_psalmorum_lt.html) for the Nova Vulgata's Psalter, which it carries on one page, verse numbers and all.
 - [bibbiaedu.it](https://www.bibbiaedu.it/) for the CEI 2008 text, which prints the addition letters and the variant markers.
 - The versification files themselves come from the UBSCAP repository (see `LICENSE-DATA`), and reproduce its errors as well as its data.
