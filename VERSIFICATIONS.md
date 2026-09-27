@@ -187,6 +187,20 @@ For each chapter, map every slot the versification declares — each base verse 
 A collision means two slots claim one verse; a gap means real text has nowhere to go.
 Both are the signature of an incomplete mapping rather than a merely inaccurate one.
 
+## Checking a mapping by round trip
+
+Most mapping errors are one-sided: the entry reads correctly in one direction, and a verse that nothing claims falls through to identity in the other.
+The check that finds them maps every `org` verse into the versification and back, and requires it to come home, allowing a verse that lands inside a joined verse.
+`tests/test_versification.py::test_psalter_round_trips_through_org` does this for the Psalter, where it found `eng`'s two-verse titles, the Clementine's Ps 12:1, 15:10, and 55:11, and the `rsc`/`rso` faults below.
+It would serve other books as well.
+
+`rsc` and `rso` carry the same Synodal Psalter under different canons, so any difference between their Psalters, other than Ps 151, is an error in one of them, and one file can be corrected from the other without the text.
+That settled Ps 89 (the title 89:1 and the first line 89:2 are together the Hebrew 90:1, as `rso` had it; `rsc` had sent 89:1 to `org` 90:0, which is no verse) and Ps 141 (whose unnumbered title is the Hebrew 142:1, as `rsc` had it).
+It does not settle Ps 114, to which `rsc` gives nine verses and `rso` eight; `rso`'s entries now agree with its own count, joining 114:8 to the Hebrew 116:8-9, but which count is right needs the text.
+
+`eng`'s Baruch 6 is another open question: it maps its 73 verses one for one onto the Letter of Jeremiah, which has 72 in `org`, so `eng` Bar 6:73 has no `org` verse and a whole-chapter reference to Bar 6 cannot be mapped.
+Somewhere one `eng` verse answers to part of another, and finding where needs the text.
+
 ## The Nova Vulgata's Psalter
 
 The Nova Vulgata numbers the psalms as the Hebrew does, not as the Greek and the old Vulgate do.

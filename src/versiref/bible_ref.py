@@ -83,6 +83,52 @@ def _chapter_verse_reason(
     return None
 
 
+_SourceLoc = tuple[int, int, str]
+
+
+def _book_segments(
+    source: Versification,
+    target: Versification,
+    book: str,
+    start: _SourceLoc,
+    end: _SourceLoc,
+) -> list[tuple[_SourceLoc, _SourceLoc]]:
+    """Divide a source range wherever the book it maps into changes.
+
+    Args:
+        source: The Versification the range is in
+        target: The Versification it is being mapped into
+        book: The book ID of the range in the source
+        start: The (chapter, verse, subverse) at which the range begins
+        end: The (chapter, verse, subverse) at which it ends
+
+    Returns:
+        (start, end) pairs of source locations that cover the range in order,
+        each mapping into a single book. The range's own subverses stay on its
+        first start and last end.
+
+    """
+    segments: list[tuple[_SourceLoc, _SourceLoc]] = []
+    segment_start = start
+    current_book: str | None = None
+    previous = start
+    for chapter in range(start[0], end[0] + 1):
+        first = start[1] if chapter == start[0] else source.first_verse(book, chapter)
+        last = end[1] if chapter == end[0] else source.last_verse(book, chapter)
+        for verse in range(first, last + 1):
+            mapped = source.map_verse(book, chapter, verse, target)
+            if mapped is not None:
+                if current_book is None:
+                    current_book = mapped[0]
+                elif mapped[0] != current_book:
+                    segments.append((segment_start, previous))
+                    segment_start = (chapter, verse, "")
+                    current_book = mapped[0]
+            previous = (chapter, verse, "")
+    segments.append((segment_start, end))
+    return segments
+
+
 def _last_present_verse(versification: Versification, book: str, chapter: int) -> int:
     """Return the last verse of a chapter that the versification does not exclude."""
     last = versification.last_verse(book, chapter)
@@ -449,13 +495,17 @@ class SimpleBibleRef:
         last_range = None
         for range in self.ranges:
             if last_range is None:
-                result += " "
                 if versification is not None and versification.is_single_chapter(
                     self.book_id
                 ):
+                    # The whole of a one-chapter book is named by the book alone.
+                    if range.start_verse >= 0:
+                        result += " "
                     states_chapter = False
                 else:
-                    result += style.format_chapter(range.start_chapter, self.book_id)
+                    result += " " + style.format_chapter(
+                        range.start_chapter, self.book_id
+                    )
                     states_chapter = True
             elif last_range.end_chapter != range.start_chapter:
                 result += style.chapter_separator + style.format_chapter(
@@ -495,13 +545,8 @@ class SimpleBibleRef:
     ) -> "SimpleBibleRef | None":
         """Map this reference from one versification to another.
 
-        Each verse location is mapped from the source versification to the
-        target, going through the "org" (original languages) versification as
-        an intermediary. A whole-chapter range is mapped through its first and
-        last verses, and remains whole chapters if the result covers whole
-        chapters in the target: Vulgate Ps 50 is Ps 51 in org, and Vulgate
-        Ps 9 is org Ps 9-10, but Vulgate Ps 115 is org Ps 116:10-19. A
-        whole-book reference passes through unchanged.
+        This is :meth:`map_parts` for the usual case of a reference that maps
+        into a single book.
 
         Args:
             source: The Versification this reference is currently in
@@ -509,121 +554,136 @@ class SimpleBibleRef:
 
         Returns:
             A new SimpleBibleRef in the target versification, or None if any
-            verse does not exist in the target
+            verse does not exist in the target or if the reference maps into
+            more than one book, as Vulgate Dan 13 does (Susanna and the first
+            verse of Bel), which only :meth:`map_parts` can express
 
         """
-        new_ranges: list[VerseRange] = []
-        first_book: str | None = None
-        for vr in self.ranges:
-            if vr.is_whole_chapters():
-                whole = self._map_whole_chapters(vr, source, target)
-                if whole is None:
-                    return None
-                if not new_ranges:
-                    first_book = whole[0]
-                new_ranges.append(whole[1])
-                continue
-
-            start = source.map_verse(
-                self.book_id,
-                vr.start_chapter,
-                vr.start_verse,
-                target,
-                subverse=vr.start_subverse,
-            )
-            if start is None:
-                return None
-
-            if vr.end_verse < 0:
-                new_ranges.append(
-                    VerseRange(
-                        start[1],
-                        start[2],
-                        start[3],
-                        start[1],
-                        vr.end_verse,
-                        vr.end_subverse,
-                    )
-                )
-                continue
-
-            end = source.map_verse(
-                self.book_id,
-                vr.end_chapter,
-                vr.end_verse,
-                target,
-                subverse=vr.end_subverse,
-                end=True,
-            )
-            if end is None:
-                return None
-
-            new_ranges.append(
-                VerseRange(
-                    start[1],
-                    start[2],
-                    start[3],
-                    end[1],
-                    end[2],
-                    end[3],
-                )
-            )
-
-        new_book = self.book_id
-        if first_book is not None:
-            new_book = first_book
-        elif new_ranges:
-            mapped_start = source.map_verse(
-                self.book_id,
-                self.ranges[0].start_chapter,
-                max(self.ranges[0].start_verse, 1),
-                target,
-                subverse=self.ranges[0].start_subverse,
-            )
-            if mapped_start is not None:
-                new_book = mapped_start[0]
-
-        return SimpleBibleRef(new_book, new_ranges)
-
-    def _map_whole_chapters(
-        self, vr: VerseRange, source: Versification, target: Versification
-    ) -> tuple[str, VerseRange] | None:
-        """Map a whole-chapter range, as a (book ID, range) pair in the target.
-
-        Returns None if the range's first or last verse does not exist in the
-        target. A chapter the source does not have passes through unchanged.
-        """
-        if (
-            source.last_verse(self.book_id, vr.start_chapter) < 1
-            or source.last_verse(self.book_id, vr.end_chapter) < 1
-        ):
-            return self.book_id, VerseRange(
-                vr.start_chapter, -1, "", vr.end_chapter, -1, ""
-            )
-        start = source.map_verse(
-            self.book_id,
-            vr.start_chapter,
-            source.first_verse(self.book_id, vr.start_chapter),
-            target,
-        )
-        end = source.map_verse(
-            self.book_id,
-            vr.end_chapter,
-            _last_present_verse(source, self.book_id, vr.end_chapter),
-            target,
-            end=True,
-        )
-        if start is None or end is None:
+        parts = self.map_parts(source, target)
+        if parts is None or len(parts) != 1:
             return None
-        if start[2] <= target.first_verse(start[0], start[1]) and end[
-            2
-        ] >= _last_present_verse(target, end[0], end[1]):
-            return start[0], VerseRange(start[1], -1, "", end[1], -1, "")
-        # A verse 0 (a psalm title) cannot be cited, so a partial range that
-        # would begin there begins at verse 1.
-        return start[0], VerseRange(
-            start[1], max(start[2], 1), start[3], end[1], end[2], end[3]
-        )
+        return parts[0]
+
+    def map_parts(
+        self, source: Versification, target: Versification
+    ) -> "list[SimpleBibleRef] | None":
+        """Map this reference from one versification to another, book by book.
+
+        Each verse location is mapped from the source versification to the
+        target, going through the "org" (original languages) versification as
+        an intermediary. A verse range is divided wherever the book it maps
+        into changes: Vulgate Dan 13:60-65 is org Sus 1:60-64 and Bel 1:1, and
+        Vulgate Dan 3 is org Dan 3:1-23, the Song of the Three, and Dan
+        3:24-33. Consecutive pieces in the same book form one SimpleBibleRef.
+
+        A whole-chapter range is mapped through its first and last verses, and
+        remains whole chapters if the result covers whole chapters in the
+        target: Vulgate Ps 50 is Ps 51 in org, and Vulgate Ps 9 is org Ps 9-10,
+        but Vulgate Ps 115 is org Ps 116:10-19. A whole-book reference passes
+        through unchanged.
+
+        Args:
+            source: The Versification this reference is currently in
+            target: The Versification to map into
+
+        Returns:
+            SimpleBibleRefs in the target versification, in this reference's
+            order, or None if the start or end of any piece does not exist in
+            the target
+
+        """
+        if not self.ranges:
+            return [SimpleBibleRef(self.book_id, [])]
+        parts: list[SimpleBibleRef] = []
+        for vr in self.ranges:
+            pieces = self._map_range(vr, source, target)
+            if pieces is None:
+                return None
+            for book, piece in pieces:
+                if book == "PSA" and self.book_id == "PSAS":
+                    book = "PSAS"
+                if parts and parts[-1].book_id == book:
+                    parts[-1].ranges.append(piece)
+                else:
+                    parts.append(SimpleBibleRef(book, [piece]))
+        return parts
+
+    def _map_range(
+        self, vr: VerseRange, source: Versification, target: Versification
+    ) -> list[tuple[str, VerseRange]] | None:
+        """Map one verse range, as (book ID, range) pieces in the target.
+
+        Returns None if the start or end of a piece does not exist in the
+        target. A whole-chapter range naming a chapter the source does not
+        have passes through unchanged.
+        """
+        # The mapping data knows the Psalms only as PSA.
+        book = "PSA" if self.book_id == "PSAS" else self.book_id
+        whole = vr.is_whole_chapters()
+        follows = not whole and vr.end_verse < 0
+        if whole:
+            if (
+                source.last_verse(book, vr.start_chapter) < 1
+                or source.last_verse(book, vr.end_chapter) < 1
+            ):
+                return [
+                    (
+                        self.book_id,
+                        VerseRange(vr.start_chapter, -1, "", vr.end_chapter, -1, ""),
+                    )
+                ]
+            start = (vr.start_chapter, source.first_verse(book, vr.start_chapter), "")
+            end = (
+                vr.end_chapter,
+                _last_present_verse(source, book, vr.end_chapter),
+                "",
+            )
+        else:
+            start = (vr.start_chapter, vr.start_verse, vr.start_subverse)
+            if follows:
+                end = (vr.end_chapter, source.last_verse(book, vr.end_chapter), "")
+            else:
+                end = (vr.end_chapter, vr.end_verse, vr.end_subverse)
+
+        segments = _book_segments(source, target, book, start, end)
+        pieces: list[tuple[str, VerseRange]] = []
+        for seg_start, seg_end in segments:
+            first = source.map_verse(
+                book, seg_start[0], seg_start[1], target, subverse=seg_start[2]
+            )
+            last = source.map_verse(
+                book, seg_end[0], seg_end[1], target, subverse=seg_end[2], end=True
+            )
+            if last is not None and first is not None and last[0] != first[0]:
+                # A single verse whose own mapping spans two books.
+                last = source.map_verse(
+                    book, seg_end[0], seg_end[1], target, subverse=seg_end[2]
+                )
+            if first is None or last is None:
+                return None
+            if (
+                whole
+                and first[2] <= target.first_verse(first[0], first[1])
+                and last[2] >= _last_present_verse(target, last[0], last[1])
+            ):
+                piece = VerseRange(first[1], -1, "", last[1], -1, "")
+            elif follows and len(segments) == 1:
+                piece = VerseRange(
+                    first[1], first[2], first[3], first[1], -1, vr.end_subverse
+                )
+            else:
+                # A verse 0 (a psalm title) cannot be cited, so a partial
+                # range that would begin there begins at verse 1.
+                piece = VerseRange(
+                    first[1],
+                    max(first[2], 1) if whole else first[2],
+                    first[3],
+                    last[1],
+                    last[2],
+                    last[3],
+                )
+            pieces.append((first[0], piece))
+        return pieces
 
     def resolve_following_verses(self, versification: Versification) -> None:
         """Resolve following verses in the verse ranges.
@@ -818,9 +878,9 @@ class BibleRef:
 
         Each verse location is mapped from this reference's versification to
         the target, going through the "org" (original languages) versification
-        as an intermediary. Whole-chapter references are mapped as described
-        under :meth:`SimpleBibleRef.map`; whole-book references pass through
-        unchanged.
+        as an intermediary, as described under :meth:`SimpleBibleRef.map_parts`.
+        A range that maps into more than one book, such as Vulgate Dan 13
+        (Susanna and the first verse of Bel), becomes a reference to each.
 
         Args:
             target: The target Versification to map into
@@ -836,10 +896,10 @@ class BibleRef:
 
         new_simple_refs: list[SimpleBibleRef] = []
         for simple_ref in self.simple_refs:
-            mapped = simple_ref.map(self.versification, target)
-            if mapped is None:
+            parts = simple_ref.map_parts(self.versification, target)
+            if parts is None:
                 return None
-            new_simple_refs.append(mapped)
+            new_simple_refs.extend(parts)
 
         return BibleRef(new_simple_refs, target)
 

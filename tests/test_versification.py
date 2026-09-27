@@ -270,8 +270,8 @@ def test_map_verse_portion_subverse_discarded_n_to_1() -> None:
     """A portion-of-verse subverse is discarded across an N:1 mapping."""
     rsc = Versification.named("rsc")
     org = Versification.named("org")
-    # PSA 89:0-1 (rsc) collapses into PSA 90:0 (org); the line is ambiguous.
-    assert rsc.map_verse("PSA", 89, 1, org, subverse="b") == ("PSA", 90, 0, "")
+    # PSA 89:1-2 (rsc) collapses into PSA 90:1 (org); the line is ambiguous.
+    assert rsc.map_verse("PSA", 89, 2, org, subverse="b") == ("PSA", 90, 1, "")
 
 
 def test_mismatched_mapping_data_loaded() -> None:
@@ -302,9 +302,9 @@ def test_map_verse_n_to_1() -> None:
     """Test mapping an N:1 verse mapping returns same result for start and end."""
     rsc = Versification.named("rsc")
     org = Versification.named("org")
-    # PSA 89:0-1 in rsc maps to PSA 90:0 in org
-    assert rsc.map_verse("PSA", 89, 1, org, end=False) == ("PSA", 90, 0, "")
-    assert rsc.map_verse("PSA", 89, 1, org, end=True) == ("PSA", 90, 0, "")
+    # PSA 89:1-2 in rsc maps to PSA 90:1 in org
+    assert rsc.map_verse("PSA", 89, 1, org, end=False) == ("PSA", 90, 1, "")
+    assert rsc.map_verse("PSA", 89, 1, org, end=True) == ("PSA", 90, 1, "")
 
 
 def test_no_warnings_loading_versifications(caplog: pytest.LogCaptureFixture) -> None:
@@ -890,3 +890,28 @@ def test_merged_entries_map_back_to_both_verses() -> None:
     # The Clementine's Isa 9:20 runs into org 9:20, the rest of which is 9:21.
     assert vul.map_verse("ISA", 9, 20, org) == ("ISA", 9, 19, "")
     assert vul.map_verse("ISA", 9, 20, org, end=True) == ("ISA", 9, 20, "")
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["rsc", "rso", "lxx", "vulgata", "douay-rheims", "eng", "nova_vulgata", "cei"],
+)
+def test_psalter_round_trips_through_org(name: str) -> None:
+    """Every org psalm verse maps into the versification and back to itself.
+
+    A failure is the signature of a verse the data maps one way but not the
+    other: rsc and rso once sent org Ps 87:1 back as Ps 87:2, and the
+    Clementine's Ps 55:11 held org 56:11-12 but was mapped to 56:12 alone.
+    """
+    target = Versification.named(name)
+    org = Versification.named("org")
+    for chapter in range(1, 151):
+        for verse in range(1, org.last_verse("PSA", chapter) + 1):
+            there = org.map_verse("PSA", chapter, verse, target)
+            if there is None:
+                continue
+            start = target.map_verse(there[0], there[1], there[2], org)
+            end = target.map_verse(there[0], there[1], there[2], org, end=True)
+            assert start is not None and end is not None
+            assert start[:2] == end[:2] == ("PSA", chapter)
+            assert start[2] <= verse <= end[2]

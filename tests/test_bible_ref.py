@@ -1587,16 +1587,16 @@ def test_simple_map_n_to_1() -> None:
     """Test mapping a SimpleBibleRef with an N:1 verse mapping."""
     rsc = Versification.named("rsc")
     org = Versification.named("org")
-    # rsc PSA 89:0-1 maps to org PSA 90:0
-    ref = SimpleBibleRef.for_range("PSA", 89, 0, end_verse=1)
+    # rsc PSA 89:1-2 (the title, then the first line) maps to org PSA 90:1
+    ref = SimpleBibleRef.for_range("PSA", 89, 1, end_verse=2)
     mapped = ref.map(rsc, org)
     assert mapped is not None
     assert mapped.book_id == "PSA"
     vr = mapped.ranges[0]
     assert vr.start_chapter == 90
-    assert vr.start_verse == 0
+    assert vr.start_verse == 1
     assert vr.end_chapter == 90
-    assert vr.end_verse == 0
+    assert vr.end_verse == 1
 
 
 def test_map_to_no_versification() -> None:
@@ -1626,3 +1626,72 @@ def test_invalid_reason_excluded_verses() -> None:
     assert not SimpleBibleRef.for_range("TOB", 11, 12, end_verse=13).is_valid(nab)
     # Whole chapters name no verse.
     assert SimpleBibleRef.for_range("PSA", 147, -1).is_valid(vul)
+
+
+@pytest.mark.parametrize(
+    ("source", "reference", "target", "expected"),
+    [
+        # Susanna and Bel are Vulgate Dan 13-14, and the seam falls at 13:65.
+        ("vulgata", "Dan 13", "org", "Sus; Bel 1"),
+        ("vulgata", "Dan 13:60-65", "org", "Sus 60–64; Bel 1"),
+        ("vulgata", "Dan 13:60ff", "org", "Sus 60–64; Bel 1"),
+        ("vulgata", "Dan 13:65-14:3", "org", "Bel 1–4"),
+        ("vulgata", "Dan 12-14", "org", "Dan 12; Sus; Bel"),
+        ("org", "Bel 1:1-3", "vulgata", "Dan 13:65–14:2"),
+        # A range can leave a book and come back: the Song of the Three is
+        # Vulgate Dan 3:24-90.
+        ("vulgata", "Dan 3", "org", "Dan 3:1–23; Sg Three; Dan 3:24–33"),
+        ("vulgata", "Dan 3:1-30", "org", "Dan 3:1–23; Sg Three 1–7"),
+        ("vulgata", "Dan 3:50", "org", "Sg Three 27"),
+        # Ranges of one reference that map into one book stay together.
+        ("vulgata", "Ps 50:3; 51:4", "org", "Ps 51:3; 52:4"),
+    ],
+)
+def test_map_across_books(
+    source: str, reference: str, target: str, expected: str
+) -> None:
+    """A range that maps into more than one book becomes a reference to each."""
+    style = RefStyle(names=standard_names("en-sbl_abbreviations"))
+    ref = RefParser(style, Versification.named(source)).parse(reference)
+    assert ref is not None
+    mapped = ref.map_to(Versification.named(target))
+    assert mapped is not None
+    assert mapped.format(style) == expected
+
+
+def test_simple_map_across_books() -> None:
+    """SimpleBibleRef.map cannot express two books; map_parts can."""
+    vul = Versification.named("vulgata")
+    org = Versification.named("org")
+    ref = SimpleBibleRef.for_range("DAN", 13, 60, end_verse=65)
+    assert ref.map(vul, org) is None
+    parts = ref.map_parts(vul, org)
+    assert parts is not None
+    assert [p.book_id for p in parts] == ["SUS", "BEL"]
+    assert (parts[0].ranges[0].start_verse, parts[0].ranges[0].end_verse) == (60, 64)
+    assert (parts[1].ranges[0].start_verse, parts[1].ranges[0].end_verse) == (1, 1)
+
+
+def test_map_plural_psalms() -> None:
+    """Psalms cited in the plural are renumbered like the singular."""
+    style = RefStyle(names=standard_names("en-sbl_abbreviations"))
+    parser = RefParser(style, Versification.named("vulgata"))
+    org = Versification.named("org")
+    for reference, expected in [
+        ("Pss 50:3-5", "Pss 51:3–5"),
+        ("Pss 50-51", "Pss 51–52"),
+    ]:
+        ref = parser.parse(reference)
+        assert ref is not None
+        assert ref.simple_refs[0].book_id == "PSAS"
+        mapped = ref.map_to(org)
+        assert mapped is not None
+        assert mapped.format(style) == expected
+
+
+def test_format_whole_single_chapter_book() -> None:
+    """The whole chapter of a one-chapter book is named by the book alone."""
+    style = RefStyle(names=standard_names("en-sbl_abbreviations"))
+    org = Versification.named("org")
+    assert SimpleBibleRef.for_range("JUD", 1, -1).format(style, org) == "Jude"
+    assert SimpleBibleRef.for_range("JUD", 1, 3).format(style, org) == "Jude 3"
