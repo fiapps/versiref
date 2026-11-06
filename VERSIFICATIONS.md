@@ -299,6 +299,11 @@ The Douay's Jdt 4 and Sir 29 entries accordingly target the Clementine's verse n
 Douay↔Clementine conversion is exact there, and Douay↔`org` is exactly as good as `vulgata`'s, which is to say not good.
 Fixing it would mean establishing the correspondence verse by verse, by comparing the Vulgate's text of the three books against Swete's, which `org` follows; that would fix both files at once.
 
+The Clementine's own Sir 29:16-18 is odd too: a single sentence, "Super scutum potentis, et super lanceam adversus inimicum tuum pugnabit", printed as one verse numbered `16 17 18`.
+All three scanned editions at sacredbible.org print it that way (Hetzenauer 1914, Vercellone 1861, and van Ess), so the numbering is the edition's and not a slip.
+Electronic texts such as Tweedale's have to give each number some text, so they cut the sentence into three verses ("Super scutum potentis" / "et super lanceam" / "adversus inimicum tuum pugnabit"), and `maxVerses` counts 35 on that basis.
+A citation of 29:16, 29:17, or 29:18 therefore names the same sentence, and 29:19 ("Vir bonus fidem facit") is where the numbering resumes in step; Cornelius a Lapide's edition (Vivès) cites that verse as "18 et 19".
+
 The boundaries were found by comparing a BibleWorks export of the 1899 American edition against `vulgata`, then confirmed in the OCR text of two scanned printings (Benziger 1899 and Murphy 1914), which agree with each other and with the export.
 The page images were not consulted.
 1 Th 4, 2 Th 2, and Amos 9 were also checked by hand in a third printing, the Douay-Rheims with Haydock's commentary, which settles that the divergences belong to the Douay and not to any one printing.
