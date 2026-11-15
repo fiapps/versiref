@@ -332,11 +332,10 @@ class Versification:
             True if the book has only one chapter, False otherwise.
 
         """
+        if book == "PSAS":  # plural of PSA
+            book = "PSA"
         if book not in self.max_verses:
             return False
-        # The plural form of PSA requires special handling.
-        if book == "PSAS":
-            book = "PSA"
         return len(self.max_verses[book]) == 1
 
     def last_verse(self, book: str, chapter: int) -> int:

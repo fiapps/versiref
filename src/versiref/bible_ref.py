@@ -441,14 +441,15 @@ class SimpleBibleRef:
                 includes that verse's inserted verses.
 
         """
-        if self.book_id not in versification.max_verses:
+        book_id = "PSA" if self.book_id == "PSAS" else self.book_id
+        if book_id not in versification.max_verses:
             return
 
-        book_num = list(versification.max_verses.keys()).index(self.book_id) + 1
+        book_num = list(versification.max_verses.keys()).index(book_id) + 1
 
         if not self.ranges:
-            last_chapter = len(versification.max_verses[self.book_id])
-            last_verse = versification.last_verse(self.book_id, last_chapter)
+            last_chapter = len(versification.max_verses[book_id])
+            last_verse = versification.last_verse(book_id, last_chapter)
             yield (
                 _verse_key(book_num, 1, 1, 0),
                 _verse_key(book_num, last_chapter, last_verse, _MAX_SUBVERSE_ORDINAL),

@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `range_keys()` yielded nothing for a reference parsed from a plural name for the Psalms ("Pss 1–2"), whose book ID is `PSAS`.
 - `Versification.last_verse()` returned the length of a book's last chapter for chapter 0. It now returns -1, as for any chapter the book does not have.
 
 ## 0.12.0 - 2026-09-27
