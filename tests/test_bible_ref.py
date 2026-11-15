@@ -510,10 +510,15 @@ def test_invalid_reason_unnamed_versification(tmp_path: pathlib.Path) -> None:
 
 
 def test_invalid_reason_excluded_verses() -> None:
-    """A range may not begin or end on an excluded verse, but may span one."""
+    """An excluded verse is valid unless asked for, and may always be spanned."""
 
     def reason(text: str, versification: str) -> str | None:
-        return _parsed(text, versification).invalid_reason()
+        ref = _parsed(text, versification)
+        assert ref.is_valid()
+        assert ref.invalid_reason() is None
+        strict = ref.invalid_reason(allow_excluded=False)
+        assert ref.is_valid(allow_excluded=False) == (strict is None)
+        return strict
 
     assert reason("Ps 147:1", "vulgata") == "PSA 147 has no verse 1"
     assert reason("Ps 147:1–20", "vulgata") == "PSA 147 has no verse 1"

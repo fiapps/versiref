@@ -53,7 +53,7 @@ Two kinds of verse belong here, and they need not be told apart:
 - a verse omitted for text-critical reasons, whose number the edition skips (the NABRE's Matt 17:21);
 - a number the numbering never uses, because a chapter does not begin at verse 1 (the Clementine's Ps 115 begins at verse 10 and Ps 147 at verse 12, continuing Ps 114 and 146).
 
-An excluded verse fails validation when a range begins or ends on it, though a range may span one (the NABRE's Tob 11:11-13).
+An excluded verse is valid by default, since it still names a place in the text; with `allow_excluded=False`, validation fails when a range begins or ends on one, though a range may span one (the NABRE's Tob 11:11-13).
 A whole chapter is taken to begin at its first verse that is not excluded, which is what lets Vulgate Ps 147 map to `org` 147:12-20 rather than to the whole Hebrew psalm.
 Mapping is not otherwise affected: `map_verse` maps an excluded verse like any other, so that a text can still be shoehorned into the nearest versification the package offers.
 

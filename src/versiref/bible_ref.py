@@ -289,7 +289,10 @@ class VerseRange:
 
 
 def _range_reason(
-    verse_range: VerseRange, versification: Versification, style: RefStyle | None
+    verse_range: VerseRange,
+    versification: Versification,
+    style: RefStyle | None,
+    allow_excluded: bool,
 ) -> str | None:
     """Explain why a verse range is invalid under a versification, or None."""
 
@@ -325,6 +328,8 @@ def _range_reason(
             )
             if reason is not None:
                 return reason
+    if allow_excluded:
+        return None
     # A range may span an excluded verse (the NABRE's Tob 11:12-14), but may
     # not begin or end on one.
     for point in (start, end):
@@ -725,23 +730,30 @@ class BibleRef:
         """
         return all(verse_range.is_whole_chapters() for verse_range in self.ranges)
 
-    def invalid_reason(self, style: RefStyle | None = None) -> str | None:
+    def invalid_reason(
+        self, style: RefStyle | None = None, *, allow_excluded: bool = True
+    ) -> str | None:
         """Explain why this Bible reference is invalid, or None if it is valid.
 
         The reference is invalid if it has no versification, or if any of its
         verse ranges is invalid under that versification: if a book is not in
         the versification, if the range is structurally inconsistent, if it
         ends in an earlier book than it starts, or if any chapter or verse it
-        names does not exist. A verse the versification excludes (see
-        :meth:`Versification.is_excluded`) does not exist, though a range may
-        span one. When more than one verse range is invalid, each reason is
-        reported, joined by "; ".
+        names does not exist. When more than one verse range is invalid, each
+        reason is reported, joined by "; ".
+
+        A verse the versification excludes (see
+        :meth:`Versification.is_excluded`), such as the NABRE's Matt 17:21, is
+        valid by default: it lies within its chapter and names a place in the
+        text, though the versification has nothing there.
 
         An empty BibleRef with a versification is vacuously valid.
 
         Args:
             style: Optional RefStyle whose book names are used to name books in
                 the message. Without it, Paratext book IDs are used.
+            allow_excluded: If False, a range that begins or ends on an
+                excluded verse is invalid, though it may still span one.
 
         Returns:
             An explanatory string, or None if the reference is valid.
@@ -752,22 +764,28 @@ class BibleRef:
 
         reasons: list[str] = []
         for verse_range in self.ranges:
-            reason = _range_reason(verse_range, self.versification, style)
+            reason = _range_reason(
+                verse_range, self.versification, style, allow_excluded
+            )
             if reason is not None:
                 reasons.append(reason)
 
         return "; ".join(reasons) if reasons else None
 
-    def is_valid(self) -> bool:
+    def is_valid(self, *, allow_excluded: bool = True) -> bool:
         """Check if this Bible reference is valid according to its versification.
 
         An empty BibleRef is vacuously valid.
+
+        Args:
+            allow_excluded: If False, a range that begins or ends on a verse
+                the versification excludes is invalid.
 
         Returns:
             bool: True if the reference is valid, False otherwise
 
         """
-        return self.invalid_reason() is None
+        return self.invalid_reason(allow_excluded=allow_excluded) is None
 
     def range_keys(self) -> Iterator[tuple[int, int]]:
         """Yield an integer key range for each verse range in the ref.
