@@ -291,11 +291,12 @@ class Versification:
             A newly constructed Versification
 
         """
+        identifier = identifier.lower()
         cached = _named.get(identifier)
         if cached is not None:
             return cached
 
-        filename = f"{identifier.lower()}.json"
+        filename = f"{identifier}.json"
 
         path = resources.files("versiref").joinpath("data", "versifications", filename)
         if path.is_file():

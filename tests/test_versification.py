@@ -963,3 +963,9 @@ def test_org_verses_that_eng_divides(
     end = org.map_verse(*org_verse, eng, end=True)
     assert start is not None and end is not None
     assert (start[2], end[2]) == (first, last)
+
+
+def test_named_ignores_case() -> None:
+    """An identifier names the same versification however it is capitalized."""
+    assert Versification.named("Vulgata") is Versification.named("vulgata")
+    assert Versification.named("Vulgata").identifier == "vulgata"
