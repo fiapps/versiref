@@ -1007,3 +1007,37 @@ def test_book_name_may_be_followed_by_a_non_letter(text: str, expected: str) -> 
     """Punctuation or a digit after a name does not prevent a match."""
     found = _scan(text, sensitivity=Sensitivity.BOOK)
     assert [match for match, _ in found] == [expected]
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "1\u00a0Kgs 3:4",
+        "1\u202fKgs 3:4",
+        "1  Kgs 3:4",
+        "1\tKgs 3:4",
+        "1\nKgs 3:4",
+        "1 \n Kgs 3:4",
+    ],
+)
+def test_space_in_book_name_matches_other_whitespace(text: str) -> None:
+    """The space in a name stands for any whitespace short of a blank line."""
+    assert _scan(text) == [(text, "1 Kgs 3:4")]
+
+
+def test_space_in_book_name_does_not_match_a_blank_line() -> None:
+    """A book name does not continue across a paragraph break."""
+    assert _scan("1\n\nKgs 3:4") == []
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "John\u00a03:16,\u00a018",
+        "John\u202f3:16,\u200918",
+        "John 3:16,\u00a0 18",
+    ],
+)
+def test_no_break_and_thin_spaces_separate_tokens(text: str) -> None:
+    """The spaces typesetters use within a reference count as whitespace."""
+    assert _scan(text) == [(text, "John 3:16, 18")]

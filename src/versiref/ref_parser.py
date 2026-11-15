@@ -10,7 +10,6 @@ from enum import Enum
 from typing import Callable, Generator
 
 import pyparsing as pp
-from pyparsing import common
 
 from versiref.bible_ref import BibleRef, SimpleBibleRef, VerseRange
 from versiref.ref_style import SHARED_NAME_PARTNER, RefStyle
@@ -46,6 +45,15 @@ def _get_str(tokens: pp.ParseResults, name: str, default: str) -> str:
         return default
 
 
+# What may separate the parts of a reference: pyparsing's defaults plus the
+# no-break, thin and narrow no-break spaces that typeset text puts between a
+# book name and its chapter or after a separator.
+_WHITESPACE_CHARS = " \t\n\r\u00a0\u2009\u202f"
+
+# Whitespace inside a book name such as "1 Kgs": any horizontal whitespace,
+# wrapping across at most one line break (never a blank line).
+_NAME_SPACE = r"(?:[^\S\n]+(?:\n[^\S\n]*)?|\n[^\S\n]*)"
+
 # Fails when a letter follows, so that a name ending in a letter does not match
 # the start of a longer word ("Mark" in "Marketing"). Unicode-aware, like the
 # leading boundary in _build_parser.
@@ -65,14 +73,36 @@ def _book_element(name_to_id: dict[str, str]) -> pp.ParserElement:
     """
     if not name_to_id:
         return pp.NoMatch()
-    ids = dict(name_to_id)
+    ids = {" ".join(name.split()): book_id for name, book_id in name_to_id.items()}
     alternatives = [
-        re.escape(name) + (_NO_LETTER_AHEAD if name[-1].isalpha() else "")
+        _NAME_SPACE.join(re.escape(word) for word in name.split(" "))
+        + (_NO_LETTER_AHEAD if name[-1].isalpha() else "")
         for name in sorted(ids, key=len, reverse=True)
     ]
     element = pp.Regex("|".join(alternatives))
-    element.set_parse_action(lambda t: ids[str(t[0])])
+    element.set_parse_action(lambda t: ids[" ".join(str(t[0]).split())])
     return element
+
+
+def _extend_whitespace(element: pp.ParserElement) -> None:
+    """Make an element and all it contains skip :data:`_WHITESPACE_CHARS`.
+
+    pyparsing has no per-grammar whitespace setting short of its global
+    default, which would change every other grammar in the process.
+    """
+    seen: set[int] = set()
+    pending = [element]
+    while pending:
+        current = pending.pop()
+        if id(current) in seen:
+            continue
+        seen.add(id(current))
+        if current.skipWhitespace:
+            current.set_whitespace_chars(_WHITESPACE_CHARS)
+        pending.extend(getattr(current, "exprs", []))
+        inner = getattr(current, "expr", None)
+        if inner is not None:
+            pending.append(inner)
 
 
 class RefParser:
@@ -132,8 +162,8 @@ class RefParser:
             chapter = pp.Regex(r"[clxvi]+(?![0-9A-Za-zÆæŒœ])")
             chapter.set_parse_action(lambda t: roman_to_int(t[0]))
         else:
-            chapter = common.integer
-        verse = common.integer
+            chapter = pp.Word(pp.nums).set_parse_action(lambda t: int(t[0]))
+        verse = pp.Word(pp.nums).set_parse_action(lambda t: int(t[0]))
         subverse = pp.Word(pp.alphas.lower(), max=2).leave_whitespace() + pp.WordEnd(
             pp.alphas.lower()
         )
@@ -429,6 +459,13 @@ class RefParser:
             )
         else:
             self.simple_ref_parser_top = self.simple_ref_parser
+
+        for parser in (
+            self.simple_ref_parser,
+            self.simple_ref_parser_top,
+            self.bible_ref_parser,
+        ):
+            _extend_whitespace(parser)
 
     def _make_verse_range(
         self, original_text: str, loc: int, tokens: pp.ParseResults

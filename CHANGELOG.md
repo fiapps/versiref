@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- A parser now treats no-break, thin, and narrow no-break spaces (U+00A0, U+2009, U+202F) as whitespace between the parts of a reference, so that a reference typeset with a no-break space after the book name is found. The space inside a book name such as "1 Kgs" likewise matches any run of whitespace, including a single line break but not a blank line; it had matched one ASCII space only.
 - A whole-book reference's `range_keys()` range now starts at verse 0 of chapter 1, as a whole-chapter range does, rather than at verse 1. The range of "Ps 1" had begun before that of "Ps", so a book did not contain its own first chapter.
 
 ### Fixed
