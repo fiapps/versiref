@@ -915,3 +915,9 @@ def test_psalter_round_trips_through_org(name: str) -> None:
             assert start is not None and end is not None
             assert start[:2] == end[:2] == ("PSA", chapter)
             assert start[2] <= verse <= end[2]
+
+
+@pytest.mark.parametrize("chapter", [0, -1, 51])
+def test_last_verse_of_a_chapter_that_does_not_exist(chapter: int) -> None:
+    """Chapter 0 is no more a chapter than one past the end of the book."""
+    assert Versification.named("eng").last_verse("GEN", chapter) == -1

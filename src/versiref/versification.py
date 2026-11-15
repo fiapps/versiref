@@ -361,7 +361,7 @@ class Versification:
             return -1
 
         # Check if the chapter exists in the book
-        if chapter < 0 or chapter > len(self.max_verses[book]):
+        if chapter < 1 or chapter > len(self.max_verses[book]):
             return -1
 
         # Return the verse count as an integer
