@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- A whole-book reference's `range_keys()` range now starts at verse 0 of chapter 1, as a whole-chapter range does, rather than at verse 1. The range of "Ps 1" had begun before that of "Ps", so a book did not contain its own first chapter.
 
 ### Fixed
 

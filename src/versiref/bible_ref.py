@@ -423,7 +423,8 @@ class SimpleBibleRef:
         included in the versification, no ranges are yielded.
 
         Whole-book references (with no ranges) yield a single range spanning
-        chapter 1, verse 1 through the last verse of the book.
+        chapter 1, verse 0 through the last verse of the book, so that it
+        contains the range of each of the book's chapters.
 
         Verse numbers less than 0 (undefined) are replaced with:
         - 0 for start verses
@@ -451,7 +452,7 @@ class SimpleBibleRef:
             last_chapter = len(versification.max_verses[book_id])
             last_verse = versification.last_verse(book_id, last_chapter)
             yield (
-                _verse_key(book_num, 1, 1, 0),
+                _verse_key(book_num, 1, 0, 0),
                 _verse_key(book_num, last_chapter, last_verse, _MAX_SUBVERSE_ORDINAL),
             )
             return

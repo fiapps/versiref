@@ -1276,9 +1276,9 @@ def test_simple_bible_ref_range_keys_whole_book() -> None:
     keys = list(ref.range_keys(versification))
     assert len(keys) == 1
     start_key, end_key = keys[0]
-    # John is book 43; first verse 43 001 001 00; last chapter 21, last verse 25,
-    # a whole-book end spreading to ordinal 99
-    assert start_key == 4300100100
+    # John is book 43; it starts at 43 001 000 00, as a whole chapter does;
+    # last chapter 21, last verse 25, a whole-book end spreading to ordinal 99
+    assert start_key == 4300100000
     assert end_key == 4302102599
 
 
@@ -1291,7 +1291,7 @@ def test_simple_bible_ref_range_keys_whole_book_genesis() -> None:
     start_key, end_key = keys[0]
     # Genesis is book 1; first verse 1 001 001 00; last chapter 50, last verse 26,
     # a whole-book end spreading to ordinal 99
-    assert start_key == 100100100
+    assert start_key == 100100000
     assert end_key == 105002699
 
 
@@ -1310,7 +1310,7 @@ def test_bible_ref_range_keys_whole_book() -> None:
     keys = list(ref.range_keys())
     assert len(keys) == 1
     start_key, end_key = keys[0]
-    assert start_key == 4300100100
+    assert start_key == 4300100000
     assert end_key == 4302102599
 
 
@@ -1324,9 +1324,9 @@ def test_bible_ref_range_keys_whole_books_multi() -> None:
     keys = list(ref.range_keys())
     assert len(keys) == 2
     # Genesis: book 1, 50 chapters, last verse Gen 50:26
-    assert keys[0] == (100100100, 105002699)
+    assert keys[0] == (100100000, 105002699)
     # Revelation: book 66, 22 chapters, last verse Rev 22:21
-    assert keys[1] == (6600100100, 6602202199)
+    assert keys[1] == (6600100000, 6602202199)
 
 
 def test_range_keys_inserted_verse_distinct_from_base() -> None:
