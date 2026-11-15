@@ -7,7 +7,7 @@ from versiref.ref_style import RefStyle, standard_names
 from versiref.versification import Versification
 
 
-def test_parse_simple_verse() -> None:
+def test_parse_single_verse() -> None:
     """Test parsing a simple verse reference."""
     # Create a style
     names = standard_names("en-sbl_abbreviations")
@@ -20,17 +20,17 @@ def test_parse_simple_verse() -> None:
     parser = RefParser(style, versification)
 
     # Parse a simple reference: "Gen 1:1"
-    ref = parser.parse_simple("Gen 1:1")
+    ref = parser.parse("Gen 1:1")
 
     assert ref is not None
-    assert ref.book_id == "GEN"
+    assert ref.ranges[0].start.book == "GEN"
     assert len(ref.ranges) == 1
-    assert ref.ranges[0].start_chapter == 1
-    assert ref.ranges[0].start_verse == 1
-    assert ref.ranges[0].start_subverse == ""
-    assert ref.ranges[0].end_chapter == 1
-    assert ref.ranges[0].end_verse == 1
-    assert ref.ranges[0].end_subverse == ""
+    assert ref.ranges[0].start.chapter == 1
+    assert ref.ranges[0].start.verse == 1
+    assert ref.ranges[0].start.subverse == ""
+    assert ref.ranges[0].end.chapter == 1
+    assert ref.ranges[0].end.verse == 1
+    assert ref.ranges[0].end.subverse == ""
     assert ref.ranges[0].original_text == "Gen 1:1"
 
 
@@ -47,17 +47,17 @@ def test_parse_verse_with_subverse() -> None:
     parser = RefParser(style, versification)
 
     # Parse a reference with a subverse: "John 3:16b"
-    ref = parser.parse_simple("John 3:16b")
+    ref = parser.parse("John 3:16b")
 
     assert ref is not None
-    assert ref.book_id == "JHN"
+    assert ref.ranges[0].start.book == "JHN"
     assert len(ref.ranges) == 1
-    assert ref.ranges[0].start_chapter == 3
-    assert ref.ranges[0].start_verse == 16
-    assert ref.ranges[0].start_subverse == "b"
-    assert ref.ranges[0].end_chapter == 3
-    assert ref.ranges[0].end_verse == 16
-    assert ref.ranges[0].end_subverse == "b"
+    assert ref.ranges[0].start.chapter == 3
+    assert ref.ranges[0].start.verse == 16
+    assert ref.ranges[0].start.subverse == "b"
+    assert ref.ranges[0].end.chapter == 3
+    assert ref.ranges[0].end.verse == 16
+    assert ref.ranges[0].end.subverse == "b"
     assert ref.ranges[0].original_text == "John 3:16b"
 
 
@@ -74,15 +74,15 @@ def test_parse_single_chapter_book() -> None:
     parser = RefParser(style, versification)
 
     # Parse a reference to a verse in Jude: "Jude 5"
-    ref = parser.parse_simple("Jude 5")
+    ref = parser.parse("Jude 5")
 
     assert ref is not None
-    assert ref.book_id == "JUD"
+    assert ref.ranges[0].start.book == "JUD"
     assert len(ref.ranges) == 1
-    assert ref.ranges[0].start_chapter == 1  # Single-chapter books have chapter 1
-    assert ref.ranges[0].start_verse == 5
-    assert ref.ranges[0].end_chapter == 1
-    assert ref.ranges[0].end_verse == 5
+    assert ref.ranges[0].start.chapter == 1  # Single-chapter books have chapter 1
+    assert ref.ranges[0].start.verse == 5
+    assert ref.ranges[0].end.chapter == 1
+    assert ref.ranges[0].end.verse == 5
     assert ref.ranges[0].original_text == "Jude 5"
 
 
@@ -99,7 +99,7 @@ def test_parse_nonexistent_reference() -> None:
     parser = RefParser(style, versification)
 
     # Try to parse a non-reference
-    ref = parser.parse_simple("This is not a Bible reference", silent=True)
+    ref = parser.parse("This is not a Bible reference", silent=True)
 
     assert ref is None
 
@@ -117,13 +117,13 @@ def test_parse_book_with_space() -> None:
     parser = RefParser(style, versification)
 
     # Parse a reference with a space in the book name: "2 John 5"
-    ref = parser.parse_simple("2 John 5")
+    ref = parser.parse("2 John 5")
 
     assert ref is not None
-    assert ref.book_id == "2JN"
+    assert ref.ranges[0].start.book == "2JN"
     assert len(ref.ranges) == 1
-    assert ref.ranges[0].start_chapter == 1  # Single-chapter books have chapter 1
-    assert ref.ranges[0].start_verse == 5
+    assert ref.ranges[0].start.chapter == 1  # Single-chapter books have chapter 1
+    assert ref.ranges[0].start.verse == 5
     assert ref.ranges[0].original_text == "2 John 5"
 
 
@@ -140,13 +140,13 @@ def test_parse_multi_chapter_book_with_space() -> None:
     parser = RefParser(style, versification)
 
     # Parse a reference with a space in the book name: "1 Kgs 8:10"
-    ref = parser.parse_simple("1 Kgs 8:10")
+    ref = parser.parse("1 Kgs 8:10")
 
     assert ref is not None
-    assert ref.book_id == "1KI"
+    assert ref.ranges[0].start.book == "1KI"
     assert len(ref.ranges) == 1
-    assert ref.ranges[0].start_chapter == 8
-    assert ref.ranges[0].start_verse == 10
+    assert ref.ranges[0].start.chapter == 8
+    assert ref.ranges[0].start.verse == 10
     assert ref.ranges[0].original_text == "1 Kgs 8:10"
 
 
@@ -166,23 +166,22 @@ def test_parse_multiple_books() -> None:
     ref = parser.parse("Is 7:10-14; Lk 1:26-38")
 
     assert ref is not None
-    assert len(ref.simple_refs) == 2
+    assert ref.books() == ["ISA", "LUK"]
+    assert len(ref.ranges) == 2
 
     # Check first book (Isaiah)
-    assert ref.simple_refs[0].book_id == "ISA"
-    assert len(ref.simple_refs[0].ranges) == 1
-    assert ref.simple_refs[0].ranges[0].start_chapter == 7
-    assert ref.simple_refs[0].ranges[0].start_verse == 10
-    assert ref.simple_refs[0].ranges[0].end_chapter == 7
-    assert ref.simple_refs[0].ranges[0].end_verse == 14
+    assert ref.ranges[0].start.book == "ISA"
+    assert ref.ranges[0].start.chapter == 7
+    assert ref.ranges[0].start.verse == 10
+    assert ref.ranges[0].end.chapter == 7
+    assert ref.ranges[0].end.verse == 14
 
     # Check second book (Luke)
-    assert ref.simple_refs[1].book_id == "LUK"
-    assert len(ref.simple_refs[1].ranges) == 1
-    assert ref.simple_refs[1].ranges[0].start_chapter == 1
-    assert ref.simple_refs[1].ranges[0].start_verse == 26
-    assert ref.simple_refs[1].ranges[0].end_chapter == 1
-    assert ref.simple_refs[1].ranges[0].end_verse == 38
+    assert ref.ranges[1].start.book == "LUK"
+    assert ref.ranges[1].start.chapter == 1
+    assert ref.ranges[1].start.verse == 26
+    assert ref.ranges[1].end.chapter == 1
+    assert ref.ranges[1].end.verse == 38
 
 
 def test_parse_multiple_books_with_multiple_ranges() -> None:
@@ -201,29 +200,29 @@ def test_parse_multiple_books_with_multiple_ranges() -> None:
     ref = parser.parse("Matt 5:3-12; 6:9-13; 1 John 3:16-17")
 
     assert ref is not None
-    assert len(ref.simple_refs) == 2
+    assert ref.books() == ["MAT", "1JN"]
+    assert len(ref.ranges) == 3
 
     # Check first book (Matthew)
-    assert ref.simple_refs[0].book_id == "MAT"
-    assert len(ref.simple_refs[0].ranges) == 2
+    assert ref.ranges[0].start.book == "MAT"
+    assert ref.ranges[1].start.book == "MAT"
     # First range in Matthew
-    assert ref.simple_refs[0].ranges[0].start_chapter == 5
-    assert ref.simple_refs[0].ranges[0].start_verse == 3
-    assert ref.simple_refs[0].ranges[0].end_chapter == 5
-    assert ref.simple_refs[0].ranges[0].end_verse == 12
+    assert ref.ranges[0].start.chapter == 5
+    assert ref.ranges[0].start.verse == 3
+    assert ref.ranges[0].end.chapter == 5
+    assert ref.ranges[0].end.verse == 12
     # Second range in Matthew
-    assert ref.simple_refs[0].ranges[1].start_chapter == 6
-    assert ref.simple_refs[0].ranges[1].start_verse == 9
-    assert ref.simple_refs[0].ranges[1].end_chapter == 6
-    assert ref.simple_refs[0].ranges[1].end_verse == 13
+    assert ref.ranges[1].start.chapter == 6
+    assert ref.ranges[1].start.verse == 9
+    assert ref.ranges[1].end.chapter == 6
+    assert ref.ranges[1].end.verse == 13
 
     # Check second book (1 John)
-    assert ref.simple_refs[1].book_id == "1JN"
-    assert len(ref.simple_refs[1].ranges) == 1
-    assert ref.simple_refs[1].ranges[0].start_chapter == 3
-    assert ref.simple_refs[1].ranges[0].start_verse == 16
-    assert ref.simple_refs[1].ranges[0].end_chapter == 3
-    assert ref.simple_refs[1].ranges[0].end_verse == 17
+    assert ref.ranges[2].start.book == "1JN"
+    assert ref.ranges[2].start.chapter == 3
+    assert ref.ranges[2].start.verse == 16
+    assert ref.ranges[2].end.chapter == 3
+    assert ref.ranges[2].end.verse == 17
 
 
 def test_parse_nonexistent_multi_book_reference() -> None:
@@ -264,22 +263,22 @@ def test_scan_string() -> None:
 
     # Check first reference (Matthew)
     ref1, start1, end1 = refs[0]
-    assert ref1.simple_refs[0].book_id == "MAT"
-    assert len(ref1.simple_refs[0].ranges) == 1
-    assert ref1.simple_refs[0].ranges[0].start_chapter == 5
-    assert ref1.simple_refs[0].ranges[0].start_verse == 3
-    assert ref1.simple_refs[0].ranges[0].end_chapter == 5
-    assert ref1.simple_refs[0].ranges[0].end_verse == 12
+    assert ref1.ranges[0].start.book == "MAT"
+    assert len(ref1.ranges) == 1
+    assert ref1.ranges[0].start.chapter == 5
+    assert ref1.ranges[0].start.verse == 3
+    assert ref1.ranges[0].end.chapter == 5
+    assert ref1.ranges[0].end.verse == 12
     assert text[start1:end1] == "Matt 5:3-12"
 
     # Check second reference (John)
     ref2, start2, end2 = refs[1]
-    assert ref2.simple_refs[0].book_id == "JHN"
-    assert len(ref2.simple_refs[0].ranges) == 1
-    assert ref2.simple_refs[0].ranges[0].start_chapter == 3
-    assert ref2.simple_refs[0].ranges[0].start_verse == 16
-    assert ref2.simple_refs[0].ranges[0].end_chapter == 3
-    assert ref2.simple_refs[0].ranges[0].end_verse == 16
+    assert ref2.ranges[0].start.book == "JHN"
+    assert len(ref2.ranges) == 1
+    assert ref2.ranges[0].start.chapter == 3
+    assert ref2.ranges[0].start.verse == 16
+    assert ref2.ranges[0].end.chapter == 3
+    assert ref2.ranges[0].end.verse == 16
     assert text[start2:end2] == "John 3:16"
 
 
@@ -302,23 +301,22 @@ def test_scan_string_with_multi_book_reference() -> None:
     assert len(refs) == 1
 
     ref, start, end = refs[0]
-    assert len(ref.simple_refs) == 2
+    assert ref.books() == ["ISA", "LUK"]
+    assert len(ref.ranges) == 2
 
     # Check first book (Isaiah)
-    assert ref.simple_refs[0].book_id == "ISA"
-    assert len(ref.simple_refs[0].ranges) == 1
-    assert ref.simple_refs[0].ranges[0].start_chapter == 7
-    assert ref.simple_refs[0].ranges[0].start_verse == 10
-    assert ref.simple_refs[0].ranges[0].end_chapter == 7
-    assert ref.simple_refs[0].ranges[0].end_verse == 14
+    assert ref.ranges[0].start.book == "ISA"
+    assert ref.ranges[0].start.chapter == 7
+    assert ref.ranges[0].start.verse == 10
+    assert ref.ranges[0].end.chapter == 7
+    assert ref.ranges[0].end.verse == 14
 
     # Check second book (Luke)
-    assert ref.simple_refs[1].book_id == "LUK"
-    assert len(ref.simple_refs[1].ranges) == 1
-    assert ref.simple_refs[1].ranges[0].start_chapter == 1
-    assert ref.simple_refs[1].ranges[0].start_verse == 26
-    assert ref.simple_refs[1].ranges[0].end_chapter == 1
-    assert ref.simple_refs[1].ranges[0].end_verse == 38
+    assert ref.ranges[1].start.book == "LUK"
+    assert ref.ranges[1].start.chapter == 1
+    assert ref.ranges[1].start.verse == 26
+    assert ref.ranges[1].end.chapter == 1
+    assert ref.ranges[1].end.verse == 38
 
     assert text[start:end] == "Is 7:10-14; Lk 1:26-38"
 
@@ -344,7 +342,7 @@ def test_scan_finds_book_name_at_word_boundary() -> None:
     refs = list(parser.scan_string("see Rom 5:1 now"))
     assert len(refs) == 1
     ref, start, end = refs[0]
-    assert ref.simple_refs[0].book_id == "ROM"
+    assert ref.ranges[0].start.book == "ROM"
     assert "see Rom 5:1 now"[start:end] == "Rom 5:1"
 
 
@@ -390,28 +388,28 @@ def _make_parser() -> RefParser:
 def test_parse_whole_chapter() -> None:
     """Test parsing a whole-chapter reference like 'John 3'."""
     parser = _make_parser()
-    ref = parser.parse_simple("John 3")
+    ref = parser.parse("John 3")
 
     assert ref is not None
-    assert ref.book_id == "JHN"
+    assert ref.ranges[0].start.book == "JHN"
     assert len(ref.ranges) == 1
-    assert ref.ranges[0].start_chapter == 3
-    assert ref.ranges[0].start_verse == -1
-    assert ref.ranges[0].end_chapter == 3
-    assert ref.ranges[0].end_verse == -1
+    assert ref.ranges[0].start.chapter == 3
+    assert ref.ranges[0].start.verse is None
+    assert ref.ranges[0].end.chapter == 3
+    assert ref.ranges[0].end.verse is None
     assert ref.ranges[0].is_whole_chapters()
 
 
 def test_parse_whole_chapter_range() -> None:
     """Test parsing a chapter range like 'John 3–5'."""
     parser = _make_parser()
-    ref = parser.parse_simple("John 3–5")
+    ref = parser.parse("John 3–5")
 
     assert ref is not None
-    assert ref.book_id == "JHN"
+    assert ref.ranges[0].start.book == "JHN"
     assert len(ref.ranges) == 1
-    assert ref.ranges[0].start_chapter == 3
-    assert ref.ranges[0].end_chapter == 5
+    assert ref.ranges[0].start.chapter == 3
+    assert ref.ranges[0].end.chapter == 5
     assert ref.ranges[0].is_whole_chapters()
 
 
@@ -421,23 +419,27 @@ def test_parse_whole_book() -> None:
     style = RefStyle(names=names)
     versification = Versification.named("eng")
     parser = RefParser(style, versification)
-    ref = parser.parse_simple("Genesis")
+    ref = parser.parse("Genesis")
 
     assert ref is not None
-    assert ref.book_id == "GEN"
-    assert ref.is_whole_book()
-    assert len(ref.ranges) == 0
+    assert ref.ranges[0].start.book == "GEN"
+    assert ref.is_whole_books()
+    assert ref.ranges[0].start.chapter is None
+    assert ref.ranges[0].end == ref.ranges[0].start
+    assert len(ref.ranges) == 1
 
 
 def test_parse_whole_book_abbreviation() -> None:
     """Test parsing a whole-book reference with an abbreviation."""
     parser = _make_parser()
-    ref = parser.parse_simple("Gen")
+    ref = parser.parse("Gen")
 
     assert ref is not None
-    assert ref.book_id == "GEN"
-    assert ref.is_whole_book()
-    assert len(ref.ranges) == 0
+    assert ref.ranges[0].start.book == "GEN"
+    assert ref.is_whole_books()
+    assert ref.ranges[0].start.chapter is None
+    assert ref.ranges[0].end == ref.ranges[0].start
+    assert len(ref.ranges) == 1
 
 
 def test_parse_whole_book_bible_ref() -> None:
@@ -446,32 +448,32 @@ def test_parse_whole_book_bible_ref() -> None:
     ref = parser.parse("Gen")
 
     assert ref is not None
-    assert len(ref.simple_refs) == 1
-    assert ref.simple_refs[0].is_whole_book()
+    assert ref.is_single_range()
     assert ref.is_whole_books()
+    assert ref.is_whole_chapters()
 
 
 def test_verse_ref_still_preferred_over_chapter() -> None:
     """Ensure 'John 3:16' parses as a verse ref, not chapter 3 followed by junk."""
     parser = _make_parser()
-    ref = parser.parse_simple("John 3:16")
+    ref = parser.parse("John 3:16")
 
     assert ref is not None
-    assert ref.book_id == "JHN"
+    assert ref.ranges[0].start.book == "JHN"
     assert len(ref.ranges) == 1
-    assert ref.ranges[0].start_verse == 16
-    assert ref.ranges[0].end_verse == 16
+    assert ref.ranges[0].start.verse == 16
+    assert ref.ranges[0].end.verse == 16
 
 
 def test_single_chapter_book_still_parses_verse() -> None:
     """Ensure 'Jude 5' still parses as verse 5, not chapter 5."""
     parser = _make_parser()
-    ref = parser.parse_simple("Jude 5")
+    ref = parser.parse("Jude 5")
 
     assert ref is not None
-    assert ref.book_id == "JUD"
-    assert ref.ranges[0].start_chapter == 1
-    assert ref.ranges[0].start_verse == 5
+    assert ref.ranges[0].start.book == "JUD"
+    assert ref.ranges[0].start.chapter == 1
+    assert ref.ranges[0].start.verse == 5
 
 
 # --- Sensitivity filtering ---
@@ -609,7 +611,7 @@ def test_designator_applies_to_whole_list() -> None:
     assert ref is not None
     assert ref.versification is not None
     assert ref.versification.identifier == "vulgata"
-    assert len(ref.simple_refs) == 2
+    assert ref.books() == ["GEN", "DAN"]
 
 
 def test_designator_aliases_and_longest_match() -> None:
@@ -628,15 +630,6 @@ def test_no_designator_uses_default_versification() -> None:
     assert ref.versification.identifier == "eng"
 
 
-def test_parse_simple_discards_designator() -> None:
-    """parse_simple matches and discards a trailing designator."""
-    parser = _make_designator_parser()
-    ref = parser.parse_simple("Dan 13:23 Vulg.")
-    assert ref is not None
-    assert ref.book_id == "DAN"
-    assert ref.original_text == "Dan 13:23"
-
-
 def test_scan_string_includes_designator_in_span() -> None:
     """scan_string reports a span covering the designator and the right versification."""
     parser = _make_designator_parser()
@@ -649,16 +642,6 @@ def test_scan_string_includes_designator_in_span() -> None:
     plain, p_start, p_end = refs[1]
     assert text[p_start:p_end] == "Gen 1:1"
     assert plain.versification.identifier == "eng"
-
-
-def test_scan_string_simple_excludes_designator() -> None:
-    """scan_string_simple's span ends before the discarded designator."""
-    parser = _make_designator_parser()
-    text = "see Dan 13:23 Vulg. here"
-    refs = list(parser.scan_string_simple(text))
-    assert len(refs) == 1
-    ref, start, end = refs[0]
-    assert text[start:end] == "Dan 13:23"
 
 
 def test_empty_designator_map_unchanged() -> None:
@@ -685,19 +668,19 @@ def _make_latin_marker_parser() -> RefParser:
     return RefParser(style, Versification.named("eng"))
 
 
-def _first_range(parser: RefParser, text: str) -> tuple[int, int, str]:
+def _first_range(parser: RefParser, text: str) -> tuple[int | None, int | None, str]:
     """Scan text and return (start_verse, end_verse, span) of the first match."""
     out = list(parser.scan_string(text))
     assert out, f"no match in {text!r}"
     ref, start, end = out[0]
-    rng = ref.simple_refs[0].ranges[0]
-    return rng.start_verse, rng.end_verse, text[start:end]
+    rng = ref.ranges[0]
+    return rng.start.verse, rng.end.verse, text[start:end]
 
 
 def test_explicit_following_verses_marker_interpreted() -> None:
     """A non-subverse following-verses marker yields an open-ended range."""
     parser = _make_latin_marker_parser()
-    assert _first_range(parser, "John 3:16seqq.") == (16, -1, "John 3:16seqq.")
+    assert _first_range(parser, "John 3:16seqq.") == (16, None, "John 3:16seqq.")
 
 
 def test_explicit_following_verse_marker_interpreted() -> None:
@@ -709,7 +692,7 @@ def test_explicit_following_verse_marker_interpreted() -> None:
 def test_following_marker_with_trailing_word() -> None:
     """A marker followed by whitespace and a word is still recognized."""
     parser = _make_latin_marker_parser()
-    assert _first_range(parser, "John 3:16seqq. and X") == (16, -1, "John 3:16seqq.")
+    assert _first_range(parser, "John 3:16seqq. and X") == (16, None, "John 3:16seqq.")
     assert _first_range(parser, "John 3:16seq. then Y") == (16, 17, "John 3:16seq.")
 
 
@@ -723,7 +706,7 @@ def test_following_marker_glued_to_word_not_matched() -> None:
 def test_single_chapter_following_marker_interpreted() -> None:
     """Single-chapter books interpret an explicit following marker too."""
     parser = _make_latin_marker_parser()
-    assert _first_range(parser, "Jude 5seqq. more") == (5, -1, "Jude 5seqq.")
+    assert _first_range(parser, "Jude 5seqq. more") == (5, None, "Jude 5seqq.")
 
 
 def test_single_chapter_following_marker_glued_not_matched() -> None:
@@ -755,10 +738,10 @@ def test_custom_verse_range_separator_parses_full_list() -> None:
     parser = _make_dot_separator_parser()
     ref = parser.parse("Lk 1:28.42")
     assert ref is not None
-    ranges = ref.simple_refs[0].ranges
+    ranges = ref.ranges
     assert len(ranges) == 2
-    assert (ranges[0].start_verse, ranges[0].end_verse) == (28, 28)
-    assert (ranges[1].start_verse, ranges[1].end_verse) == (42, 42)
+    assert (ranges[0].start.verse, ranges[0].end.verse) == (28, 28)
+    assert (ranges[1].start.verse, ranges[1].end.verse) == (42, 42)
 
 
 def test_custom_verse_range_separator_with_designator() -> None:
@@ -768,8 +751,8 @@ def test_custom_verse_range_separator_with_designator() -> None:
     assert ref is not None
     assert ref.versification.identifier == "vulgata"
     assert ref.is_valid()
-    ranges = ref.simple_refs[0].ranges
-    assert [r.start_verse for r in ranges] == [5, 10, 15]
+    ranges = ref.ranges
+    assert [r.start.verse for r in ranges] == [5, 10, 15]
 
 
 def test_default_verse_range_separator_unchanged() -> None:
@@ -777,9 +760,9 @@ def test_default_verse_range_separator_unchanged() -> None:
     parser = _make_parser()
     ref = parser.parse("Rom 1:3, 5")
     assert ref is not None
-    ranges = ref.simple_refs[0].ranges
+    ranges = ref.ranges
     assert len(ranges) == 2
-    assert (ranges[0].start_verse, ranges[1].start_verse) == (3, 5)
+    assert (ranges[0].start.verse, ranges[1].start.verse) == (3, 5)
 
 
 def _la_vetus_parser() -> RefParser:
@@ -789,11 +772,11 @@ def _la_vetus_parser() -> RefParser:
 def test_parse_roman_chapter() -> None:
     """Test parsing a reference with an uppercase Roman numeral chapter."""
     parser = _la_vetus_parser()
-    ref = parser.parse_simple("Lc. I, 35")
+    ref = parser.parse("Lc. I, 35")
     assert ref is not None
-    assert ref.book_id == "LUK"
-    assert ref.ranges[0].start_chapter == 1
-    assert ref.ranges[0].start_verse == 35
+    assert ref.ranges[0].start.book == "LUK"
+    assert ref.ranges[0].start.chapter == 1
+    assert ref.ranges[0].start.verse == 35
 
 
 @pytest.mark.parametrize(
@@ -815,69 +798,69 @@ def test_parse_la_vetus_forms(
 ) -> None:
     """Test parsing traditional Latin abbreviations and variants."""
     parser = _la_vetus_parser()
-    ref = parser.parse_simple(text)
+    ref = parser.parse(text)
     assert ref is not None
-    assert ref.book_id == book_id
-    assert ref.ranges[0].start_chapter == chapter
-    assert ref.ranges[0].start_verse == verse
+    assert ref.ranges[0].start.book == book_id
+    assert ref.ranges[0].start.chapter == chapter
+    assert ref.ranges[0].start.verse == verse
 
 
 def test_parse_roman_verse_range() -> None:
     """Test parsing a verse range with a Roman chapter; verses stay Arabic."""
     parser = _la_vetus_parser()
-    ref = parser.parse_simple("Io. XIX, 26-27")
+    ref = parser.parse("Io. XIX, 26-27")
     assert ref is not None
-    assert ref.book_id == "JHN"
-    assert ref.ranges[0].start_chapter == 19
-    assert ref.ranges[0].start_verse == 26
-    assert ref.ranges[0].end_verse == 27
+    assert ref.ranges[0].start.book == "JHN"
+    assert ref.ranges[0].start.chapter == 19
+    assert ref.ranges[0].start.verse == 26
+    assert ref.ranges[0].end.verse == 27
 
 
 def test_parse_roman_cross_chapter_range() -> None:
     """Test parsing a range that crosses a chapter boundary."""
     parser = _la_vetus_parser()
-    ref = parser.parse_simple("Luc. XXIII, 50-XXIV, 12")
+    ref = parser.parse("Luc. XXIII, 50-XXIV, 12")
     assert ref is not None
-    assert ref.ranges[0].start_chapter == 23
-    assert ref.ranges[0].start_verse == 50
-    assert ref.ranges[0].end_chapter == 24
-    assert ref.ranges[0].end_verse == 12
+    assert ref.ranges[0].start.chapter == 23
+    assert ref.ranges[0].start.verse == 50
+    assert ref.ranges[0].end.chapter == 24
+    assert ref.ranges[0].end.verse == 12
 
 
 def test_parse_roman_whole_chapter() -> None:
     """Test parsing a whole-chapter reference with a Roman numeral."""
     parser = _la_vetus_parser()
-    ref = parser.parse_simple("Cant. IV")
+    ref = parser.parse("Cant. IV")
     assert ref is not None
-    assert ref.book_id == "SNG"
-    assert ref.ranges[0].start_chapter == 4
-    assert ref.ranges[0].start_verse < 0
+    assert ref.ranges[0].start.book == "SNG"
+    assert ref.ranges[0].start.chapter == 4
+    assert ref.ranges[0].start.verse is None
 
 
 def test_roman_parser_rejects_arabic_chapter() -> None:
     """Test that a Roman-numeral style does not accept Arabic chapters."""
     parser = _la_vetus_parser()
-    assert parser.parse_simple("Lc. 1, 35", silent=True) is None
+    assert parser.parse("Lc. 1, 35", silent=True) is None
 
 
 def test_arabic_parser_rejects_roman_chapter() -> None:
     """Test that an Arabic-numeral style does not accept Roman chapters."""
     parser = RefParser(RefStyle.named("la-cce"), Versification.named("vulgata"))
-    assert parser.parse_simple("Lc I, 35", silent=True) is None
-    ref = parser.parse_simple("Lc 1, 35")
+    assert parser.parse("Lc I, 35", silent=True) is None
+    ref = parser.parse("Lc 1, 35")
     assert ref is not None
-    assert ref.book_id == "LUK"
-    assert ref.ranges[0].start_chapter == 1
-    assert ref.ranges[0].start_verse == 35
+    assert ref.ranges[0].start.book == "LUK"
+    assert ref.ranges[0].start.chapter == 1
+    assert ref.ranges[0].start.verse == 35
 
 
 def test_roman_chapter_not_start_of_word() -> None:
     """Test that a Roman numeral glued to a longer word is not a chapter."""
     parser = _la_vetus_parser()
-    assert parser.parse_simple("Psal. Clementis, 3", silent=True) is None
+    assert parser.parse("Psal. Clementis, 3", silent=True) is None
     # The æ/œ ligatures count as word characters
-    assert parser.parse_simple("Psal. Lætitia, 3", silent=True) is None
-    assert parser.parse_simple("Psal. Cœna, 3", silent=True) is None
+    assert parser.parse("Psal. Lætitia, 3", silent=True) is None
+    assert parser.parse("Psal. Cœna, 3", silent=True) is None
 
 
 def test_parse_roman_lowercase_style() -> None:
@@ -886,11 +869,11 @@ def test_parse_roman_lowercase_style() -> None:
         {"base": "la-vetus", "chapter_number_style": "roman-lower"}
     )
     parser = RefParser(style, Versification.named("vulgata"))
-    ref = parser.parse_simple("Lc. i, 35")
+    ref = parser.parse("Lc. i, 35")
     assert ref is not None
-    assert ref.ranges[0].start_chapter == 1
-    assert ref.ranges[0].start_verse == 35
-    assert parser.parse_simple("Lc. I, 35", silent=True) is None
+    assert ref.ranges[0].start.chapter == 1
+    assert ref.ranges[0].start.verse == 35
+    assert parser.parse("Lc. I, 35", silent=True) is None
 
 
 def test_scan_string_la_vetus() -> None:
@@ -898,7 +881,7 @@ def test_scan_string_la_vetus() -> None:
     style = RefStyle.named("la-vetus")
     parser = RefParser(style, Versification.named("vulgata"))
     text = "Angelus ait (Lc. I, 35), et propheta praedixit (Isa. VII, 14)."
-    refs = list(parser.scan_string_simple(text))
+    refs = list(parser.scan_string(text))
     assert len(refs) == 2
     ref1, start1, end1 = refs[0]
     assert ref1.format(style) == "Luc. I, 35"
@@ -911,10 +894,10 @@ def test_scan_string_la_vetus() -> None:
 def test_parse_chapter_verse_separator_without_space() -> None:
     """Test that a ", " separator style also parses references without the space."""
     parser = _la_vetus_parser()
-    ref = parser.parse_simple("Lc. I,35")
+    ref = parser.parse("Lc. I,35")
     assert ref is not None
-    assert ref.ranges[0].start_chapter == 1
-    assert ref.ranges[0].start_verse == 35
+    assert ref.ranges[0].start.chapter == 1
+    assert ref.ranges[0].start.verse == 35
 
 
 def test_reference_wraps_across_single_newline() -> None:
@@ -923,13 +906,13 @@ def test_reference_wraps_across_single_newline() -> None:
         RefStyle(names=standard_names("en-sbl_abbreviations")),
         Versification.named("eng"),
     )
-    ref = parser.parse_simple("Mark 4:3-9,\n13-20")
+    ref = parser.parse("Mark 4:3-9,\n13-20")
     assert ref is not None
     assert len(ref.ranges) == 2
-    assert ref.ranges[1].start_verse == 13
-    ref = parser.parse_simple("Luke 23:50-\n24:12")
+    assert ref.ranges[1].start.verse == 13
+    ref = parser.parse("Luke 23:50-\n24:12")
     assert ref is not None
-    assert ref.ranges[0].end_chapter == 24
+    assert ref.ranges[0].end.chapter == 24
 
 
 def test_reference_stops_at_blank_line() -> None:
@@ -937,7 +920,7 @@ def test_reference_stops_at_blank_line() -> None:
     style = RefStyle.named("la-vetus")
     parser = RefParser(style, Versification.named("vulgata"))
     text = "ut dicitur Gen. XXII, 18.\n\n2 Deinde considerandum est."
-    refs = list(parser.scan_string_simple(text))
+    refs = list(parser.scan_string(text))
     assert len(refs) == 1
     ref, start, end = refs[0]
     assert ref.format(style) == "Gen. XXII, 18"
@@ -951,7 +934,7 @@ def test_reference_stops_at_blank_line_with_spaces() -> None:
         Versification.named("eng"),
     )
     text = "See Mark 4:3-9,  \n  \n13 is the footnote."
-    refs = list(parser.scan_string_simple(text))
+    refs = list(parser.scan_string(text))
     assert len(refs) == 1
     ref, start, end = refs[0]
     assert text[start:end] == "Mark 4:3-9"
@@ -964,7 +947,7 @@ def test_chapter_separator_stops_at_blank_line() -> None:
         Versification.named("eng"),
     )
     text = "Heb 7:3;\n\n9:4 begins a new paragraph."
-    refs = list(parser.scan_string_simple(text))
+    refs = list(parser.scan_string(text))
     assert refs[0][0].format(
         RefStyle(names=standard_names("en-sbl_abbreviations"))
     ) == ("Heb 7:3")
@@ -1062,3 +1045,139 @@ def test_range_end_keeps_its_verse_before_a_comma(
     back to its first verse.
     """
     assert [match for match, _ in _scan(text, style, versification)] == [expected]
+
+
+def _spans(text: str, style: str = "en-sbl") -> list[tuple[object, ...]]:
+    """Parse text, describing each range by the book, chapter and verse of its ends."""
+    parser = RefParser(RefStyle.named(style), Versification.named("eng"))
+    ref = parser.parse(text)
+    assert ref is not None
+    return [
+        (r.start.book, r.start.chapter, r.start.verse)
+        + (r.end.book, r.end.chapter, r.end.verse)
+        for r in ref.ranges
+    ]
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("Gen 1; 2:4", [("GEN", 1, None, "GEN", 1, None), ("GEN", 2, 4, "GEN", 2, 4)]),
+        ("Gen 1–2:4", [("GEN", 1, None, "GEN", 2, 4)]),
+        ("Gen 1-2:4a", [("GEN", 1, None, "GEN", 2, 4)]),
+        (
+            "John 3:16; 4",
+            [("JHN", 3, 16, "JHN", 3, 16), ("JHN", 4, None, "JHN", 4, None)],
+        ),
+        (
+            "Rom 8:1–9:5; 12; 13:1, 8",
+            [
+                ("ROM", 8, 1, "ROM", 9, 5),
+                ("ROM", 12, None, "ROM", 12, None),
+                ("ROM", 13, 1, "ROM", 13, 1),
+                ("ROM", 13, 8, "ROM", 13, 8),
+            ],
+        ),
+        (
+            "John 3; 4:5; 6–7",
+            [
+                ("JHN", 3, None, "JHN", 3, None),
+                ("JHN", 4, 5, "JHN", 4, 5),
+                ("JHN", 6, None, "JHN", 7, None),
+            ],
+        ),
+    ],
+)
+def test_parse_whole_chapters_mixed_with_verses(
+    text: str, expected: list[tuple[object, ...]]
+) -> None:
+    """Whole chapters and verses of one book may follow one another."""
+    assert _spans(text) == expected
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("Matt–John", [("MAT", None, None, "JHN", None, None)]),
+        ("Luke-Acts", [("LUK", None, None, "ACT", None, None)]),
+        ("Matt–Mark 3", [("MAT", None, None, "MRK", 3, None)]),
+        ("1 Sam 31:1–2 Sam 1:27", [("1SA", 31, 1, "2SA", 1, 27)]),
+        ("Gen 50–Exod 2", [("GEN", 50, None, "EXO", 2, None)]),
+        ("Gen 50–Exod 2:3", [("GEN", 50, None, "EXO", 2, 3)]),
+        ("Gen 1–2 Sam 3", [("GEN", 1, None, "2SA", 3, None)]),
+        ("Ps 150:1–Prov 3", [("PSA", 150, 1, "PRO", 3, None)]),
+        # A lone number after a one-chapter book is a verse.
+        ("2 John 12–3 John 4", [("2JN", 1, 12, "3JN", 1, 4)]),
+        ("Phlm 20–Heb 1:2", [("PHM", 1, 20, "HEB", 1, 2)]),
+        # What follows is in the book where the range ended.
+        (
+            "1 Sam 31–2 Sam 1; 3:1",
+            [("1SA", 31, None, "2SA", 1, None), ("2SA", 3, 1, "2SA", 3, 1)],
+        ),
+        (
+            "1 Sam 31:1–2 Sam 1:27, 30",
+            [("1SA", 31, 1, "2SA", 1, 27), ("2SA", 1, 30, "2SA", 1, 30)],
+        ),
+    ],
+)
+def test_parse_range_that_spans_books(
+    text: str, expected: list[tuple[object, ...]]
+) -> None:
+    """A range may end in another book."""
+    assert _spans(text) == expected
+
+
+def test_parse_range_that_spans_books_roman() -> None:
+    """A range into another book parses with Roman-numeral chapters too."""
+    assert _spans("I Reg. XXXI, 1-II Reg. I, 27", "la-vetus") == [
+        ("1SA", 31, 1, "2SA", 1, 27)
+    ]
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        # A number that begins a numbered book's name starts a new book.
+        ("John 3:16; 1 John 2:1", ["John 3:16; 1 John 2:1"]),
+        ("John 3:16, 1 Cor 2:3", ["John 3:16", "1 Cor 2:3"]),
+        ("John 3; 1 John 2", ["John 3; 1 John 2"]),
+        # At the end of a range it does so only if the book is cited.
+        ("Luke 1–2 John the Baptist", ["Luke 1–2", "John"]),
+        ("Rev 1–3 John wrote", ["Rev 1–3", "John"]),
+        ("John 3:16–1 John 2", ["John 3:16–1 John 2"]),
+        # A range that starts within a book does not end with a bare name.
+        ("Mark 2:1–John", ["Mark 2:1", "John"]),
+        # A chapter number is not the start of a word.
+        ("John 3:16; 4th", ["John 3:16"]),
+        ("John 3rd", ["John"]),
+    ],
+)
+def test_scan_numbers_and_book_names(text: str, expected: list[str]) -> None:
+    """Numbers are assigned to the book before or the book after as sense requires."""
+    found = _scan(text, sensitivity=Sensitivity.BOOK)
+    assert [match for match, _ in found] == expected
+
+
+def test_parse_plural_psalms_is_the_book_of_psalms() -> None:
+    """A plural name for the Psalms parses as PSA."""
+    assert _spans("Pss 1–2") == [("PSA", 1, None, "PSA", 2, None)]
+    assert _spans("Pss") == [("PSA", None, None, "PSA", None, None)]
+
+
+def test_scan_as_ranges_reports_each_range() -> None:
+    """With as_ranges, every range is reported, whole books among them."""
+    style = RefStyle.named("en-sbl")
+    parser = RefParser(style, Versification.named("eng"))
+    text = "See John; Mark 1:1, 3; 2 and Matt–Luke."
+
+    def found(sensitivity: Sensitivity) -> list[str]:
+        return [
+            text[start:end]
+            for _, start, end in parser.scan_string(
+                text, as_ranges=True, sensitivity=sensitivity
+            )
+        ]
+
+    assert found(Sensitivity.BOOK) == ["John", "Mark 1:1", "3", "2", "Matt–Luke"]
+    assert found(Sensitivity.CHAPTER) == ["Mark 1:1", "3", "2"]
+    assert found(Sensitivity.VERSE) == ["Mark 1:1", "3"]

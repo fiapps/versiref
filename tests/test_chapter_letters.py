@@ -1,7 +1,7 @@
 """Test chapter letters (e.g. the NABRE's Esther A–F) in parsing and formatting."""
 
 import pytest
-from versiref import RefParser, RefStyle, SimpleBibleRef, Versification, VerseRange
+from versiref import BibleRef, RefParser, RefStyle, Versification
 
 ESTHER_LETTERS = ["A", "B", "C", "D", "E", "F"]
 
@@ -25,46 +25,46 @@ def parser() -> RefParser:
             [(3, 12, 3, 12), (3, 14, 3, 14), (3, 25, 3, 30)],
             "Esth C:12, 14, 25–30",
         ),
-        ("Esth B:1ff", "ESG", [(2, 1, 2, -1)], "Esth B:1ff"),
+        ("Esth B:1ff", "ESG", [(2, 1, 2, None)], "Esth B:1ff"),
         # Recognized EST names all take letters
         ("Esther C:12", "ESG", [(3, 12, 3, 12)], "Esth C:12"),
         ("Est D:5", "ESG", [(4, 5, 4, 5)], "Esth D:5"),
         # Whole-chapter references
-        ("Esth A", "ESG", [(1, -1, 1, -1)], "Esth A"),
-        ("Esth A–C", "ESG", [(1, -1, 3, -1)], "Esth A–C"),
+        ("Esth A", "ESG", [(1, None, 1, None)], "Esth A"),
+        ("Esth A–C", "ESG", [(1, None, 3, None)], "Esth A–C"),
         # ESG's own name still parses with letters, though it formats
         # with EST's name
         ("Add Esth B:5", "ESG", [(2, 5, 2, 5)], "Esth B:5"),
         # Numeric chapters still resolve to EST
         ("Esther 4:17", "EST", [(4, 17, 4, 17)], "Esth 4:17"),
         ("Esth 10:3", "EST", [(10, 3, 10, 3)], "Esth 10:3"),
-        ("Esth 3", "EST", [(3, -1, 3, -1)], "Esth 3"),
+        ("Esth 3", "EST", [(3, None, 3, None)], "Esth 3"),
         # A bare shared name still resolves to EST
-        ("Esther", "EST", [], "Esth"),
+        ("Esther", "EST", [(None, None, None, None)], "Esth"),
     ],
 )
 def test_parse_and_format(
     parser: RefParser,
     text: str,
     book_id: str,
-    ranges: list[tuple[int, int, int, int]],
+    ranges: list[tuple[int | None, int | None, int | None, int | None]],
     formatted: str,
 ) -> None:
     """Letter chapters parse to ESG and format back as letters."""
-    ref = parser.parse_simple(text)
+    ref = parser.parse(text)
     assert ref is not None
-    assert ref.book_id == book_id
+    assert ref.books() == [book_id]
     assert [
-        (r.start_chapter, r.start_verse, r.end_chapter, r.end_verse) for r in ref.ranges
+        (r.start.chapter, r.start.verse, r.end.chapter, r.end.verse) for r in ref.ranges
     ] == ranges
-    assert ref.format(parser.style, parser.versification) == formatted
+    assert ref.format(parser.style) == formatted
 
 
 def test_scan_string(parser: RefParser) -> None:
     """Scanning picks out letter-chapter references without false positives."""
     text = "Esther Also spoke, but see Esth C:12f and Esth 4:17 for more."
     found = [
-        (text[start:end], ref.simple_refs[0].book_id)
+        (text[start:end], ref.books()[0])
         for ref, start, end in parser.scan_string(text)
     ]
     assert found == [("Esth C:12f", "ESG"), ("Esth 4:17", "EST")]
@@ -95,7 +95,7 @@ def test_format_chapter_without_letter() -> None:
     style = RefStyle.named("en-nabre")
     with pytest.raises(ValueError, match="No chapter letter for ESG 7"):
         style.format_chapter(7, "ESG")
-    ref = SimpleBibleRef("ESG", [VerseRange(7, 1, "", 7, 1, "")])
+    ref = BibleRef.for_range("ESG", 7, 1)
     with pytest.raises(ValueError, match="No chapter letter for ESG 7"):
         ref.format(style)
 
@@ -114,10 +114,10 @@ def test_from_dict_chapter_letters() -> None:
         }
     )
     parser = RefParser(style, Versification.named("nabre"))
-    ref = parser.parse_simple("Est F:3")
+    ref = parser.parse("Est F:3")
     assert ref is not None
-    assert ref.book_id == "ESG"
-    assert ref.ranges[0].start_chapter == 6
+    assert ref.books() == ["ESG"]
+    assert ref.ranges[0].start.chapter == 6
 
 
 def test_letters_without_est_name() -> None:
@@ -129,10 +129,10 @@ def test_letters_without_est_name() -> None:
         }
     )
     parser = RefParser(style, Versification.named("nabre"))
-    ref = parser.parse_simple("Greek Esther D:5")
+    ref = parser.parse("Greek Esther D:5")
     assert ref is not None
-    assert ref.book_id == "ESG"
-    assert ref.ranges[0].start_chapter == 4
+    assert ref.books() == ["ESG"]
+    assert ref.ranges[0].start.chapter == 4
     # With no EST name to borrow, ESG formats with its own name
     assert ref.format(style) == "Greek Esther D:5"
 

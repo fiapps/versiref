@@ -32,16 +32,16 @@ def test_parse_normalizes() -> None:
 
 
 def test_parse_json_structure() -> None:
-    """`parse --json` emits the structured book/range breakdown."""
+    """`parse --json` emits the structured breakdown into ranges."""
     result = CliRunner().invoke(
         main, ["parse", "Jn 3:16-18", "--style", "en-cmos_short", "--json"]
     )
     assert result.exit_code == 0
     data = json.loads(result.output)
-    assert data["books"][0]["book"] == "JHN"
-    rng = data["books"][0]["ranges"][0]
-    assert rng["start"]["verse"] == 16
-    assert rng["end"]["verse"] == 18
+    (rng,) = data["ranges"]
+    assert rng["start"] == {"book": "JHN", "chapter": 3, "verse": 16, "subverse": None}
+    assert rng["end"] == {"book": "JHN", "chapter": 3, "verse": 18, "subverse": None}
+    assert rng["whole_chapters"] is False
 
 
 def test_parse_unparseable_exits_2() -> None:
@@ -64,6 +64,7 @@ def test_validate_out_of_range_exits_1() -> None:
         main, ["validate", "Gen 1:99", "--style", "en-sbl", "-v", "eng"]
     )
     assert result.exit_code == 1
+    assert "Gen 1 has no verse 99 (only 31 verses)" in result.output
 
 
 def test_validate_unparseable_exits_2() -> None:
@@ -102,7 +103,7 @@ def test_scan_finds_references() -> None:
     )
     assert result.exit_code == 0
     data = json.loads(result.output)
-    books = [m["reference"]["books"][0]["book"] for m in data["matches"]]
+    books = [m["reference"]["ranges"][0]["start"]["book"] for m in data["matches"]]
     assert books == ["GEN", "ROM"]
 
 

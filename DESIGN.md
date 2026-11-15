@@ -3,6 +3,7 @@
 VersiRef is a Python package for sophisticated parsing, manipulation, and printing of references to the Bible.
 
 This design document was created prior to the implementation, and so may not fully correspond to it.
+In particular, `SimpleBibleRef` no longer exists: a `BibleRef` holds its verse ranges directly, and each end of a range names its own book, so that a range can span books.
 
 ## SimpleBibleRef
 

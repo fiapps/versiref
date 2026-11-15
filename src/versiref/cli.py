@@ -25,9 +25,9 @@ import click
 from versiref import (
     BibleRef,
     RefParser,
+    RefPoint,
     RefStyle,
     Sensitivity,
-    SimpleBibleRef,
     VerseRange,
     Versification,
     available_standard_names,
@@ -78,30 +78,23 @@ def _load_versification(
         )
 
 
-def _point(chapter: int, verse: int, subverse: str) -> dict[str, object]:
-    """Serialize one end of a verse range; an unspecified verse becomes null."""
+def _point(point: RefPoint) -> dict[str, object]:
+    """Serialize one end of a verse range; an unspecified part becomes null."""
     return {
-        "chapter": chapter,
-        "verse": verse if verse >= 0 else None,
-        "subverse": subverse or None,
+        "book": point.book,
+        "chapter": point.chapter,
+        "verse": point.verse,
+        "subverse": point.subverse or None,
     }
 
 
 def _range_dict(vr: VerseRange) -> dict[str, object]:
     """Serialize a VerseRange as a start/end pair."""
     return {
-        "start": _point(vr.start_chapter, vr.start_verse, vr.start_subverse),
-        "end": _point(vr.end_chapter, vr.end_verse, vr.end_subverse),
+        "start": _point(vr.start),
+        "end": _point(vr.end),
+        "whole_books": vr.is_whole_books(),
         "whole_chapters": vr.is_whole_chapters(),
-    }
-
-
-def _book_dict(sr: SimpleBibleRef) -> dict[str, object]:
-    """Serialize a SimpleBibleRef as a book plus its ranges."""
-    return {
-        "book": sr.book_id,
-        "whole_book": sr.is_whole_book(),
-        "ranges": [_range_dict(vr) for vr in sr.ranges],
     }
 
 
@@ -112,7 +105,7 @@ def _ref_dict(ref: BibleRef, out_style: RefStyle) -> dict[str, object]:
         "versification": vers.identifier if vers is not None else None,
         "valid": ref.is_valid(),
         "formatted": ref.format(out_style),
-        "books": [_book_dict(sr) for sr in ref.simple_refs],
+        "ranges": [_range_dict(vr) for vr in ref.ranges],
     }
 
 
@@ -260,19 +253,22 @@ def validate(
 ) -> None:
     """Check whether REFERENCE parses and exists in the versification.
 
-    Exit status: 0 valid, 1 parses but out of range, 2 unparseable.
+    Exit status: 0 valid, 1 parses but invalid, 2 unparseable.
     """
     parser = RefParser(
         _load_style(style, also_recognize), _load_versification(versification)
     )
     ref = parser.parse(reference, silent=True)
 
+    reason = None
     if ref is None:
         status, code = "unparseable", EXIT_UNPARSEABLE
-    elif ref.is_valid():
-        status, code = "valid", EXIT_OK
     else:
-        status, code = "invalid", EXIT_FALSIFIED
+        reason = ref.invalid_reason(parser.style)
+        if reason is None:
+            status, code = "valid", EXIT_OK
+        else:
+            status, code = "invalid", EXIT_FALSIFIED
 
     if as_json:
         _echo_json(
@@ -281,12 +277,13 @@ def validate(
                 "versification": versification,
                 "status": status,
                 "valid": status == "valid",
+                "reason": reason,
             }
         )
     else:
         messages = {
             "valid": f"valid in {versification}",
-            "invalid": f"out of range in {versification}",
+            "invalid": f"invalid in {versification}: {reason}",
             "unparseable": "could not parse",
         }
         stream = sys.stdout if code == EXIT_OK else sys.stderr

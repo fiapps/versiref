@@ -3,8 +3,8 @@
 This module provides classes for representing and manipulating Bible references.
 """
 
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass, field
-from typing import Generator
 
 from versiref.ref_style import RefStyle, standard_names
 from versiref.versification import Versification
@@ -56,7 +56,7 @@ def _count(n: int, noun: str) -> str:
 
 
 def _chapter_verse_reason(
-    label: str, chapters: list[int], chapter: int, verse: int
+    label: str, chapters: list[int], chapter: int, verse: int | None
 ) -> str | None:
     """Explain why a (chapter, verse) is out of range, or None if it is in range.
 
@@ -64,7 +64,7 @@ def _chapter_verse_reason(
         label: Reader-facing book name to name in the message.
         chapters: The book's last-verse-per-chapter list (from the versification).
         chapter: The chapter number to check.
-        verse: The verse number to check, or a value < 0 for an unspecified verse.
+        verse: The verse number to check, or None for an unspecified verse.
 
     Returns:
         An explanatory string, or None if the chapter (and verse, if specified)
@@ -73,7 +73,7 @@ def _chapter_verse_reason(
     """
     if chapter < 1 or chapter > len(chapters):
         return f"{label} has no chapter {chapter} (only {_count(len(chapters), 'chapter')})"
-    if verse >= 0:
+    if verse is not None:
         max_verse = chapters[chapter - 1]
         if verse < 1 or verse > max_verse:
             return (
@@ -137,75 +137,142 @@ def _last_present_verse(versification: Versification, book: str, chapter: int) -
     return last
 
 
-@dataclass
-class VerseRange:
-    """Represents a range of verses within a single book of the Bible.
+@dataclass(frozen=True)
+class RefPoint:
+    """One end of a verse range: a book, a chapter of it, or a verse.
 
-    A verse range has a start and end point, each defined by chapter, verse, and
-    subverse. The original text from which this range was parsed can be stored.
+    A point with no chapter is a whole book, and a point with a chapter but no
+    verse is a whole chapter. At the start of a range such a point means the
+    beginning of the book or chapter, and at the end of a range it means the
+    end of it.
 
-    A verse number less than 0 means "unspecified". When a verse number is less
-    than 0, the corresponding subverse should be "", but it is ignored
-    regardless of its value. If start_verse and end_verse are both less than 0,
-    the range is a whole chapter or chapters. If start_verse >= 0 and end_verse
-    < 0, the verses are f"{start_verse}ff". This is only allowed if
-    start_chapter == end_chapter. Nor is it allowed to have start_verse < 0 and
-    end_verse >= 0, start_chapter == end_chapter && start_verse > end_verse, or
-    start_chapter < end_chapter. The result of SimpleBibleRef.format() is
-    undefined if the class contains a VerseRange with disallowed values. Where a
-    definite end is needed, applications can interpret "ff"
-    (style.following_verses) as "until the end of the chapter."
+    Attributes:
+        book: The book ID (a Paratext three-letter code such as "JHN")
+        chapter: The chapter number, or None for the whole book
+        verse: The verse number, or None for the whole chapter
+        subverse: Letters naming a part of the verse, or "" for the whole verse
+
     """
 
-    start_chapter: int
-    start_verse: int
-    start_subverse: str
-    end_chapter: int
-    end_verse: int
-    end_subverse: str
-    original_text: str | None = None
+    book: str
+    chapter: int | None = None
+    verse: int | None = None
+    subverse: str = ""
+
+    def __post_init__(self) -> None:
+        """Reject values that cannot name a location.
+
+        Raises:
+            ValueError: If a verse is given without a chapter, if a number is
+                negative (an unspecified chapter or verse is None), or if the
+                book is "PSAS", which names the Psalms in the plural in book
+                name data but is not a book.
+
+        """
+        if self.book == "PSAS":
+            raise ValueError('"PSAS" is not a book ID; use "PSA"')
+        if self.chapter is None and self.verse is not None:
+            raise ValueError("A verse requires a chapter")
+        if (self.chapter is not None and self.chapter < 0) or (
+            self.verse is not None and self.verse < 0
+        ):
+            raise ValueError(
+                "Chapter and verse numbers cannot be negative; "
+                "use None for an unspecified chapter or verse"
+            )
+
+
+@dataclass(frozen=True)
+class VerseRange:
+    """Represents a range of verses, usually within a single book of the Bible.
+
+    A verse range runs from its start point to its end point. The two are
+    equal for a single verse, a single chapter, or a single book, and they
+    name different books for a range that spans books, such as Matthew–John
+    or 1 Sam 31:1–2 Sam 1:27.
+
+    Either point may leave its verse, or its chapter and verse, unspecified
+    (see :class:`RefPoint`). John 3:16ff, the verses from 3:16 to the end of
+    the chapter, starts at John 3:16 and ends at John 3. Gen 1–2:4 starts at
+    Genesis 1 and ends at Genesis 2:4.
+
+    The text from which the range was parsed can be stored. It plays no part
+    in comparing ranges.
+    """
+
+    start: RefPoint
+    end: RefPoint
+    original_text: str | None = field(default=None, compare=False)
+
+    def is_single_book(self) -> bool:
+        """Return True if this range starts and ends in the same book."""
+        return self.start.book == self.end.book
+
+    def is_whole_books(self) -> bool:
+        """Return True if this range specifies no chapter or verse limits."""
+        return self.start.chapter is None and self.end.chapter is None
 
     def is_whole_chapters(self) -> bool:
-        """Return True if this range does not specify verse limits."""
-        return self.start_verse < 0 and self.end_verse < 0
+        """Return True if this range does not specify verse limits.
+
+        This is also true of a range of whole books.
+        """
+        return self.start.verse is None and self.end.verse is None
+
+    def has_following_verses(self) -> bool:
+        """Return True if this range runs from a verse to the end of its chapter.
+
+        This is the form written with "ff", as in John 3:16ff.
+        """
+        return (
+            self.is_single_book()
+            and self.start.verse is not None
+            and self.end.verse is None
+            and self.end.chapter == self.start.chapter
+        )
 
     def invalid_reason(self) -> str | None:
         """Explain why this verse range is structurally invalid.
 
         This checks the internal consistency of the range only; it says nothing
-        about whether the chapters and verses exist in any versification.
+        about whether the books, chapters and verses exist in any
+        versification, nor about the order of two different books.
 
         Returns:
-            An explanatory string if any of these conditions are met, or None
-            if the range is structurally valid:
+            An explanatory string if the range starts and ends in the same book
+            and any of these conditions is met, or None if the range is
+            structurally valid:
 
-            - start_chapter > end_chapter
-            - start_verse >= 0 and end_verse < 0 ("ff") but start_chapter != end_chapter
-            - start_verse < 0 and end_verse >= 0
-            - start_chapter == end_chapter and start_verse > end_verse
+            - only one end names a chapter
+            - it ends in an earlier chapter than it starts
+            - it starts at a verse and ends with a whole chapter other than
+              the one it starts in
+            - it ends at an earlier verse of the same chapter than it starts
 
         """
-        # Cannot have start chapter greater than end chapter
-        if self.start_chapter > self.end_chapter:
+        if not self.is_single_book():
+            return None
+        start, end = self.start, self.end
+        if start.chapter is None or end.chapter is None:
+            if start.chapter is not None or end.chapter is not None:
+                return "range joins the whole book with a part of it"
+            return None
+
+        if start.chapter > end.chapter:
             return "range ends in an earlier chapter than it starts"
 
-        # "ff" notation must stay within a single chapter
         if (
-            self.start_verse >= 0
-            and self.end_verse < 0
-            and self.start_chapter != self.end_chapter
+            start.verse is not None
+            and end.verse is None
+            and start.chapter != end.chapter
         ):
             return "'ff' range spans more than one chapter"
 
-        # Cannot have unspecified start verse but specified end verse
-        if self.start_verse < 0 and self.end_verse >= 0:
-            return "unspecified start verse with a specified end verse"
-
-        # Cannot have start verse greater than end verse in same chapter
         if (
-            self.start_chapter == self.end_chapter
-            and self.end_verse >= 0
-            and self.start_verse > self.end_verse
+            start.chapter == end.chapter
+            and start.verse is not None
+            and end.verse is not None
+            and start.verse > end.verse
         ):
             return "range ends at an earlier verse than it starts"
 
@@ -221,501 +288,315 @@ class VerseRange:
         return self.invalid_reason() is None
 
 
-@dataclass
-class SimpleBibleRef:
-    """Represents a sequence of verse ranges within a single book of the Bible.
+def _range_reason(
+    verse_range: VerseRange, versification: Versification, style: RefStyle | None
+) -> str | None:
+    """Explain why a verse range is invalid under a versification, or None."""
 
-    A SimpleBibleRef consists of a book ID (using Paratext three-letter codes)
-    and a list of verse ranges. The ranges are not necessarily in numeric order.
-    A SimpleBibleRef with an empty list of ranges refers to the entire book.
-    It optionally stores the original text from which the book ID was parsed.
+    def label(book: str) -> str:
+        return book if style is None else style.names.get(book, book)
 
-    This class is "naive" in that it doesn't specify its versification system.
-    """
-
-    book_id: str
-    ranges: list[VerseRange] = field(default_factory=list)
-    original_text: str | None = None
-
-    def __str__(self) -> str:
-        """Return a string representation of this simple Bible reference.
-
-        Shows a concise representation using the reference's original text
-        or formatted representation.
-
-        Returns:
-            A string representation of this simple Bible reference
-
-        """
-        ref_part = self.original_text or self.format(
-            RefStyle(names=standard_names("en-sbl_abbreviations"))
-        )
-        return f'SimpleBibleRef("{ref_part}")'
-
-    @classmethod
-    def for_range(
-        cls,
-        book_id: str,
-        chapter: int,
-        start_verse: int,
-        end_chapter: int | None = None,
-        end_verse: int | None = None,
-        start_subverse: str = "",
-        end_subverse: str = "",
-        original_text: str | None = None,
-    ) -> "SimpleBibleRef":
-        """Create a SimpleBibleRef with a single VerseRange.
-
-        Args:
-            book_id: The book ID (e.g., "JHN" for John)
-            chapter: The chapter number
-            start_verse: The starting verse number
-            end_chapter: The ending chapter number (defaults to start chapter if None)
-            end_verse: The ending verse number (defaults to start verse if None)
-            start_subverse: The starting subverse (defaults to "")
-            end_subverse: The ending subverse (defaults to "")
-            original_text: The original text from which this reference was parsed (defaults to None)
-
-        Returns:
-            A SimpleBibleRef instance with a single VerseRange
-
-        """
-        # If end_chapter is not specified, use the start chapter
-        if end_chapter is None:
-            end_chapter = chapter
-
-        # If end_verse is not specified, use the start verse
-        if end_verse is None:
-            end_verse = start_verse
-
-        verse_range = VerseRange(
-            start_chapter=chapter,
-            start_verse=start_verse,
-            start_subverse=start_subverse,
-            end_chapter=end_chapter,
-            end_verse=end_verse,
-            end_subverse=end_subverse,
-            original_text=original_text,
-        )
-
-        return cls(book_id=book_id, ranges=[verse_range], original_text=original_text)
-
-    def is_whole_book(self) -> bool:
-        """Return True if this reference refers to the entire book.
-
-        Note that this regards the form of the reference rather than its
-        content. So it returns True for John but False for John 1–21.
-        """
-        return len(self.ranges) == 0
-
-    def is_whole_chapters(self) -> bool:
-        """Return True if this reference does not specify verse limits.
-
-        Note that this regards the form of the reference rather than its
-        content. So it returns true for John and John 6 but False for John
-        1:1–51.
-        """
-        for range in self.ranges:
-            if not range.is_whole_chapters():
-                return False
-        return True
-
-    def invalid_reason(
-        self, versification: Versification, style: RefStyle | None = None
-    ) -> str | None:
-        """Explain why this reference is invalid under the given versification.
-
-        A reference is invalid if its book is not in the versification, if any
-        verse range is structurally inconsistent, or if any chapter or verse it
-        names does not exist in the book. A verse the versification excludes
-        (see :meth:`Versification.is_excluded`) does not exist, though a range
-        may span one. When more than one verse range is invalid, each reason is
-        reported, joined by "; ".
-
-        Args:
-            versification: The Versification to check against.
-            style: Optional RefStyle whose book names are used to name the book
-                in the message. Without it, the Paratext book ID is used.
-
-        Returns:
-            An explanatory string, or None if the reference is valid.
-
-        """
-        label = (
-            self.book_id
-            if style is None
-            else style.names.get(self.book_id, self.book_id)
-        )
-
-        if not versification.includes(self.book_id):
+    start, end = verse_range.start, verse_range.end
+    for book in dict.fromkeys((start.book, end.book)):
+        if not versification.includes(book):
             named = f" {versification.identifier!r}" if versification.identifier else ""
-            return f"{label} is not in versification{named}"
+            return f"{label(book)} is not in versification{named}"
 
-        book_id = "PSA" if self.book_id == "PSAS" else self.book_id
-        chapters = versification.max_verses.get(book_id, [])
+    # A structurally inconsistent range (one that ends before it starts,
+    # etc.) is reported on its own terms.
+    structural = verse_range.invalid_reason()
+    if structural is not None:
+        return f"{label(start.book)}: {structural}"
 
-        reasons: list[str] = []
-        for verse_range in self.ranges:
-            # A structurally inconsistent range (one that ends before it starts,
-            # etc.) is reported on its own terms.
-            structural = verse_range.invalid_reason()
-            if structural is not None:
-                reasons.append(f"{label}: {structural}")
-                continue
+    books = list(versification.max_verses)
+    if books.index(start.book) > books.index(end.book):
+        return (
+            f"{label(start.book)}: range ends in an earlier book "
+            f"({label(end.book)}) than it starts"
+        )
 
-            # Otherwise check that its chapters and verses exist in the book.
+    for point in (start, end):
+        if point.chapter is not None:
             reason = _chapter_verse_reason(
-                label, chapters, verse_range.start_chapter, verse_range.start_verse
-            ) or _chapter_verse_reason(
-                label, chapters, verse_range.end_chapter, verse_range.end_verse
+                label(point.book),
+                versification.max_verses[point.book],
+                point.chapter,
+                point.verse,
             )
-            # A range may span an excluded verse (the NABRE's Tob 11:12-14),
-            # but may not begin or end on one.
-            if reason is None:
-                for chapter, verse in (
-                    (verse_range.start_chapter, verse_range.start_verse),
-                    (verse_range.end_chapter, verse_range.end_verse),
-                ):
-                    if versification.is_excluded(book_id, chapter, verse):
-                        reason = f"{label} {chapter} has no verse {verse}"
-                        break
             if reason is not None:
-                reasons.append(reason)
+                return reason
+    # A range may span an excluded verse (the NABRE's Tob 11:12-14), but may
+    # not begin or end on one.
+    for point in (start, end):
+        if (
+            point.chapter is not None
+            and point.verse is not None
+            and versification.is_excluded(point.book, point.chapter, point.verse)
+        ):
+            return f"{label(point.book)} {point.chapter} has no verse {point.verse}"
+    return None
 
-        return "; ".join(reasons) if reasons else None
 
-    def is_valid(self, versification: Versification) -> bool:
-        """Check if this Bible reference is valid according to the given versification.
+def _map_chapters(
+    verse_range: VerseRange, source: Versification, target: Versification
+) -> list[VerseRange] | None:
+    """Map a range that names chapters of a single book, as pieces in the target.
 
-        Args:
-            versification: The Versification to check against
-
-        Returns:
-            bool: True if the reference is valid, False otherwise
-
-        """
-        return self.invalid_reason(versification) is None
-
-    def range_refs(self) -> Generator["SimpleBibleRef", None, None]:
-        """Yield a new SimpleBibleRef for each verse range.
-
-        Each yielded SimpleBibleRef contains only one verse range from this reference.
-        The book ID is preserved, and the original text for each new instance comes
-        from the verse range.
-
-        Yields:
-            SimpleBibleRef: A new reference containing a single verse range
-
-        """
-        for verse_range in self.ranges:
-            yield SimpleBibleRef(
-                book_id=self.book_id if self.book_id != "PSAS" else "PSA",
-                ranges=[verse_range],
-                original_text=verse_range.original_text,
+    Returns None if the start or end of a piece does not exist in the target.
+    A whole-chapter range naming a chapter the source does not have passes
+    through unchanged.
+    """
+    book = verse_range.start.book
+    start_point, end_point = verse_range.start, verse_range.end
+    assert start_point.chapter is not None and end_point.chapter is not None
+    whole = verse_range.is_whole_chapters()
+    follows = verse_range.has_following_verses()
+    if whole and (
+        source.last_verse(book, start_point.chapter) < 1
+        or source.last_verse(book, end_point.chapter) < 1
+    ):
+        return [
+            VerseRange(
+                RefPoint(book, start_point.chapter), RefPoint(book, end_point.chapter)
             )
+        ]
 
-    def range_keys(
-        self, versification: Versification
-    ) -> Generator[tuple[int, int], None, None]:
-        """Yield an integer key range for each verse range in this ref.
+    start: _SourceLoc
+    if start_point.verse is None:
+        start = (
+            start_point.chapter,
+            source.first_verse(book, start_point.chapter),
+            "",
+        )
+    else:
+        start = (start_point.chapter, start_point.verse, start_point.subverse)
+    end: _SourceLoc
+    if end_point.verse is not None:
+        end = (end_point.chapter, end_point.verse, end_point.subverse)
+    elif follows:
+        end = (end_point.chapter, source.last_verse(book, end_point.chapter), "")
+    else:
+        end = (
+            end_point.chapter,
+            _last_present_verse(source, book, end_point.chapter),
+            "",
+        )
 
-        Book numbers are derived from versification. If this book ID is not
-        included in the versification, no ranges are yielded.
-
-        Whole-book references (with no ranges) yield a single range spanning
-        chapter 1, verse 0 through the last verse of the book, so that it
-        contains the range of each of the book's chapters.
-
-        Verse numbers less than 0 (undefined) are replaced with:
-        - 0 for start verses
-        - the last verse number for the chapter for end verses
-
-        Args:
-            versification: The Versification to use for computing keys.
-
-        Yields:
-            (start_key, end_key): integer keys for the start and end of a range.
-                Each key has 2 book digits, 3 chapter digits, 3 verse digits, and
-                2 subverse-ordinal digits (0 for the base verse; nonzero for an
-                inserted verse such as ESG 4:17k). A range end that spreads to a
-                whole verse carries the maximal subverse ordinal so that it
-                includes that verse's inserted verses.
-
-        """
-        book_id = "PSA" if self.book_id == "PSAS" else self.book_id
-        if book_id not in versification.max_verses:
-            return
-
-        book_num = list(versification.max_verses.keys()).index(book_id) + 1
-
-        if not self.ranges:
-            last_chapter = len(versification.max_verses[book_id])
-            last_verse = versification.last_verse(book_id, last_chapter)
-            yield (
-                _verse_key(book_num, 1, 0, 0),
-                _verse_key(book_num, last_chapter, last_verse, _MAX_SUBVERSE_ORDINAL),
+    segments = _book_segments(source, target, book, start, end)
+    pieces: list[VerseRange] = []
+    for index, (seg_start, seg_end) in enumerate(segments):
+        first = source.map_verse(
+            book, seg_start[0], seg_start[1], target, subverse=seg_start[2]
+        )
+        last = source.map_verse(
+            book, seg_end[0], seg_end[1], target, subverse=seg_end[2], end=True
+        )
+        if last is not None and first is not None and last[0] != first[0]:
+            # A single verse whose own mapping spans two books.
+            last = source.map_verse(
+                book, seg_end[0], seg_end[1], target, subverse=seg_end[2]
             )
-            return
-
-        for range_ref in self.range_refs():
-            range = range_ref.ranges[0]
-            start_verse = 0 if range.start_verse < 0 else range.start_verse
-            start_ord = versification.partial_ordinal(
-                self.book_id, range.start_chapter, start_verse, range.start_subverse
-            )
-            end_verse = range.end_verse
-            if end_verse < 0:
-                end_verse = versification.last_verse(self.book_id, range.end_chapter)
-                end_ord = _MAX_SUBVERSE_ORDINAL
-            else:
-                end_ord = versification.partial_ordinal(
-                    self.book_id, range.end_chapter, end_verse, range.end_subverse
-                )
-            start_key = _verse_key(
-                book_num, range.start_chapter, start_verse, start_ord
-            )
-            end_key = _verse_key(book_num, range.end_chapter, end_verse, end_ord)
-            yield (start_key, end_key)
-
-    def format(
-        self, style: RefStyle, versification: Versification | None = None
-    ) -> str:
-        """Format this Bible reference as a string according to the given style.
-
-        Args:
-            style: The RefStyle to use for formatting
-            versification: Optional Versification to use for determining book structure.
-                           If provided, chapter numbers will be omitted for
-                           one-chapter books.
-
-        Returns:
-            A formatted string representation of this Bible reference
-
-        """
-        # We start with the book name and then add ranges incrementally.
-        result = style.book_name(self.book_id)
-        last_range = None
-        for range in self.ranges:
-            if last_range is None:
-                if versification is not None and versification.is_single_chapter(
-                    self.book_id
-                ):
-                    # The whole of a one-chapter book is named by the book alone.
-                    if range.start_verse >= 0:
-                        result += " "
-                    states_chapter = False
-                else:
-                    result += " " + style.format_chapter(
-                        range.start_chapter, self.book_id
-                    )
-                    states_chapter = True
-            elif last_range.end_chapter != range.start_chapter:
-                result += style.chapter_separator + style.format_chapter(
-                    range.start_chapter, self.book_id
-                )
-                states_chapter = True
-            else:
-                result += style.verse_range_separator
-                states_chapter = False
-            # Add start verse if specified
-            if range.start_verse >= 0:
-                if states_chapter:
-                    result += style.chapter_verse_separator
-                result += f"{range.start_verse}{range.start_subverse}"
-            # Add range end if different
-            if range.end_verse < 0 and range.start_verse >= 0:
-                result += style.following_verses
-            elif (
-                range.end_chapter != range.start_chapter
-                or range.end_verse != range.start_verse
-                or range.end_subverse != range.start_subverse
-            ):
-                result += style.range_separator
-                if range.end_chapter != range.start_chapter:
-                    result += style.format_chapter(range.end_chapter, self.book_id)
-                    if range.end_verse >= 0:
-                        result += f"{style.chapter_verse_separator}{range.end_verse}"
-                elif range.end_verse != range.start_verse:
-                    result += f"{range.end_verse}"
-                if range.end_verse >= 0:
-                    result += range.end_subverse
-            last_range = range
-        return result
-
-    def map(
-        self, source: Versification, target: Versification
-    ) -> "SimpleBibleRef | None":
-        """Map this reference from one versification to another.
-
-        This is :meth:`map_parts` for the usual case of a reference that maps
-        into a single book.
-
-        Args:
-            source: The Versification this reference is currently in
-            target: The Versification to map into
-
-        Returns:
-            A new SimpleBibleRef in the target versification, or None if any
-            verse does not exist in the target or if the reference maps into
-            more than one book, as Vulgate Dan 13 does (Susanna and the first
-            verse of Bel), which only :meth:`map_parts` can express
-
-        """
-        parts = self.map_parts(source, target)
-        if parts is None or len(parts) != 1:
+        if first is None or last is None:
             return None
-        return parts[0]
-
-    def map_parts(
-        self, source: Versification, target: Versification
-    ) -> "list[SimpleBibleRef] | None":
-        """Map this reference from one versification to another, book by book.
-
-        Each verse location is mapped from the source versification to the
-        target, going through the "org" (original languages) versification as
-        an intermediary. A verse range is divided wherever the book it maps
-        into changes: Vulgate Dan 13:60-65 is org Sus 1:60-64 and Bel 1:1, and
-        Vulgate Dan 3 is org Dan 3:1-23, the Song of the Three, and Dan
-        3:24-33. Consecutive pieces in the same book form one SimpleBibleRef.
-
-        A whole-chapter range is mapped through its first and last verses, and
-        remains whole chapters if the result covers whole chapters in the
-        target: Vulgate Ps 50 is Ps 51 in org, and Vulgate Ps 9 is org Ps 9-10,
-        but Vulgate Ps 115 is org Ps 116:10-19. A whole-book reference passes
-        through unchanged.
-
-        Args:
-            source: The Versification this reference is currently in
-            target: The Versification to map into
-
-        Returns:
-            SimpleBibleRefs in the target versification, in this reference's
-            order, or None if the start or end of any piece does not exist in
-            the target
-
-        """
-        if not self.ranges:
-            return [SimpleBibleRef(self.book_id, [])]
-        parts: list[SimpleBibleRef] = []
-        for vr in self.ranges:
-            pieces = self._map_range(vr, source, target)
-            if pieces is None:
-                return None
-            for book, piece in pieces:
-                if book == "PSA" and self.book_id == "PSAS":
-                    book = "PSAS"
-                if parts and parts[-1].book_id == book:
-                    parts[-1].ranges.append(piece)
-                else:
-                    parts.append(SimpleBibleRef(book, [piece]))
-        return parts
-
-    def _map_range(
-        self, vr: VerseRange, source: Versification, target: Versification
-    ) -> list[tuple[str, VerseRange]] | None:
-        """Map one verse range, as (book ID, range) pieces in the target.
-
-        Returns None if the start or end of a piece does not exist in the
-        target. A whole-chapter range naming a chapter the source does not
-        have passes through unchanged.
-        """
-        # The mapping data knows the Psalms only as PSA.
-        book = "PSA" if self.book_id == "PSAS" else self.book_id
-        whole = vr.is_whole_chapters()
-        follows = not whole and vr.end_verse < 0
-        if whole:
-            if (
-                source.last_verse(book, vr.start_chapter) < 1
-                or source.last_verse(book, vr.end_chapter) < 1
-            ):
-                return [
-                    (
-                        self.book_id,
-                        VerseRange(vr.start_chapter, -1, "", vr.end_chapter, -1, ""),
-                    )
-                ]
-            start = (vr.start_chapter, source.first_verse(book, vr.start_chapter), "")
-            end = (
-                vr.end_chapter,
-                _last_present_verse(source, book, vr.end_chapter),
-                "",
+        mapped_book = first[0]
+        starts_chapter = first[2] <= target.first_verse(mapped_book, first[1])
+        ends_chapter = last[2] >= _last_present_verse(target, last[0], last[1])
+        # A verse 0 (a psalm title) cannot be cited, so a range that would
+        # begin there begins at verse 1.
+        first_verse = max(first[2], 1) if start_point.verse is None else first[2]
+        if whole and starts_chapter and ends_chapter:
+            piece = VerseRange(
+                RefPoint(mapped_book, first[1]), RefPoint(mapped_book, last[1])
+            )
+        elif follows and len(segments) == 1:
+            piece = VerseRange(
+                RefPoint(mapped_book, first[1], first[2], first[3]),
+                RefPoint(mapped_book, first[1]),
+            )
+        elif start_point.verse is None and not whole and index == 0 and starts_chapter:
+            piece = VerseRange(
+                RefPoint(mapped_book, first[1]),
+                RefPoint(mapped_book, last[1], last[2], last[3]),
             )
         else:
-            start = (vr.start_chapter, vr.start_verse, vr.start_subverse)
-            if follows:
-                end = (vr.end_chapter, source.last_verse(book, vr.end_chapter), "")
-            else:
-                end = (vr.end_chapter, vr.end_verse, vr.end_subverse)
-
-        segments = _book_segments(source, target, book, start, end)
-        pieces: list[tuple[str, VerseRange]] = []
-        for seg_start, seg_end in segments:
-            first = source.map_verse(
-                book, seg_start[0], seg_start[1], target, subverse=seg_start[2]
+            piece = VerseRange(
+                RefPoint(mapped_book, first[1], first_verse, first[3]),
+                RefPoint(mapped_book, last[1], last[2], last[3]),
             )
-            last = source.map_verse(
-                book, seg_end[0], seg_end[1], target, subverse=seg_end[2], end=True
+        pieces.append(piece)
+    return pieces
+
+
+def _map_single_book(
+    verse_range: VerseRange, source: Versification, target: Versification
+) -> list[VerseRange] | None:
+    """Map a range within one book, as pieces in the target, or None."""
+    if not verse_range.is_whole_books():
+        return _map_chapters(verse_range, source, target)
+
+    # A whole book maps as its chapters do, and is a whole book again if they
+    # fill exactly one book of the target.
+    book = verse_range.start.book
+    if not source.includes(book):
+        return None
+    chapters = VerseRange(
+        RefPoint(book, 1), RefPoint(book, len(source.max_verses[book]))
+    )
+    pieces = _map_chapters(chapters, source, target)
+    if pieces is None:
+        return None
+    if len(pieces) == 1 and pieces[0].is_whole_chapters():
+        piece = pieces[0]
+        mapped_book = piece.start.book
+        if (
+            target.includes(mapped_book)
+            and piece.start.chapter == 1
+            and piece.end.chapter == len(target.max_verses[mapped_book])
+        ):
+            return [VerseRange(RefPoint(mapped_book), RefPoint(mapped_book))]
+    return pieces
+
+
+def _divide_by_book(
+    verse_range: VerseRange, versification: Versification
+) -> list[VerseRange] | None:
+    """Divide a range that spans books into one range for each book.
+
+    Returns None if either book is missing from the versification or the
+    range ends in an earlier book than it starts.
+    """
+    start, end = verse_range.start, verse_range.end
+    books = list(versification.max_verses)
+    if start.book not in books or end.book not in books:
+        return None
+    first, last = books.index(start.book), books.index(end.book)
+    if first >= last:
+        return None
+
+    pieces: list[VerseRange] = []
+    if start.chapter is None:
+        pieces.append(VerseRange(start, start))
+    else:
+        last_chapter = len(versification.max_verses[start.book])
+        if start.verse is None:
+            book_end = RefPoint(start.book, last_chapter)
+        else:
+            book_end = RefPoint(
+                start.book,
+                last_chapter,
+                versification.last_verse(start.book, last_chapter),
             )
-            if last is not None and first is not None and last[0] != first[0]:
-                # A single verse whose own mapping spans two books.
-                last = source.map_verse(
-                    book, seg_end[0], seg_end[1], target, subverse=seg_end[2]
-                )
-            if first is None or last is None:
-                return None
-            if (
-                whole
-                and first[2] <= target.first_verse(first[0], first[1])
-                and last[2] >= _last_present_verse(target, last[0], last[1])
-            ):
-                piece = VerseRange(first[1], -1, "", last[1], -1, "")
-            elif follows and len(segments) == 1:
-                piece = VerseRange(
-                    first[1], first[2], first[3], first[1], -1, vr.end_subverse
-                )
-            else:
-                # A verse 0 (a psalm title) cannot be cited, so a partial
-                # range that would begin there begins at verse 1.
-                piece = VerseRange(
-                    first[1],
-                    max(first[2], 1) if whole else first[2],
-                    first[3],
-                    last[1],
-                    last[2],
-                    last[3],
-                )
-            pieces.append((first[0], piece))
-        return pieces
-
-    def resolve_following_verses(self, versification: Versification) -> None:
-        """Resolve following verses in the verse ranges.
-
-        This gives a definite end to ranges that use "ff" notation, namely, the
-        last verse of the chapter.
-
-        Args:
-            versification: The Versification to use for resolving following verses
-
-        """
-        for range in self.ranges:
-            if range.start_verse >= 0 and range.end_verse < 0:
-                range.end_verse = versification.last_verse(
-                    self.book_id, range.end_chapter
-                )
+        pieces.append(VerseRange(start, book_end))
+    pieces.extend(
+        VerseRange(RefPoint(book), RefPoint(book)) for book in books[first + 1 : last]
+    )
+    if end.chapter is None:
+        pieces.append(VerseRange(end, end))
+    else:
+        pieces.append(VerseRange(RefPoint(end.book, 1), end))
+    return pieces
 
 
-@dataclass
+def _map_range(
+    verse_range: VerseRange, source: Versification, target: Versification
+) -> list[VerseRange] | None:
+    """Map one verse range, as ranges in the target, or None."""
+    if verse_range.is_single_book():
+        return _map_single_book(verse_range, source, target)
+
+    by_book = _divide_by_book(verse_range, source)
+    if by_book is None:
+        return None
+    mapped: list[VerseRange] = []
+    for piece in by_book:
+        pieces = _map_single_book(piece, source, target)
+        if pieces is None:
+            return None
+        mapped.extend(pieces)
+
+    return _rejoin(mapped, target)
+
+
+def _rejoin(pieces: list[VerseRange], target: Versification) -> list[VerseRange]:
+    """Join the mapped pieces of a range that spans books wherever they abut.
+
+    Two pieces abut when each lies in one book, the second book follows the
+    first in the target, the first piece ends its book, and the second begins
+    its book. Each run of abutting pieces becomes one range, so books the
+    target orders differently divide the range without undoing all of it.
+    """
+    books = {book: index for index, book in enumerate(target.max_verses)}
+
+    def begins_book(point: RefPoint) -> bool:
+        return point.chapter is None or (point.chapter == 1 and point.verse is None)
+
+    def ends_book(point: RefPoint) -> bool:
+        if point.chapter is None:
+            return True
+        last_chapter = len(target.max_verses[point.book])
+        return point.chapter == last_chapter and (
+            point.verse is None
+            or point.verse >= _last_present_verse(target, point.book, last_chapter)
+        )
+
+    def abut(first: VerseRange, second: VerseRange) -> bool:
+        return (
+            first.is_single_book()
+            and second.is_single_book()
+            and first.end.book in books
+            and books.get(second.start.book) == books[first.end.book] + 1
+            and ends_book(first.end)
+            and begins_book(second.start)
+        )
+
+    def joined(run: list[VerseRange]) -> VerseRange:
+        if len(run) == 1:
+            return run[0]
+        start, end = run[0].start, run[-1].end
+        if start.chapter is not None and end.chapter is None:
+            # Only a range that starts with a whole book can end with one, so
+            # the end is stated as the book's last chapter or verse.
+            last_chapter = len(target.max_verses[end.book])
+            last_verse = (
+                None
+                if start.verse is None
+                else _last_present_verse(target, end.book, last_chapter)
+            )
+            end = RefPoint(end.book, last_chapter, last_verse)
+        return VerseRange(start, end)
+
+    runs: list[list[VerseRange]] = []
+    for piece in pieces:
+        if runs and abut(runs[-1][-1], piece):
+            runs[-1].append(piece)
+        else:
+            runs.append([piece])
+    return [joined(run) for run in runs]
+
+
+@dataclass(frozen=True)
 class BibleRef:
     """Represents a sequence of verse ranges within one or more books of the Bible.
 
-    A BibleRef consists of a list of SimpleBibleRef objects and the Versification
-    they use. The versification can be None, though this will not usually be the case.
-    It optionally stores the original text from which this reference was parsed.
+    A BibleRef consists of verse ranges and the Versification they use. The
+    ranges are not necessarily in canonical order. The versification can be
+    None, though this will not usually be the case: without one a reference
+    can be formatted, but it cannot be validated, mapped, or given verse keys.
+
+    It optionally stores the original text from which the reference was
+    parsed, which plays no part in comparing references.
+
+    A BibleRef is immutable and hashable. The ranges may be given as any
+    sequence and are stored as a tuple.
     """
 
-    simple_refs: list[SimpleBibleRef] = field(default_factory=list)
+    ranges: Sequence[VerseRange] = ()
     versification: Versification | None = None
-    original_text: str | None = None
+    original_text: str | None = field(default=None, compare=False)
+
+    def __post_init__(self) -> None:
+        """Store the ranges as a tuple."""
+        object.__setattr__(self, "ranges", tuple(self.ranges))
 
     def __str__(self) -> str:
         """Return a string representation of this Bible reference.
@@ -739,68 +620,122 @@ class BibleRef:
         cls,
         book_id: str,
         chapter: int,
-        start_verse: int,
+        start_verse: int | None = None,
         end_chapter: int | None = None,
         end_verse: int | None = None,
         start_subverse: str = "",
-        end_subverse: str = "",
+        end_subverse: str | None = None,
         original_text: str | None = None,
         versification: Versification | None = None,
+        end_book: str | None = None,
     ) -> "BibleRef":
-        """Create a BibleRef with a single SimpleBibleRef containing a single VerseRange.
+        """Create a BibleRef with a single VerseRange.
 
         Args:
             book_id: The book ID (e.g., "JHN" for John)
             chapter: The chapter number
-            start_verse: The starting verse number
-            end_chapter: The ending chapter number (defaults to start chapter if None)
-            end_verse: The ending verse number (defaults to start verse if None)
+            start_verse: The starting verse number, or None for the whole chapter
+            end_chapter: The ending chapter number (defaults to the start chapter,
+                or to None, the whole book, if end_book is given)
+            end_verse: The ending verse number (defaults to the start verse if
+                the range ends in the chapter it starts in, and otherwise to
+                None, the whole of the ending chapter)
             start_subverse: The starting subverse (defaults to "")
-            end_subverse: The ending subverse (defaults to "")
+            end_subverse: The ending subverse (defaults to the starting subverse
+                for a single verse, and otherwise to "")
             original_text: The original text from which this reference was parsed (defaults to None)
             versification: The Versification to use (defaults to None)
+            end_book: The book ID in which the range ends (defaults to book_id)
 
         Returns:
-            A BibleRef instance with a single SimpleBibleRef containing a single VerseRange
+            A BibleRef instance containing a single VerseRange
 
         """
-        simple_ref = SimpleBibleRef.for_range(
-            book_id=book_id,
-            chapter=chapter,
-            start_verse=start_verse,
-            end_chapter=end_chapter,
-            end_verse=end_verse,
-            start_subverse=start_subverse,
-            end_subverse=end_subverse,
-            original_text=original_text,
-        )
-
+        start = RefPoint(book_id, chapter, start_verse, start_subverse)
+        same_chapter = end_book is None and end_chapter is None
+        if same_chapter and end_verse is None:
+            end_verse = start_verse
+            if end_subverse is None:
+                end_subverse = start_subverse
+        if end_book is None and end_chapter is None:
+            end_chapter = chapter
+        end = RefPoint(end_book or book_id, end_chapter, end_verse, end_subverse or "")
         return cls(
-            simple_refs=[simple_ref],
+            ranges=(VerseRange(start, end, original_text),),
             versification=versification,
             original_text=original_text,
         )
 
+    @classmethod
+    def for_book(
+        cls,
+        book_id: str,
+        end_book: str | None = None,
+        original_text: str | None = None,
+        versification: Versification | None = None,
+    ) -> "BibleRef":
+        """Create a BibleRef for a whole book or a range of whole books.
+
+        Args:
+            book_id: The book ID (e.g., "JHN" for John)
+            end_book: The book ID of the last book of the range (defaults to
+                book_id, a single book)
+            original_text: The original text from which this reference was parsed (defaults to None)
+            versification: The Versification to use (defaults to None)
+
+        Returns:
+            A BibleRef instance containing a single whole-book VerseRange
+
+        """
+        verse_range = VerseRange(
+            RefPoint(book_id), RefPoint(end_book or book_id), original_text
+        )
+        return cls((verse_range,), versification, original_text)
+
+    def books(self) -> list[str]:
+        """Return the IDs of the books this reference names, in order of mention.
+
+        Each book is listed once. The books that lie between the ends of a
+        range that spans books are not listed.
+        """
+        ids: dict[str, None] = {}
+        for verse_range in self.ranges:
+            ids[verse_range.start.book] = None
+            ids[verse_range.end.book] = None
+        return list(ids)
+
+    def is_single_range(self) -> bool:
+        """Return True if this reference consists of exactly one verse range."""
+        return len(self.ranges) == 1
+
     def is_whole_books(self) -> bool:
         """Return True if this reference refers to entire books only.
 
-        Returns True iff all contained SimpleBibleRef instances refer to entire books.
+        Note that this regards the form of the reference rather than its
+        content. So it returns True for John but False for John 1–21.
         """
-        return all(ref.is_whole_book() for ref in self.simple_refs)
+        return all(verse_range.is_whole_books() for verse_range in self.ranges)
 
     def is_whole_chapters(self) -> bool:
         """Return True if this reference does not specify verse limits.
 
-        Returns True iff all contained SimpleBibleRef instances refer to whole chapters.
+        Note that this regards the form of the reference rather than its
+        content. So it returns True for John and John 6 but False for John
+        1:1–51.
         """
-        return all(ref.is_whole_chapters() for ref in self.simple_refs)
+        return all(verse_range.is_whole_chapters() for verse_range in self.ranges)
 
     def invalid_reason(self, style: RefStyle | None = None) -> str | None:
         """Explain why this Bible reference is invalid, or None if it is valid.
 
         The reference is invalid if it has no versification, or if any of its
-        single-book references is invalid under that versification. When more
-        than one is invalid, each reason is reported, joined by "; ".
+        verse ranges is invalid under that versification: if a book is not in
+        the versification, if the range is structurally inconsistent, if it
+        ends in an earlier book than it starts, or if any chapter or verse it
+        names does not exist. A verse the versification excludes (see
+        :meth:`Versification.is_excluded`) does not exist, though a range may
+        span one. When more than one verse range is invalid, each reason is
+        reported, joined by "; ".
 
         An empty BibleRef with a versification is vacuously valid.
 
@@ -816,8 +751,8 @@ class BibleRef:
             return "no versification is set"
 
         reasons: list[str] = []
-        for ref in self.simple_refs:
-            reason = ref.invalid_reason(self.versification, style)
+        for verse_range in self.ranges:
+            reason = _range_reason(verse_range, self.versification, style)
             if reason is not None:
                 reasons.append(reason)
 
@@ -834,55 +769,131 @@ class BibleRef:
         """
         return self.invalid_reason() is None
 
-    def range_keys(self) -> Generator[tuple[int, int], None, None]:
+    def range_keys(self) -> Iterator[tuple[int, int]]:
         """Yield an integer key range for each verse range in the ref.
 
-        Book numbers are derived from self.versification, so it cannot be None.
-        If any book ID in the simple refs is not included in the versification,
-        no ranges for that book are yielded.
+        Book numbers are derived from self.versification, so nothing is
+        yielded if it is None. Nor is anything yielded for a verse range that
+        names a book the versification does not include.
 
-        Verse numbers less than 0 (undefined) are replaced with:
-        - 0 for start verses
-        - the last verse number for the chapter for end verses
+        A point that leaves its verse or chapter unspecified is replaced with:
+
+        - verse 0 of the chapter, or of chapter 1, at the start of a range
+        - the last verse of the chapter, or of the book, at the end of a range
+
+        A range that spans books yields a single pair of keys, which takes in
+        the books between them in the versification's order.
 
         Yields:
             (start_key, end_key): integer keys for the start and end of a range in the ref
                 Each key has 2 book digits, 3 chapter digits, 3 verse digits, and
                 2 subverse-ordinal digits (0 for the base verse; nonzero for an
-                inserted verse such as ESG 4:17k).
+                inserted verse such as ESG 4:17k). A range end that spreads to
+                a whole verse carries the maximal subverse ordinal so that it
+                includes that verse's inserted verses.
 
         """
-        if self.versification is None:
+        versification = self.versification
+        if versification is None:
             return
-        for simple_ref in self.simple_refs:
-            yield from simple_ref.range_keys(self.versification)
+        books = list(versification.max_verses)
+        for verse_range in self.ranges:
+            start, end = verse_range.start, verse_range.end
+            if start.book not in books or end.book not in books:
+                continue
 
-    def range_refs(self) -> Generator["BibleRef", None, None]:
-        """Yield a new BibleRef for each verse range across all simple refs.
+            start_chapter = 1 if start.chapter is None else start.chapter
+            start_verse = 0 if start.verse is None else start.verse
+            start_key = _verse_key(
+                books.index(start.book) + 1,
+                start_chapter,
+                start_verse,
+                versification.partial_ordinal(
+                    start.book, start_chapter, start_verse, start.subverse
+                ),
+            )
 
-        Each yielded BibleRef contains a single SimpleBibleRef with a single verse range.
-        The versification is preserved.
+            end_chapter = end.chapter
+            if end_chapter is None:
+                end_chapter = len(versification.max_verses[end.book])
+            if end.verse is None:
+                end_verse = versification.last_verse(end.book, end_chapter)
+                end_ordinal = _MAX_SUBVERSE_ORDINAL
+            else:
+                end_verse = end.verse
+                end_ordinal = versification.partial_ordinal(
+                    end.book, end_chapter, end_verse, end.subverse
+                )
+            end_key = _verse_key(
+                books.index(end.book) + 1, end_chapter, end_verse, end_ordinal
+            )
+            yield (start_key, end_key)
+
+    def range_refs(self) -> Iterator["BibleRef"]:
+        """Yield a new BibleRef for each verse range.
+
+        Each yielded BibleRef contains a single verse range. The versification
+        is preserved, and the original text of each comes from its verse range.
 
         Yields:
             BibleRef: A new reference containing a single verse range
 
         """
-        for simple_ref in self.simple_refs:
-            for range_ref in simple_ref.range_refs():
-                yield BibleRef(
-                    simple_refs=[range_ref],
-                    versification=self.versification,
-                    original_text=range_ref.original_text,
+        for verse_range in self.ranges:
+            yield BibleRef(
+                ranges=(verse_range,),
+                versification=self.versification,
+                original_text=verse_range.original_text,
+            )
+
+    def resolve_following_verses(self) -> "BibleRef":
+        """Return this reference with a definite end for each "ff" range.
+
+        A range that runs from a verse to the end of its chapter (John 3:16ff)
+        ends instead at the last verse of the chapter (John 3:16–36).
+
+        Returns:
+            A new BibleRef, or this one if it has no versification
+
+        """
+        versification = self.versification
+        if versification is None:
+            return self
+        ranges: list[VerseRange] = []
+        for verse_range in self.ranges:
+            end = verse_range.end
+            if verse_range.has_following_verses() and end.chapter is not None:
+                last_verse = versification.last_verse(end.book, end.chapter)
+                verse_range = VerseRange(
+                    verse_range.start,
+                    RefPoint(end.book, end.chapter, last_verse),
+                    verse_range.original_text,
                 )
+            ranges.append(verse_range)
+        return BibleRef(ranges, versification, self.original_text)
 
     def map_to(self, target: Versification) -> "BibleRef | None":
         """Map this reference into a different versification.
 
         Each verse location is mapped from this reference's versification to
         the target, going through the "org" (original languages) versification
-        as an intermediary, as described under :meth:`SimpleBibleRef.map_parts`.
-        A range that maps into more than one book, such as Vulgate Dan 13
-        (Susanna and the first verse of Bel), becomes a reference to each.
+        as an intermediary. A verse range is divided wherever the book it maps
+        into changes: Vulgate Dan 13:60-65 is org Sus 1:60-64 and Bel 1:1, and
+        Vulgate Dan 3 is org Dan 3:1-23, the Song of the Three, and Dan
+        3:24-33.
+
+        A whole-chapter range is mapped through its first and last verses, and
+        remains whole chapters if the result covers whole chapters in the
+        target: Vulgate Ps 50 is Ps 51 in org, and Vulgate Ps 9 is org Ps 9-10,
+        but Vulgate Ps 115 is org Ps 116:10-19. A whole book is mapped as its
+        chapters are, and remains a whole book if they fill one book of the
+        target: Vulgate Daniel is org Daniel together with the Song of the
+        Three, Susanna, and Bel.
+
+        A range that spans books is mapped book by book, since the books
+        between its ends depend on the versification's order. The pieces are
+        rejoined wherever their books are consecutive in the target too: nabre
+        Neh–Jdt is eng Neh and Tob–Jdt.
 
         Args:
             target: The target Versification to map into
@@ -896,17 +907,21 @@ class BibleRef:
         if self.versification is None:
             return None
 
-        new_simple_refs: list[SimpleBibleRef] = []
-        for simple_ref in self.simple_refs:
-            parts = simple_ref.map_parts(self.versification, target)
-            if parts is None:
+        ranges: list[VerseRange] = []
+        for verse_range in self.ranges:
+            mapped = _map_range(verse_range, self.versification, target)
+            if mapped is None:
                 return None
-            new_simple_refs.extend(parts)
+            ranges.extend(mapped)
 
-        return BibleRef(new_simple_refs, target)
+        return BibleRef(ranges, target)
 
     def format(self, style: RefStyle) -> str:
         """Format this Bible reference as a string according to the given style.
+
+        If the reference has a versification, chapter numbers are omitted for
+        one-chapter books. A book's name is stated where the book changes, and
+        the Psalms are named in the plural where more than one is cited.
 
         Args:
             style: The RefStyle to use for formatting
@@ -915,6 +930,103 @@ class BibleRef:
             A formatted string representation of this Bible reference
 
         """
-        return style.chapter_separator.join(
-            [r.format(style, self.versification) for r in self.simple_refs]
-        )
+        versification = self.versification
+
+        def single_chapter(book: str) -> bool:
+            return versification is not None and versification.is_single_chapter(book)
+
+        def chapter_verse(point: RefPoint) -> str:
+            """Format a point's chapter and verse, as far as it has them."""
+            assert point.chapter is not None
+            text = style.format_chapter(point.chapter, point.book)
+            if point.verse is not None:
+                text += f"{style.chapter_verse_separator}{point.verse}{point.subverse}"
+            return text
+
+        def named(point: RefPoint, plural: bool) -> str:
+            """Format a point together with the name of its book."""
+            name = style.book_name(point.book, plural=plural)
+            if point.chapter is None:
+                return name
+            if single_chapter(point.book):
+                if point.verse is None:
+                    return name
+                return f"{name} {point.verse}{point.subverse}"
+            return f"{name} {chapter_verse(point)}"
+
+        def continues(previous: VerseRange, current: VerseRange) -> bool:
+            """Tell whether a range can rely on the book the last one named."""
+            if (
+                current.start.book != previous.end.book
+                or previous.end.chapter is None
+                or current.start.chapter is None
+            ):
+                return False
+            # A one-chapter book prints no chapter, so only a verse that
+            # follows a verse can do without the name.
+            return not single_chapter(current.start.book) or (
+                current.start.verse is not None
+                and (previous.end.verse is not None or previous.has_following_verses())
+            )
+
+        def is_plural(index: int) -> bool:
+            """Tell whether the ranges sharing a book name cite several chapters."""
+            chapters: set[int | None] = set()
+            for position in range(index, len(self.ranges)):
+                verse_range = self.ranges[position]
+                if position > index and not continues(
+                    self.ranges[position - 1], verse_range
+                ):
+                    break
+                chapters.add(verse_range.start.chapter)
+                if not verse_range.is_single_book():
+                    break
+                chapters.add(verse_range.end.chapter)
+            return None in chapters or len(chapters) > 1
+
+        result = ""
+        previous: VerseRange | None = None
+        for index, verse_range in enumerate(self.ranges):
+            start, end = verse_range.start, verse_range.end
+            if previous is not None and continues(previous, verse_range):
+                assert start.chapter is not None
+                if (
+                    start.verse is not None
+                    and start.chapter == previous.end.chapter
+                    and (
+                        previous.end.verse is not None
+                        or previous.has_following_verses()
+                    )
+                ):
+                    result += (
+                        f"{style.verse_range_separator}{start.verse}{start.subverse}"
+                    )
+                else:
+                    result += style.chapter_separator + chapter_verse(start)
+            else:
+                if previous is not None:
+                    result += style.chapter_separator
+                result += named(start, is_plural(index))
+
+            if end.book != start.book:
+                result += style.range_separator + named(end, end.chapter is None)
+            elif end.chapter is None or start.chapter is None:
+                pass
+            elif verse_range.has_following_verses():
+                result += style.following_verses
+            elif end.chapter != start.chapter:
+                result += style.range_separator + chapter_verse(end)
+            elif end.verse is None:
+                pass
+            elif start.verse is None:
+                result += style.range_separator
+                if single_chapter(end.book):
+                    result += f"{end.verse}{end.subverse}"
+                else:
+                    result += chapter_verse(end)
+            elif end.verse != start.verse:
+                result += f"{style.range_separator}{end.verse}{end.subverse}"
+            elif end.subverse != start.subverse:
+                result += style.range_separator + end.subverse
+            previous = verse_range
+        return result

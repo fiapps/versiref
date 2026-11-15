@@ -10,17 +10,18 @@ the bug makes the test fail until the marker is removed.
 """
 
 import logging
+from importlib import resources
 
 import pytest
 from versiref import (
     BibleRef,
     RefParser,
+    RefPoint,
     RefStyle,
     Sensitivity,
-    SimpleBibleRef,
+    VerseRange,
     Versification,
 )
-from versiref.bible_ref import VerseRange
 
 CANONICAL_STYLE = "en-sbl"
 
@@ -63,16 +64,27 @@ CORPUS = [
     "Obad",
     "Gen; Exod",
     "Matt; Mark 1:1",
+    # Whole chapters mixed with verses
+    "Gen 1; 2:4",
+    "Gen 1–2:4",
+    "John 3:16; 4",
+    "Rom 8:1–9:5; 12",
+    "John 3; 3:5",
+    # Ranges that span books
+    "Matt–John",
+    "Pss–Prov",
+    "Gen 50–Exod 2",
+    "1 Sam 31:1–2 Sam 1:27",
+    "2 John 12–3 John 4",
+    "Matt–Mark 3",
+    "1 Sam 31–2 Sam 1; 3:1",
 ]
 
-_versifications: dict[str, Versification] = {}
 _parsers: dict[str, RefParser] = {}
 
 
 def _versification(name: str) -> Versification:
-    if name not in _versifications:
-        _versifications[name] = Versification.named(name)
-    return _versifications[name]
+    return Versification.named(name)
 
 
 def _versification_for(style_name: str) -> Versification:
@@ -91,32 +103,20 @@ def _parser(style_name: str, versification_style: str | None = None) -> RefParse
 
 
 def _whole_book(book: str, versification: Versification) -> BibleRef:
-    return BibleRef([SimpleBibleRef(book)], versification)
+    return BibleRef.for_book(book, versification=versification)
 
 
 def _whole_chapter(book: str, chapter: int, versification: Versification) -> BibleRef:
-    return BibleRef(
-        [SimpleBibleRef(book, [VerseRange(chapter, -1, "", chapter, -1, "")])],
-        versification,
-    )
+    return BibleRef.for_range(book, chapter, versification=versification)
 
 
 def _chapter_then_verse(
     book: str, chapter: int, verse: int, versification: Versification
 ) -> BibleRef:
     """Return a whole chapter followed by one verse of the same chapter."""
-    return BibleRef(
-        [
-            SimpleBibleRef(
-                book,
-                [
-                    VerseRange(chapter, -1, "", chapter, -1, ""),
-                    VerseRange(chapter, verse, "", chapter, verse, ""),
-                ],
-            )
-        ],
-        versification,
-    )
+    whole = RefPoint(book, chapter)
+    one = RefPoint(book, chapter, verse)
+    return BibleRef([VerseRange(whole, whole), VerseRange(one, one)], versification)
 
 
 def _in_style(canonical: str, style_name: str) -> BibleRef:
@@ -163,7 +163,8 @@ def test_every_named_book_round_trips(style_name: str) -> None:
     parser = _parser(style_name)
     checked = 0
     for book in style.names:
-        if not versification.includes(book):
+        # "PSAS" is the key for a plural name of the Psalms, not a book.
+        if book == "PSAS" or not versification.includes(book):
             continue
         ref = BibleRef.for_range(book, 1, 1, versification=versification)
         formatted = ref.format(style)
@@ -171,7 +172,7 @@ def test_every_named_book_round_trips(style_name: str) -> None:
         assert reparsed is not None
         assert reparsed.format(style) == formatted
         # ESG may share EST's name, in which case it reads back as EST.
-        if style.recognized_names.get(style.names[book]) in (book, "PSA"):
+        if style.recognized_names.get(style.names[book]) in (book, "PSAS"):
             assert list(reparsed.range_keys()) == list(ref.range_keys()), formatted
         checked += 1
     assert checked >= 66
@@ -211,7 +212,6 @@ def test_scan_as_ranges_spans_lie_in_order(style_name: str) -> None:
             previous_end = end
 
 
-@pytest.mark.xfail(strict=True, reason="#33")
 @pytest.mark.parametrize(
     "text",
     ["Gen 1; 2:4", "Gen 1–2:4", "John 3:16; 4", "Rom 8:1–9:5; 12"],
@@ -226,7 +226,6 @@ def test_scan_reads_mixed_chapters_and_verses_whole(text: str) -> None:
     assert found == [text]
 
 
-@pytest.mark.xfail(strict=True, reason="#44")
 @pytest.mark.parametrize(("book", "chapter"), [("JHN", 3), ("JUD", 1)])
 def test_chapter_then_verse_formats_unambiguously(book: str, chapter: int) -> None:
     """A verse after its whole chapter formats to text that means the same."""
@@ -270,24 +269,27 @@ def test_keys_nest_and_ascend(name: str) -> None:
                 assert start <= key <= end, f"{where}:{verse}"
 
 
-@pytest.mark.parametrize("name", VERSIFICATIONS)
-def test_plural_psalms_have_the_same_keys(name: str) -> None:
-    """PSAS is PSA under another name, wherever a book ID is taken."""
-    versification = _versification(name)
-    assert list(_whole_book("PSAS", versification).range_keys()) == list(
-        _whole_book("PSA", versification).range_keys()
-    )
-    assert list(
-        BibleRef.for_range("PSAS", 2, 1, versification=versification).range_keys()
-    ) == list(BibleRef.for_range("PSA", 2, 1, versification=versification).range_keys())
-    assert versification.is_single_chapter("PSAS") is False
+@pytest.mark.parametrize("style_name", STYLES)
+def test_plural_psalms_are_the_book_of_psalms(style_name: str) -> None:
+    """A plural name for the Psalms reads as PSA, and "PSAS" is no book."""
+    style = RefStyle.named(style_name)
+    versification = _versification_for(style_name)
+    expected = BibleRef.for_range("PSA", 1, end_chapter=2, versification=versification)
+    plural = _parser(style_name).parse(expected.format(style))
+    assert plural == expected
+    assert list(plural.range_keys()) == list(expected.range_keys())
+    with pytest.raises(ValueError, match="PSAS"):
+        RefPoint("PSAS", 1, 1)
 
 
 @pytest.mark.parametrize("style_name", STYLES)
 def test_mapping_to_the_same_versification_changes_nothing(style_name: str) -> None:
     """Mapping into a second copy of a versification is the identity."""
     canonical_style = RefStyle.named(CANONICAL_STYLE)
-    twin = Versification.named(STYLE_VERSIFICATIONS.get(style_name, "eng"))
+    name = STYLE_VERSIFICATIONS.get(style_name, "eng")
+    data = resources.files("versiref").joinpath("data", "versifications")
+    twin = Versification.from_file(str(data.joinpath(f"{name}.json")), name)
+    assert twin is not _versification_for(style_name)
     for canonical in CORPUS:
         mapped = _in_style(canonical, style_name).map_to(twin)
         assert mapped is not None, canonical
@@ -301,7 +303,6 @@ def test_psalm_151_can_be_formatted() -> None:
     assert ref.format(RefStyle.named(CANONICAL_STYLE))
 
 
-@pytest.mark.xfail(strict=True, reason="#40")
 def test_whole_book_maps_as_its_contents_do() -> None:
     """Vulgate Daniel as a whole includes what org calls Susanna."""
     whole = _whole_book("DAN", _versification("vulgata")).map_to(_versification("org"))
@@ -311,7 +312,6 @@ def test_whole_book_maps_as_its_contents_do() -> None:
     assert any(start <= verse <= end for start, end in whole.range_keys())
 
 
-@pytest.mark.xfail(strict=True, reason="#41")
 def test_empty_versification_is_consistent() -> None:
     """A versification has the verses of exactly the books it includes."""
     versification = Versification()

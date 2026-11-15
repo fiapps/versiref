@@ -11,11 +11,12 @@ VersiRef is a Python package for sophisticated parsing, manipulation, and printi
 ## Overview of `versiref` classes
 
 - `BibleRef` represents a sequence of verse ranges within one or more books of the Bible.
-    - It has a `Versification` and a list of `SimpleBibleRef`s.
+    - It has a `Versification` and a tuple of `VerseRange`s. Without a `Versification` it can still be formatted, but not validated, mapped, or given verse keys.
+    - It is immutable and hashable, and two references are equal if they cite the same verses in the same versification, however they were written.
+- `VerseRange` is a range from one `RefPoint` to another, each of which names a book and optionally a chapter and a verse.
+    - A point with no verse is a whole chapter, and one with no chapter is a whole book.
+    - The two points may be in different books, as in "Matt–John" or "1 Sam 31:1–2 Sam 1:27".
 - `Versification` represents a division of the Bible into chapters and verses. Different texts of the Bible do this differently.
-- `SimpleBibleRef` represents a sequence of verse ranges within a single book of the Bible.
-    - It can be used independently of a `BibleRef`, but since it has no `Versification`, you need to supply a `Versification` for all operations that require one.
-    - It contains a list of `VerseRange`s: this is a data class not intended to be used independently.
 - `RefStyle` defines separators and book names or abbreviations to use in formatting or parsing a reference.
     - This gives the package the versatility to handle different styles and languages.
 - `RefParser` creates PEG parsers based on a `RefStyle` and `Versification`.

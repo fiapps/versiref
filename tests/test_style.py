@@ -218,13 +218,13 @@ def test_override_names_parse_and_format() -> None:
     style = RefStyle.named("it-cei")
     style.override_names({"GEN": "Gn", "JON": "Gio"})
     parser = RefParser(style, Versification.named("cei"))
-    ref = parser.parse_simple("Gn 1,1")
+    ref = parser.parse("Gn 1,1")
     assert ref is not None
-    assert ref.book_id == "GEN"
+    assert ref.books() == ["GEN"]
     assert ref.format(style) == "Gn 1,1"
-    jon = parser.parse_simple("Gio 2,1")
+    jon = parser.parse("Gio 2,1")
     assert jon is not None
-    assert jon.book_id == "JON"
+    assert jon.books() == ["JON"]
     assert jon.format(style) == "Gio 2,1"
 
 

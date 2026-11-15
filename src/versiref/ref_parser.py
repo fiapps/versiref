@@ -6,12 +6,13 @@ We don't call pp.ParserElement.enablePackrat() because it made parsing slower.
 """
 
 import re
+from collections.abc import Callable, Iterator
+from dataclasses import dataclass
 from enum import Enum
-from typing import Callable, Generator
 
 import pyparsing as pp
 
-from versiref.bible_ref import BibleRef, SimpleBibleRef, VerseRange
+from versiref.bible_ref import BibleRef, RefPoint, VerseRange
 from versiref.ref_style import SHARED_NAME_PARTNER, RefStyle
 from versiref.roman import roman_to_int
 from versiref.versification import Versification
@@ -43,6 +44,33 @@ def _get_str(tokens: pp.ParseResults, name: str, default: str) -> str:
         return str(tokens[name])
     else:
         return default
+
+
+def _opt_int(tokens: pp.ParseResults, name: str) -> int | None:
+    """Get an integer from the parsed tokens, or None if it is absent."""
+    return int(tokens[name]) if name in tokens else None
+
+
+@dataclass
+class _Draft:
+    """A verse range as the grammar finds it, before its context is known.
+
+    A chapter left as None is supplied from what precedes the range, and
+    the book from the name that begins the reference.
+    """
+
+    start_loc: int
+    end_loc: int
+    whole_book: bool = False
+    chapter: int | None = None
+    verse: int | None = None
+    subverse: str = ""
+    following: str = ""
+    has_end: bool = False
+    end_book: str | None = None
+    end_chapter: int | None = None
+    end_verse: int | None = None
+    end_subverse: str = ""
 
 
 # What may separate the parts of a reference: pyparsing's defaults plus the
@@ -109,8 +137,8 @@ class RefParser:
     """Parser for Bible references.
 
     RefParser uses pyparsing to build a parser that recognizes Bible references
-    according to a given style. It can parse a string to produce a SimpleBibleRef
-    instance.
+    according to a given style. It can parse a string to produce a BibleRef
+    instance, or scan a longer text for the references in it.
     """
 
     def __init__(
@@ -135,22 +163,33 @@ class RefParser:
         self.versification = versification
         self.strict = strict
 
-        # Resolve each distinct versification id once, so aliases such as
-        # "Vulg." and "Vulgate" -> "vulgata" load a single Versification.
-        resolved: dict[str, Versification] = {}
-        self._designator_versifications: dict[str, Versification] = {}
-        for designator, vid in style.versification_identifiers.items():
-            if vid not in resolved:
-                resolved[vid] = Versification.named(vid)
-            self._designator_versifications[designator] = resolved[vid]
+        self._designator_versifications: dict[str, Versification] = {
+            designator: Versification.named(vid)
+            for designator, vid in style.versification_identifiers.items()
+        }
 
         # Build the parser
         self._build_parser()
 
     def _build_parser(self) -> None:
         """Build the pyparsing parser based on the style and versification."""
-        # Define basic elements
-        book = _book_element(self.style.recognized_names)
+        # "PSAS" marks a plural name for the Psalms; the book is PSA.
+        names = {
+            name: "PSA" if book_id == "PSAS" else book_id
+            for name, book_id in self.style.recognized_names.items()
+        }
+        book = _book_element(names)
+        # The chapter can be omitted for single-chapter (sc) books
+        sc_book = _book_element(
+            {
+                name: book_id
+                for name, book_id in names.items()
+                if self.versification.is_single_chapter(book_id)
+            }
+        )
+        # A number that begins the name of a numbered book ("1 John") is not a
+        # chapter or verse of the book before it.
+        not_a_book = pp.NotAny(book)
         # The lookahead keeps a Roman numeral from matching the start of a
         # longer word ("Cl" in "Clemens"); it counts the æ/œ ligatures common
         # in Latin text as word characters ("Cœna", "Lætitia").
@@ -164,6 +203,10 @@ class RefParser:
         else:
             chapter = pp.Word(pp.nums).set_parse_action(lambda t: int(t[0]))
         verse = pp.Word(pp.nums).set_parse_action(lambda t: int(t[0]))
+        # At the end of a range the number is taken for the book's only if a
+        # chapter or verse follows the name: "Luke 1–2 John the Baptist" is
+        # Luke 1–2, though "Luke 1–2 John 3" is not.
+        not_a_cited_book = pp.NotAny(book + (chapter | verse))
         subverse = pp.Word(pp.alphas.lower(), max=2).leave_whitespace() + pp.WordEnd(
             pp.alphas.lower()
         )
@@ -195,130 +238,159 @@ class RefParser:
             if self.style.range_separator not in range_separators:
                 range_separators.append(self.style.range_separator)
             range_separator = separator(pp.one_of(range_separators))
+        chapter_verse_separator = self.style.chapter_verse_separator.strip()
+        verse_range_separator = self.style.verse_range_separator.strip()
+        chapter_separator = self.style.chapter_separator.strip()
         # Empty marker to record location
         location_marker = pp.Empty().set_parse_action(lambda s, loc, t: loc)
+        end_location = location_marker.copy().set_results_name("end_location")
         # A boundary that fails if the marker is glued to a longer word (e.g. the
         # "ff" in "ffoo"). leave_whitespace keeps the enclosing And from skipping
         # whitespace first and testing the next word instead of the character
         # right after the marker.
         word_boundary = pp.NotAny(pp.Char(pp.identbodychars)).leave_whitespace()
+        # Likewise for a chapter number that stands alone ("3" in "3rd").
+        no_letter_after = pp.Regex(_NO_LETTER_AHEAD).leave_whitespace()
+
+        following = (
+            pp.Literal(self.style.following_verses).set_results_name("following_verses")
+            | pp.Literal(self.style.following_verse).set_results_name("following_verse")
+        ) + word_boundary.copy()
+
+        # The end of a range that runs into another book, which must name a
+        # chapter or verse there: "1 Sam 31:1–2 Sam 1:27", "Gen 50–Exod 2",
+        # "2 John 12–3 John 4".
+        other_book_end = (
+            book.copy().set_results_name("end_book")
+            + chapter.copy().set_results_name("end_chapter")
+            + separator(chapter_verse_separator)
+            + verse.copy().set_results_name("end_verse")
+            + optional_subverse.copy().set_results_name("end_subverse")
+            | sc_book.copy().set_results_name("end_book")
+            + verse.copy().set_results_name("end_verse")
+            + optional_subverse.copy().set_results_name("end_subverse")
+            | book.copy().set_results_name("end_book")
+            + chapter.copy().set_results_name("end_chapter")
+            + no_letter_after.copy()
+        )
+
+        def build_verse_range(
+            chapter_elem: pp.ParserElement | None,
+        ) -> pp.ParserElement:
+            """Build the grammar for one verse or range of verses.
+
+            With no chapter element, as for a single-chapter book, the range
+            cannot end with a chapter and verse.
+            """
+            same_book_end: pp.ParserElement = verse.copy().set_results_name(
+                "end_verse"
+            ) + optional_subverse.copy().set_results_name("end_subverse")
+            if chapter_elem is not None:
+                # The lookahead keeps the chapter from claiming an end verse
+                # that punctuation happens to follow ("Mt 5,3-12, dove" in a
+                # style that writes 5,3).
+                same_book_end = (
+                    pp.Opt(
+                        chapter_elem.copy().set_results_name("end_chapter")
+                        + separator(chapter_verse_separator)
+                        + pp.FollowedBy(verse)
+                    )
+                    + same_book_end
+                )
+            return (
+                not_a_book
+                + verse.copy().set_results_name("start_verse")
+                + optional_subverse.copy().set_results_name("start_subverse")
+                + pp.Opt(
+                    following
+                    | (
+                        range_separator
+                        + (
+                            other_book_end
+                            | not_a_cited_book + same_book_end
+                            # Or just a subverse of the same verse
+                            | subverse.copy().set_results_name("end_subverse")
+                        )
+                    )
+                )
+                + end_location
+            ).set_parse_action(self._draft_verses)
 
         def build_book_branches(
             book_elem: pp.ParserElement, chapter_elem: pp.ParserElement
         ) -> tuple[pp.ParserElement, pp.ParserElement]:
             """Build the book grammar branches for a book and chapter element.
 
-            Returns the chapter:verse branch and the whole-chapter branch
-            (e.g. "John 3", "John 3–5", "John 3; 5; 7").
+            Returns the branch that begins with a chapter and verse
+            ("John 3:16; 4") and the one that begins with a whole chapter
+            ("John 3", "John 3–5", "John 3; 4:5").
             """
-            # For now, we only parse ranges of a single verse.
-            verse_range = (
-                verse.copy().set_results_name("start_verse")
-                + optional_subverse.set_results_name("start_subverse")
-                + pp.Opt(
-                    (
-                        (
-                            pp.Literal(self.style.following_verses).set_results_name(
-                                "following_verses"
-                            )
-                            | pp.Literal(self.style.following_verse).set_results_name(
-                                "following_verse"
-                            )
-                        )
-                        + word_boundary.copy()
-                    )
-                    | (
-                        range_separator
-                        + (
-                            # Either a full chapter:verse reference. The
-                            # lookahead keeps the chapter from claiming an
-                            # end verse that punctuation happens to follow
-                            # ("Mt 5,3-12, dove" in a style that writes 5,3).
-                            (
-                                pp.Opt(
-                                    chapter_elem.copy().set_results_name("end_chapter")
-                                    + separator(
-                                        self.style.chapter_verse_separator.strip()
-                                    )
-                                    + pp.FollowedBy(verse)
-                                )
-                                + verse.copy().set_results_name("end_verse")
-                                + optional_subverse.copy().set_results_name(
-                                    "end_subverse"
-                                )
-                            )
-                            # Or just a subverse of the same verse
-                            | subverse.copy().set_results_name("end_subverse")
-                        )
-                    )
+            chapter_and_verses = (
+                chapter_elem.copy().set_results_name("start_chapter")
+                + separator(chapter_verse_separator)
+                + pp.DelimitedList(
+                    build_verse_range(chapter_elem),
+                    delim=separator(verse_range_separator),
                 )
-                + location_marker.copy().set_results_name("end_location")
-            ).set_parse_action(self._make_verse_range)
+            ).set_parse_action(self._draft_chapter_and_verses)
 
-            verse_ranges = pp.DelimitedList(
-                verse_range, delim=separator(self.style.verse_range_separator.strip())
-            ).set_results_name("verse_ranges")
-
-            chapter_range = (
+            whole_chapters = (
                 chapter_elem.copy().set_results_name("start_chapter")
-                + separator(self.style.chapter_verse_separator.strip())
-                + location_marker.copy().set_results_name("verse_ranges_location")
-                + verse_ranges
-            ).set_parse_action(self._make_chapter_range)
-
-            chapter_ranges = pp.DelimitedList(
-                chapter_range, delim=separator(self.style.chapter_separator.strip())
-            ).set_results_name("chapter_ranges")
-
-            book_chapter_verse_ranges = (
-                book_elem.copy().set_results_name("book")
-                + location_marker.copy().set_results_name("chapter_ranges_location")
-                + chapter_ranges
-                + location_marker.copy().set_results_name("end_location")
-            ).set_parse_action(self._make_simple_ref)
-
-            chapter_only_range = (
-                chapter_elem.copy().set_results_name("start_chapter")
-                + pp.Opt(
+                + (
                     range_separator
-                    + chapter_elem.copy().set_results_name("end_chapter")
+                    + (
+                        other_book_end
+                        | not_a_cited_book
+                        + chapter_elem.copy().set_results_name("end_chapter")
+                        + (
+                            separator(chapter_verse_separator)
+                            + verse.copy().set_results_name("end_verse")
+                            + optional_subverse.copy().set_results_name("end_subverse")
+                            | no_letter_after.copy()
+                        )
+                    )
+                    | no_letter_after.copy()
                 )
-                + location_marker.copy().set_results_name("end_location")
-            ).set_parse_action(self._make_chapter_only_range)
+                + end_location
+            ).set_parse_action(self._draft_chapters)
 
-            chapter_only_ranges = pp.DelimitedList(
-                chapter_only_range,
-                delim=separator(self.style.chapter_separator.strip()),
-            ).set_results_name("chapter_ranges")
+            more = pp.ZeroOrMore(
+                separator(chapter_separator)
+                + not_a_book
+                + (chapter_and_verses | whole_chapters)
+            )
 
-            book_chapter_only_ranges = (
+            verses_first = (
                 book_elem.copy().set_results_name("book")
-                + location_marker.copy().set_results_name("chapter_ranges_location")
-                + chapter_only_ranges
-                + location_marker.copy().set_results_name("end_location")
-            ).set_parse_action(self._make_simple_ref)
+                + chapter_and_verses
+                + more
+                + end_location
+            ).set_parse_action(self._make_ranges)
+            chapters_first = (
+                book_elem.copy().set_results_name("book")
+                + whole_chapters
+                + more
+                + end_location
+            ).set_parse_action(self._make_ranges)
+            return verses_first, chapters_first
 
-            return book_chapter_verse_ranges, book_chapter_only_ranges
-
-        book_chapter_verse_ranges, book_chapter_only_ranges = build_book_branches(
-            book, chapter
-        )
+        verses_first, chapters_first = build_book_branches(book, chapter)
 
         # A book with chapter letters (e.g. the NABRE's Esther A–F) gets its
         # own branches whose chapter element matches the letters. The branches
         # also claim the names of the book it may share a name with (ESG with
-        # EST, PSAS with PSA), so that "Esther C:12" parses as ESG even though
-        # "Esther" alone resolves to EST.
-        lettered_verse_branches: list[pp.ParserElement] = []
-        lettered_chapter_branches: list[pp.ParserElement] = []
+        # EST), so that "Esther C:12" parses as ESG even though "Esther" alone
+        # resolves to EST.
+        lettered_verses_first: list[pp.ParserElement] = []
+        lettered_chapters_first: list[pp.ParserElement] = []
         for lettered_id, letters in self.style.chapter_letters.items():
             partner = SHARED_NAME_PARTNER.get(lettered_id)
-            names = [
+            lettered_names = [
                 name
                 for name, book_id in self.style.recognized_names.items()
                 if book_id == lettered_id or book_id == partner
             ]
-            if not names or not letters:
+            if not lettered_names or not letters:
                 continue
             # A factory function gives the parse action a single-argument
             # signature (pyparsing dispatches on arity) with the loop
@@ -331,7 +403,7 @@ class RefParser:
                 letter_list = list(letters)
                 return lambda t: letter_list.index(str(t[0])) + 1
 
-            lettered_book = _book_element(dict.fromkeys(names, lettered_id))
+            lettered_book = _book_element(dict.fromkeys(lettered_names, lettered_id))
             # The lookahead keeps a letter from matching the start of a longer
             # word, as with Roman-numeral chapters above.
             letter_chapter = pp.Regex(
@@ -344,63 +416,27 @@ class RefParser:
             )
             letter_chapter.set_parse_action(make_letter_action(letters))
             lettered_cv, lettered_c = build_book_branches(lettered_book, letter_chapter)
-            lettered_verse_branches.append(lettered_cv)
-            lettered_chapter_branches.append(lettered_c)
+            lettered_verses_first.append(lettered_cv)
+            lettered_chapters_first.append(lettered_c)
 
-        # The chapter can be omitted for single-chapter (sc) books
-        sc_book = _book_element(
-            {
-                name: id
-                for name, id in self.style.recognized_names.items()
-                if self.versification.is_single_chapter(id)
-            }
-        ).set_results_name("book")
-
-        sc_verse_range = (
-            verse.copy().set_results_name("start_verse")
-            + optional_subverse.copy().set_results_name("start_subverse")
-            + pp.Opt(
-                (
-                    (
-                        pp.Literal(self.style.following_verses).set_results_name(
-                            "following_verses"
-                        )
-                        | pp.Literal(self.style.following_verse).set_results_name(
-                            "following_verse"
-                        )
-                    )
-                    + word_boundary.copy()
-                )
-                | (
-                    range_separator
-                    + (
-                        (
-                            verse.copy().set_results_name("end_verse")
-                            + optional_subverse.copy().set_results_name("end_subverse")
-                        )
-                        | subverse.copy().set_results_name("end_subverse")
-                    )
-                )
+        sc_verses = (
+            sc_book.copy().set_results_name("book")
+            + pp.DelimitedList(
+                build_verse_range(None), delim=separator(verse_range_separator)
             )
-            + location_marker.copy().set_results_name("end_location")
-        ).set_parse_action(self._make_sc_verse_range)
+            + end_location
+        ).set_parse_action(self._make_sc_ranges)
 
-        sc_verse_ranges = pp.DelimitedList(
-            sc_verse_range, delim=separator(self.style.verse_range_separator.strip())
-        ).set_results_name("chapter_ranges")
-
-        sc_book_verse_ranges = (
-            sc_book
-            + location_marker.copy().set_results_name("chapter_ranges_location")
-            + sc_verse_ranges
-            + location_marker.copy().set_results_name("end_location")
-        ).set_parse_action(self._make_simple_ref)
-
-        # Whole-book references: bare book name
-        book_only = (
+        # A bare book name is the whole book, and two joined by a range
+        # separator are a range of whole books ("Matt–John").
+        whole_books = (
             book.copy().set_results_name("book")
-            + location_marker.copy().set_results_name("end_location")
-        ).set_parse_action(self._make_whole_book_ref)
+            + pp.Opt(
+                range_separator
+                + (other_book_end | book.copy().set_results_name("end_book"))
+            )
+            + end_location
+        ).set_parse_action(self._make_ranges)
 
         # A leading word boundary keeps a book name from matching when it is
         # glued to the end of a longer word (e.g. the "Rom" in "CongrRom") while
@@ -416,289 +452,207 @@ class RefParser:
         # Jude 1 or "John 3:16" parse as "John 3". The lettered branches come
         # before their numeric counterparts so that a letter chapter is tried
         # before the fallbacks that would match less of the text.
-        self.simple_ref_parser = leading_word_boundary + pp.MatchFirst(
+        book_ref = leading_word_boundary + pp.MatchFirst(
             [
-                *lettered_verse_branches,
-                book_chapter_verse_ranges,
-                sc_book_verse_ranges,
-                *lettered_chapter_branches,
-                book_chapter_only_ranges,
-                book_only,
+                *lettered_verses_first,
+                verses_first,
+                sc_verses,
+                *lettered_chapters_first,
+                chapters_first,
+                whole_books,
             ]
         )
 
-        # A trailing versification designator (e.g. "Vulg.", "(LXX)"). one_of
-        # escapes regex metacharacters and prefers longer matches, so "Vulgate"
-        # wins over "Vulg.". The word boundary keeps "LXX" from matching inside a
-        # longer word. The parse action resolves the designator to a Versification.
+        # A reference may go on to other books. A trailing versification
+        # designator (e.g. "Vulg.", "(LXX)") applies to every book in it.
+        bible_ref_body: pp.ParserElement = pp.DelimitedList(
+            book_ref, separator(chapter_separator)
+        )
         if self._designator_versifications:
-            # leave_whitespace on the boundary keeps the And from skipping past
-            # the space after the designator and testing the next word instead.
+            # one_of escapes regex metacharacters and prefers longer matches,
+            # so "Vulgate" wins over "Vulg.". The word boundary keeps "LXX"
+            # from matching inside a longer word; leave_whitespace on it keeps
+            # the And from skipping past the space after the designator and
+            # testing the next word instead.
             designator = (
                 pp.one_of(list(self._designator_versifications.keys()))
                 + pp.NotAny(pp.Char(pp.identbodychars)).leave_whitespace()
             )
             designator.set_parse_action(lambda t: self._designator_versifications[t[0]])
-        else:
-            designator = None
-
-        # Now it's simple to build a parser for BibleRef. A designator at the end
-        # of the whole reference applies to every book in it.
-        bible_ref_body: pp.ParserElement = pp.DelimitedList(
-            self.simple_ref_parser, separator(self.style.chapter_separator.strip())
-        )
-        if designator is not None:
             bible_ref_body = bible_ref_body + pp.Opt(
-                designator.copy().set_results_name("versification_designator")
+                designator.set_results_name("versification_designator")
             )
-        self.bible_ref_parser = (
-            bible_ref_body + location_marker.copy().set_results_name("end_location")
-        ).set_parse_action(self._make_bible_ref)
+        self.bible_ref_parser = (bible_ref_body + end_location).set_parse_action(
+            self._make_bible_ref
+        )
+        _extend_whitespace(self.bible_ref_parser)
 
-        # A SimpleBibleRef carries no versification, so parse_simple matches and
-        # discards a trailing designator (parse_all then succeeds on the suffix).
-        if designator is not None:
-            self.simple_ref_parser_top = self.simple_ref_parser + pp.Opt(
-                pp.Suppress(designator.copy())
-            )
-        else:
-            self.simple_ref_parser_top = self.simple_ref_parser
-
-        for parser in (
-            self.simple_ref_parser,
-            self.simple_ref_parser_top,
-            self.bible_ref_parser,
-        ):
-            _extend_whitespace(parser)
-
-    def _make_verse_range(
+    def _draft_verses(
         self, original_text: str, loc: int, tokens: pp.ParseResults
-    ) -> VerseRange:
-        """Create a VerseRange from parsed tokens.
+    ) -> _Draft:
+        """Draft a verse or range of verses from parsed tokens.
 
-        Chapter numbers that cannot be determined locally are set to -1.
         This is a parse action for use with pyparsing.
-
-        Returns:
-            A VerseRange instance based on the parsed tokens
-
         """
-        start_chapter = _get_int(tokens, "start_chapter", -1)
-        start_verse = tokens.start_verse
-        start_subverse = tokens.start_subverse
-        # Handle following_verse(s) mis-parsed as subverse.
-        if "following_verse" in tokens:
-            has_following_verse = True
-        elif start_subverse == self.style.following_verse and "end_verse" not in tokens:
-            start_subverse = ""
-            has_following_verse = True
-        else:
-            has_following_verse = False
-        if "following_verses" in tokens:
-            has_following_verses = True
-        elif (
-            start_subverse == self.style.following_verses and "end_verse" not in tokens
-        ):
-            start_subverse = ""
-            has_following_verses = True
-        else:
-            has_following_verses = False
-        # Now set end based on type of range.
-        if has_following_verse or has_following_verses:
-            end_chapter = start_chapter
-            if has_following_verse:
-                end_verse = start_verse + 1
-            else:
-                end_verse = -1
-            end_subverse = ""
-        else:
-            end_chapter = _get_int(tokens, "end_chapter", start_chapter)
-            end_verse = _get_int(tokens, "end_verse", start_verse)
-            end_subverse = _get_str(tokens, "end_subverse", start_subverse)
-        end_location = _get_int(tokens, "end_location", -1)
-        range_original_text = original_text[loc:end_location].strip()
-        return VerseRange(
-            start_chapter=start_chapter,
-            start_verse=start_verse,
-            start_subverse=start_subverse,
-            end_chapter=end_chapter,
-            end_verse=end_verse,
-            end_subverse=end_subverse,
-            original_text=range_original_text,
+        draft = _Draft(
+            start_loc=loc,
+            end_loc=_get_int(tokens, "end_location", loc),
+            verse=int(tokens["start_verse"]),
+            subverse=str(tokens["start_subverse"]),
         )
+        has_end = any(
+            name in tokens for name in ("end_book", "end_verse", "end_subverse")
+        )
+        # A following-verses marker may have parsed as a subverse.
+        if "following_verses" in tokens:
+            draft.following = "ff"
+        elif "following_verse" in tokens:
+            draft.following = "f"
+        elif not has_end and draft.subverse == self.style.following_verses:
+            draft.following = "ff"
+            draft.subverse = ""
+        elif not has_end and draft.subverse == self.style.following_verse:
+            draft.following = "f"
+            draft.subverse = ""
+        elif has_end:
+            draft.has_end = True
+            if "end_book" in tokens:
+                draft.end_book = str(tokens["end_book"])
+            draft.end_chapter = _opt_int(tokens, "end_chapter")
+            if draft.end_book is None:
+                # A subverse alone ends the range in the verse it starts in.
+                draft.end_verse = _get_int(tokens, "end_verse", draft.verse or 0)
+            else:
+                draft.end_verse = _opt_int(tokens, "end_verse")
+            draft.end_subverse = _get_str(tokens, "end_subverse", "")
+        return draft
 
     @staticmethod
-    def _make_chapter_range(
+    def _draft_chapter_and_verses(
         original_text: str, loc: int, tokens: pp.ParseResults
-    ) -> pp.ParseResults:
-        """Set the chapter for the verse ranges.
+    ) -> list[_Draft]:
+        """Give the first of a chapter's verse ranges the chapter stated with it.
 
-        Here we supply chapter numbers that cannot be determined locally.
         This is a parse action for use with pyparsing.
         """
-        this_chapter = tokens.start_chapter
-        verse_ranges = tokens.verse_ranges
-        for range in verse_ranges:
-            # Set the chapter for each verse range
-            range.start_chapter = this_chapter
-            if range.end_chapter < 0:
-                range.end_chapter = this_chapter
-            else:
-                this_chapter = range.end_chapter
-        if verse_ranges:
-            # Expand the original text for the first verse range to include the
-            # chapter number. Why do we need to use find()? Because there could
-            # be whitespace after verse_ranges_location.
-            verse_ranges_location = _get_int(tokens, "verse_ranges_location", loc)
-            range_0_start = original_text.find(
-                verse_ranges[0].original_text, verse_ranges_location
-            )
-            verse_ranges[0].original_text = original_text[
-                loc : range_0_start + len(verse_ranges[0].original_text)
-            ]
-        assert isinstance(verse_ranges, pp.ParseResults)
-        return verse_ranges
+        drafts = [token for token in tokens if isinstance(token, _Draft)]
+        drafts[0].chapter = int(tokens["start_chapter"])
+        drafts[0].start_loc = loc
+        return drafts
 
-    def _make_sc_verse_range(
+    @staticmethod
+    def _draft_chapters(
+        original_text: str, loc: int, tokens: pp.ParseResults
+    ) -> _Draft:
+        """Draft a range that begins with a whole chapter from parsed tokens.
+
+        This is a parse action for use with pyparsing.
+        """
+        draft = _Draft(
+            start_loc=loc,
+            end_loc=_get_int(tokens, "end_location", loc),
+            chapter=int(tokens["start_chapter"]),
+        )
+        if "end_chapter" in tokens or "end_book" in tokens:
+            draft.has_end = True
+            if "end_book" in tokens:
+                draft.end_book = str(tokens["end_book"])
+            draft.end_chapter = _opt_int(tokens, "end_chapter")
+            draft.end_verse = _opt_int(tokens, "end_verse")
+            draft.end_subverse = _get_str(tokens, "end_subverse", "")
+        return draft
+
+    def _make_ranges(
         self, original_text: str, loc: int, tokens: pp.ParseResults
-    ) -> VerseRange:
-        """Create a VerseRange from parsed tokens.
-
-        This is for a single-chapter book.
-        This is a parse action for use with pyparsing.
-
-        Returns:
-            A VerseRange instance based on the parsed tokens
-
-        """
-        start_chapter = 1
-        start_verse = tokens.start_verse
-        start_subverse = tokens.start_subverse
-        end_chapter = 1
-        # Handle following_verse(s) mis-parsed as subverse.
-        if "following_verse" in tokens:
-            has_following_verse = True
-        elif start_subverse == self.style.following_verse and "end_verse" not in tokens:
-            start_subverse = ""
-            has_following_verse = True
-        else:
-            has_following_verse = False
-        if "following_verses" in tokens:
-            has_following_verses = True
-        elif (
-            start_subverse == self.style.following_verses and "end_verse" not in tokens
-        ):
-            start_subverse = ""
-            has_following_verses = True
-        else:
-            has_following_verses = False
-        # Now set end based on type of range.
-        if has_following_verse or has_following_verses:
-            if has_following_verse:
-                end_verse = start_verse + 1
-            else:
-                end_verse = -1
-            end_subverse = ""
-        else:
-            end_verse = _get_int(tokens, "end_verse", start_verse)
-            end_subverse = _get_str(tokens, "end_subverse", start_subverse)
-        end_location = _get_int(tokens, "end_location", -1)
-        range_original_text = original_text[loc:end_location].strip()
-        return VerseRange(
-            start_chapter=start_chapter,
-            start_verse=start_verse,
-            start_subverse=start_subverse,
-            end_chapter=end_chapter,
-            end_verse=end_verse,
-            end_subverse=end_subverse,
-            original_text=range_original_text,
-        )
-
-    @staticmethod
-    def _make_chapter_only_range(
-        original_text: str, loc: int, tokens: pp.ParseResults
-    ) -> VerseRange:
-        """Create a whole-chapter VerseRange from parsed tokens.
+    ) -> list[VerseRange]:
+        """Create the VerseRanges of one book name from parsed tokens.
 
         This is a parse action for use with pyparsing.
-
-        Returns:
-            A VerseRange with verse numbers set to -1 (whole chapters)
-
         """
-        start_chapter = tokens.start_chapter
-        end_chapter = _get_int(tokens, "end_chapter", start_chapter)
-        end_location = _get_int(tokens, "end_location", -1)
-        range_original_text = original_text[loc:end_location].strip()
-        return VerseRange(
-            start_chapter=start_chapter,
-            start_verse=-1,
-            start_subverse="",
-            end_chapter=end_chapter,
-            end_verse=-1,
-            end_subverse="",
-            original_text=range_original_text,
-        )
+        return self._finish_ranges(original_text, loc, tokens, None)
 
-    @staticmethod
-    def _make_whole_book_ref(
-        original_text: str, loc: int, tokens: pp.ParseResults
-    ) -> SimpleBibleRef:
-        """Create a whole-book SimpleBibleRef from parsed tokens.
+    def _make_sc_ranges(
+        self, original_text: str, loc: int, tokens: pp.ParseResults
+    ) -> list[VerseRange]:
+        """Create the VerseRanges of a single-chapter book from parsed tokens.
 
         This is a parse action for use with pyparsing.
+        """
+        return self._finish_ranges(original_text, loc, tokens, 1)
+
+    def _finish_ranges(
+        self,
+        original_text: str,
+        loc: int,
+        tokens: pp.ParseResults,
+        chapter: int | None,
+    ) -> list[VerseRange]:
+        """Supply each drafted range with its book and chapter.
+
+        Args:
+            original_text: The text being parsed
+            loc: Where the book name begins
+            tokens: The book ID and the drafts of its ranges
+            chapter: The chapter in force before any is stated
 
         Returns:
-            A SimpleBibleRef with no ranges (whole book)
+            The finished verse ranges
 
         """
-        book_name = tokens.book
-        end_location = _get_int(tokens, "end_location", -1)
-        ref_original_text = original_text[loc:end_location].strip()
-        return SimpleBibleRef(
-            book_id=book_name,
-            ranges=[],
-            original_text=ref_original_text,
-        )
-
-    @staticmethod
-    def _make_simple_ref(
-        original_text: str, loc: int, tokens: pp.ParseResults
-    ) -> SimpleBibleRef:
-        """Create a SimpleBibleRef from parsed tokens.
-
-        This is a parse action for use with pyparsing.
-
-        Returns:
-            A SimpleBibleRef instance based on the parsed tokens
-
-        """
-        # Extract the book ID and verse ranges
-        book_name = tokens.book
-        if "chapter_ranges" in tokens:
-            verse_ranges = tokens.chapter_ranges
-        else:
-            verse_ranges = tokens.verse_ranges
-        if verse_ranges:
-            # Expand the original text for the first verse range to include the
-            # book name. Why do we need to use find()? Because there could
-            # be whitespace after verse_ranges_location.
-            chapter_ranges_location = _get_int(tokens, "chapter_ranges_location", loc)
-            range_0_start = original_text.find(
-                verse_ranges[0].original_text, chapter_ranges_location
+        book = str(tokens["book"])
+        drafts = [token for token in tokens if isinstance(token, _Draft)]
+        if not drafts:
+            whole_book = _Draft(
+                loc, _get_int(tokens, "end_location", loc), whole_book=True
             )
-            verse_ranges[0].original_text = original_text[
-                loc : range_0_start + len(verse_ranges[0].original_text)
-            ]
-        end_location = _get_int(tokens, "end_location", -1)
-        ref_original_text = original_text[loc:end_location].strip()
+            if "end_book" in tokens:
+                whole_book.has_end = True
+                whole_book.end_book = str(tokens["end_book"])
+                whole_book.end_chapter = _opt_int(tokens, "end_chapter")
+                whole_book.end_verse = _opt_int(tokens, "end_verse")
+                whole_book.end_subverse = _get_str(tokens, "end_subverse", "")
+            drafts = [whole_book]
+        drafts[0].start_loc = loc
 
-        # Create a SimpleBibleRef with the parsed data
-        return SimpleBibleRef(
-            book_id=book_name,
-            ranges=verse_ranges.as_list(),
-            original_text=ref_original_text,
-        )
+        ranges: list[VerseRange] = []
+        for draft in drafts:
+            if draft.whole_book:
+                start = RefPoint(book)
+            else:
+                if draft.chapter is not None:
+                    chapter = draft.chapter
+                start = RefPoint(book, chapter, draft.verse, draft.subverse)
+
+            if draft.end_book is not None:
+                end_chapter = draft.end_chapter
+                # A verse alone is a verse of a single-chapter book.
+                if end_chapter is None and draft.end_verse is not None:
+                    end_chapter = 1
+                end = RefPoint(
+                    draft.end_book, end_chapter, draft.end_verse, draft.end_subverse
+                )
+            elif draft.following == "ff":
+                end = RefPoint(book, chapter)
+            elif draft.following == "f":
+                assert draft.verse is not None
+                end = RefPoint(book, chapter, draft.verse + 1)
+            elif draft.has_end:
+                end_chapter = (
+                    chapter if draft.end_chapter is None else draft.end_chapter
+                )
+                end = RefPoint(book, end_chapter, draft.end_verse, draft.end_subverse)
+            else:
+                end = start
+
+            ranges.append(
+                VerseRange(
+                    start,
+                    end,
+                    original_text[draft.start_loc : draft.end_loc].strip(),
+                )
+            )
+            book, chapter = end.book, end.chapter
+        return ranges
 
     def _make_bible_ref(
         self, original_text: str, loc: int, tokens: pp.ParseResults
@@ -712,9 +666,7 @@ class RefParser:
 
         """
         end_location = _get_int(tokens, "end_location", -1)
-        # One token (end_location) is not a SimpleBibleRef
-        simple_refs = [r for r in tokens if isinstance(r, SimpleBibleRef)]
-        ref_original_text = original_text[loc:end_location].strip()
+        ranges = [token for token in tokens if isinstance(token, VerseRange)]
 
         # A trailing designator overrides the parser's default versification.
         versification = self.versification
@@ -723,38 +675,11 @@ class RefParser:
             assert isinstance(designated, Versification)
             versification = designated
 
-        # Create a BibleRef with the parsed data
         return BibleRef(
+            ranges=ranges,
             versification=versification,
-            simple_refs=simple_refs,
-            original_text=ref_original_text,
+            original_text=original_text[loc:end_location].strip(),
         )
-
-    def parse_simple(self, text: str, silent: bool = False) -> SimpleBibleRef | None:
-        """Parse a string to produce a SimpleBibleRef.
-
-        This method attempts to parse the entire string as a reference to a single book of the Bible.
-
-        Args:
-            text: The string to parse
-            silent: If True, return None on failure instead of raising a pyparsing.ParseException
-
-        Returns:
-            A SimpleBibleRef instance, or None if silent=True and parsing fails
-
-        """
-        try:
-            # Try to parse the text
-            result = self.simple_ref_parser_top.parse_string(text, parse_all=True)
-            ref = result[0]
-            assert isinstance(ref, SimpleBibleRef)
-            return ref
-
-        except pp.ParseException as e:
-            if silent:
-                return None
-            else:
-                raise e
 
     def parse(self, text: str, silent: bool = False) -> BibleRef | None:
         """Parse a string to produce a BibleRef.
@@ -770,7 +695,6 @@ class RefParser:
 
         """
         try:
-            # Try to parse the text
             result = self.bible_ref_parser.parse_string(text, parse_all=True)
             ref = result[0]
             assert isinstance(ref, BibleRef)
@@ -783,17 +707,6 @@ class RefParser:
                 raise e
 
     @staticmethod
-    def _passes_sensitivity_simple(
-        ref: SimpleBibleRef, sensitivity: "Sensitivity"
-    ) -> bool:
-        """Check if a SimpleBibleRef passes the sensitivity filter."""
-        if sensitivity == Sensitivity.BOOK:
-            return True
-        if sensitivity == Sensitivity.CHAPTER:
-            return not ref.is_whole_book()
-        return not ref.is_whole_chapters()
-
-    @staticmethod
     def _passes_sensitivity(ref: BibleRef, sensitivity: "Sensitivity") -> bool:
         """Check if a BibleRef passes the sensitivity filter."""
         if sensitivity == Sensitivity.BOOK:
@@ -802,60 +715,12 @@ class RefParser:
             return not ref.is_whole_books()
         return not ref.is_whole_chapters()
 
-    def scan_string_simple(
-        self,
-        text: str,
-        as_ranges: bool = False,
-        sensitivity: "Sensitivity" = Sensitivity.VERSE,
-    ) -> Generator[tuple["SimpleBibleRef", int, int], None, None]:
-        """Scan a string for SimpleBibleRefs.
-
-        This method scans the entire string for references to a single book of the Bible.
-
-        Args:
-            text: The string to scan
-            as_ranges: If True, yield a SimpleBibleRef for each verse range
-            sensitivity: Controls which references are reported. VERSE (default)
-                skips whole-chapter and whole-book references. CHAPTER also
-                reports whole-chapter references. BOOK reports everything.
-
-        Yields:
-            A reference and the start and end of its location in text.
-            (ref: SimpleBibleRef, start: int, end: int)
-
-        """
-        for tokens, start, end in self.simple_ref_parser.scan_string(text):
-            ref = tokens[0]
-            assert isinstance(ref, SimpleBibleRef)
-            if as_ranges:
-                next_start = start
-                for range_ref in ref.range_refs():
-                    if not self._passes_sensitivity_simple(range_ref, sensitivity):
-                        continue
-                    # Use the original text to find the start and end.
-                    assert range_ref.original_text is not None
-                    range_start = text.find(range_ref.original_text, next_start)
-                    assert range_start >= 0
-                    next_start = range_start + len(range_ref.original_text)
-                    yield (range_ref, range_start, next_start)
-                # Whole-book refs have no ranges; yield as-is if allowed.
-                if ref.is_whole_book() and self._passes_sensitivity_simple(
-                    ref, sensitivity
-                ):
-                    assert ref.original_text is not None
-                    yield (ref, start, start + len(ref.original_text))
-            else:
-                if not self._passes_sensitivity_simple(ref, sensitivity):
-                    continue
-                assert ref.original_text is not None
-                yield (ref, start, start + len(ref.original_text))
-
     def scan_string(
         self,
         text: str,
         as_ranges: bool = False,
         sensitivity: "Sensitivity" = Sensitivity.VERSE,
-    ) -> Generator[tuple["BibleRef", int, int], None, None]:
+    ) -> Iterator[tuple[BibleRef, int, int]]:
         """Scan a string for BibleRefs.
 
         This method scans the entire string for references to one or more books of the Bible.
@@ -866,72 +731,31 @@ class RefParser:
             sensitivity: Controls which references are reported. VERSE (default)
                 skips whole-chapter and whole-book references. CHAPTER also
                 reports whole-chapter references. BOOK reports everything.
+                With as_ranges, each verse range is judged by itself.
 
         Yields:
             A reference and the start and end of its location in text.
             (ref: BibleRef, start: int, end: int)
 
         """
-        for tokens, start, end in self.bible_ref_parser.scan_string(text):
+        for tokens, start, _ in self.bible_ref_parser.scan_string(text):
             ref = tokens[0]
             assert isinstance(ref, BibleRef)
             if as_ranges:
                 next_start = start
                 for range_ref in ref.range_refs():
-                    if not self._passes_sensitivity(range_ref, sensitivity):
-                        continue
                     # Use the original text to find the start and end.
                     assert range_ref.original_text is not None
                     range_start = text.find(range_ref.original_text, next_start)
                     assert range_start >= 0
                     next_start = range_start + len(range_ref.original_text)
-                    yield (range_ref, range_start, next_start)
-                # Whole-book refs have no ranges; yield as-is if allowed.
-                if ref.is_whole_books() and self._passes_sensitivity(ref, sensitivity):
-                    assert ref.original_text is not None
-                    yield (ref, start, start + len(ref.original_text))
+                    if self._passes_sensitivity(range_ref, sensitivity):
+                        yield (range_ref, range_start, next_start)
             else:
                 if not self._passes_sensitivity(ref, sensitivity):
                     continue
                 assert ref.original_text is not None
                 yield (ref, start, start + len(ref.original_text))
-
-    def sub_refs_simple(
-        self,
-        text: str,
-        callback: Callable[[SimpleBibleRef], str | None],
-        as_ranges: bool = False,
-        sensitivity: "Sensitivity" = Sensitivity.VERSE,
-    ) -> str:
-        """Substitute SimpleBibleRefs in a string.
-
-        This method scans the entire string for references to a single book of the Bible and
-        applies a callback function to each reference.
-
-        Args:
-            text: The string to scan
-            callback: A function that takes a SimpleBibleRef and returns a string or None
-                Unless None is returned, the reference is replaced with the returned
-                value.
-            as_ranges: If True, yield a SimpleBibleRef for each verse range
-            sensitivity: Controls which references are reported. VERSE (default)
-                skips whole-chapter and whole-book references. CHAPTER also
-                reports whole-chapter references. BOOK reports everything.
-
-        Returns:
-            The modified string
-
-        """
-        result = []
-        last_end = 0
-        for ref, start, end in self.scan_string_simple(text, as_ranges, sensitivity):
-            replacement = callback(ref)
-            if replacement is not None:
-                result.append(text[last_end:start])
-                result.append(replacement)
-                last_end = end
-        result.append(text[last_end:])
-        return "".join(result)
 
     def sub_refs(
         self,

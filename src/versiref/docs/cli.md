@@ -58,7 +58,9 @@ versiref list book-names --pattern 'it-*'
 ## `parse`
 
 Parse a single reference and print it normalized, or — with `--json` — emit its
-structured book/chapter/verse breakdown.
+structured breakdown: a list of `ranges`, each with a `start` and an `end` that
+give a `book`, `chapter`, `verse`, and `subverse`. A whole chapter has a null
+`verse`, and a whole book a null `chapter` as well.
 
 ```sh
 versiref parse "Jn 3:16-18" --style en-cmos_short
@@ -73,11 +75,12 @@ Check whether a reference both parses and exists in the versification.
 
 ```sh
 versiref validate "Gen 1:31" --style en-sbl -v eng   # valid
-versiref validate "Gen 1:99" --style en-sbl -v eng   # out of range
+versiref validate "Gen 1:99" --style en-sbl -v eng   # Gen 1 has no verse 99 (only 31 verses)
 ```
 
-Exit status: `0` valid, `1` parses but out of range, `2` unparseable. Useful for
-a caller checking its own citations.
+An invalid reference is reported with the reason, which `--json` gives as
+`reason`. Exit status: `0` valid, `1` parses but invalid, `2` unparseable.
+Useful for a caller checking its own citations.
 
 ## `convert`
 

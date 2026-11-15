@@ -40,7 +40,7 @@ def _invert(d: dict[str, str]) -> dict[str, str]:
 
 @dataclass
 class RefStyle:
-    """Defines how a SimpleBibleRef is converted to and from strings.
+    """Defines how a BibleRef is converted to and from strings.
 
     A RefStyle primarily holds data that specifies the formatting conventions
     for Bible references. Formatting and parsing is done by other classes
@@ -119,7 +119,7 @@ class RefStyle:
             return f'RefStyle.named("{self.identifier}")'
         return object.__str__(self)
 
-    def book_name(self, book_id: str) -> str:
+    def book_name(self, book_id: str, plural: bool = False) -> str:
         """Return the name used to format a book.
 
         A book with chapter letters takes the name of the book it shares a
@@ -129,6 +129,9 @@ class RefStyle:
 
         Args:
             book_id: The book to name.
+            plural: If True, name the Psalms in the plural ("Pss" rather than
+                "Ps"), where the style has such a name under the key "PSAS".
+                It has no effect on other books.
 
         Returns:
             The book's name in this style.
@@ -137,6 +140,8 @@ class RefStyle:
             ValueError: If the style has no name for the book.
 
         """
+        if plural and book_id == "PSA" and "PSAS" in self.names:
+            return self.names["PSAS"]
         if book_id in self.chapter_letters:
             partner = SHARED_NAME_PARTNER.get(book_id)
             if partner is not None and partner in self.names:

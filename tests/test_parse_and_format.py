@@ -1,7 +1,7 @@
 """Test parsing and formatting Bible references."""
 
 import pytest
-from versiref import RefParser, RefStyle, SimpleBibleRef, Versification, standard_names
+from versiref import BibleRef, RefParser, RefStyle, Versification, standard_names
 
 
 @pytest.mark.parametrize(
@@ -68,13 +68,14 @@ def test_parse_sbl_and_format_cei(sbl_ref: str, expected_cei_ref: str) -> None:
     parser = RefParser(sbl_style, eng_versification)
 
     # Parse the reference
-    bible_ref = parser.parse_simple(sbl_ref)
+    bible_ref = parser.parse(sbl_ref)
 
     # Assert the reference was parsed successfully
     assert bible_ref is not None, f"Failed to parse: {sbl_ref}"
 
-    # Format the reference in CEI style
-    formatted_ref = bible_ref.format(cei_style)
+    # Format the reference in CEI style, without a versification, so that
+    # the chapter of a one-chapter book is stated
+    formatted_ref = BibleRef(bible_ref.ranges).format(cei_style)
 
     # Assert the formatted reference matches the expected CEI style
     assert formatted_ref == expected_cei_ref
@@ -133,7 +134,7 @@ def test_parse_cmos_and_format_sbl(cmos_ref: str, expected_sbl_ref: str) -> None
     assert formatted_ref == expected_sbl_ref
 
 
-def test_scan_string_simple() -> None:
+def test_scan_string() -> None:
     """Test scanning text for Bible references."""
     # Setup
     sbl_style = RefStyle(
@@ -148,7 +149,7 @@ def test_scan_string_simple() -> None:
     text = "Look at John 3:16 and Rom 8:28-30 for encouragement. Also Matt 5:3-12."
 
     # Test scanning for complete references
-    refs = list(parser.scan_string_simple(text))
+    refs = list(parser.scan_string(text))
     assert len(refs) == 3
 
     ref1, start1, end1 = refs[0]
@@ -164,7 +165,7 @@ def test_scan_string_simple() -> None:
     assert text[start3:end3] == ref3.original_text
 
 
-def test_scan_string_simple_as_ranges() -> None:
+def test_scan_string_as_ranges() -> None:
     """Test scanning text for Bible references split into verse ranges."""
     # Setup
     sbl_style = RefStyle(names=standard_names("en-sbl_abbreviations"))
@@ -175,7 +176,7 @@ def test_scan_string_simple_as_ranges() -> None:
     text = "See Luke 1:53,79 and Pss 2:1–3, 7–9; 110:1, 5–7"
 
     # Test scanning with as_ranges=True
-    range_refs = list(parser.scan_string_simple(text, as_ranges=True))
+    range_refs = list(parser.scan_string(text, as_ranges=True))
     assert len(range_refs) == 6
 
     ref1, start1, end1 = range_refs[0]
@@ -203,7 +204,7 @@ def test_scan_string_simple_as_ranges() -> None:
     assert text[start6:end6] == ref6.original_text
 
 
-def test_scan_string_simple_with_noise() -> None:
+def test_scan_string_with_noise() -> None:
     """Test scanning text with non-reference content."""
     # Setup
     sbl_names = RefStyle(names=standard_names("en-sbl_names"))
@@ -220,7 +221,7 @@ def test_scan_string_simple_with_noise() -> None:
     """
 
     # Should only find the valid references
-    refs = list(parser.scan_string_simple(text))
+    refs = list(parser.scan_string(text))
     assert len(refs) == 2
 
     ref1, start1, end1 = refs[0]
@@ -232,8 +233,8 @@ def test_scan_string_simple_with_noise() -> None:
     assert text[start2:end2] == ref2.original_text
 
 
-def test_sub_refs_simple_normalize() -> None:
-    """Test using sub_refs_simple to normalize references to SBL style."""
+def test_sub_refs_normalize() -> None:
+    """Test using sub_refs to normalize references to SBL style."""
     # Setup - create a style that recognizes multiple formats
     sbl_style = RefStyle(names=standard_names("en-sbl_abbreviations"))
     # Add alternative names
@@ -257,11 +258,11 @@ def test_sub_refs_simple_normalize() -> None:
     )
 
     # Function to format references consistently
-    def normalize_ref(ref: SimpleBibleRef) -> str | None:
+    def normalize_ref(ref: BibleRef) -> str | None:
         return ref.format(sbl_style)
 
     # Normalize all references
-    result = parser.sub_refs_simple(text, normalize_ref)
+    result = parser.sub_refs(text, normalize_ref)
 
     expected = (
         "Let us strive to embody Christ’s teaching on loving our neighbors "
@@ -278,8 +279,8 @@ def test_sub_refs_simple_normalize() -> None:
     assert result == expected
 
 
-def test_sub_refs_simple_no_change() -> None:
-    """Test using sub_refs_simple callback returning None."""
+def test_sub_refs_no_change() -> None:
+    """Test using sub_refs callback returning None."""
     # Setup - create a style that recognizes multiple formats
     sbl_style = RefStyle(names=standard_names("en-sbl_abbreviations"))
     # Add alternative names
@@ -293,14 +294,14 @@ def test_sub_refs_simple_no_change() -> None:
     text = "See Jn 13:16 and Mk 28:1–15."
 
     # Function to format references consistently
-    def normalize_ref(ref: SimpleBibleRef) -> str | None:
-        if ref.is_valid(eng_versification):
+    def normalize_ref(ref: BibleRef) -> str | None:
+        if ref.is_valid():
             return ref.format(sbl_style)
         else:
             return None
 
     # Normalize all references
-    result = parser.sub_refs_simple(text, normalize_ref)
+    result = parser.sub_refs(text, normalize_ref)
 
     expected = "See John 13:16 and Mk 28:1–15."
 
@@ -329,7 +330,7 @@ def test_parse_sbl_and_format_la_vetus(sbl_ref: str, expected_latin_ref: str) ->
     vetus_style = RefStyle.named("la-vetus")
     parser = RefParser(sbl_style, Versification.named("eng"))
 
-    bible_ref = parser.parse_simple(sbl_ref)
+    bible_ref = parser.parse(sbl_ref)
     assert bible_ref is not None, f"Failed to parse: {sbl_ref}"
     assert bible_ref.format(vetus_style) == expected_latin_ref
 
@@ -352,7 +353,7 @@ def test_parse_la_vetus_and_format_sbl(latin_ref: str, expected_sbl_ref: str) ->
     sbl_style = RefStyle(names=standard_names("en-sbl_abbreviations"))
     parser = RefParser(vetus_style, Versification.named("vulgata"))
 
-    bible_ref = parser.parse_simple(latin_ref)
+    bible_ref = parser.parse(latin_ref)
     assert bible_ref is not None, f"Failed to parse: {latin_ref}"
     assert bible_ref.format(sbl_style) == expected_sbl_ref
 
@@ -374,6 +375,6 @@ def test_parse_la_cce_and_format_sbl(cce_ref: str, expected_sbl_ref: str) -> Non
     sbl_style = RefStyle(names=standard_names("en-sbl_abbreviations"))
     parser = RefParser(cce_style, Versification.named("vulgata"))
 
-    bible_ref = parser.parse_simple(cce_ref)
+    bible_ref = parser.parse(cce_ref)
     assert bible_ref is not None, f"Failed to parse: {cce_ref}"
     assert bible_ref.format(sbl_style) == expected_sbl_ref

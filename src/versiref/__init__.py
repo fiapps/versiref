@@ -5,7 +5,7 @@ versifications, and it is flexible about the format is parses and the output it
 generates.
 """
 
-from versiref.bible_ref import BibleRef, SimpleBibleRef, VerseRange
+from versiref.bible_ref import BibleRef, RefPoint, VerseRange
 from versiref.ref_parser import RefParser, Sensitivity
 from versiref.ref_style import RefStyle, available_standard_names, standard_names
 from versiref.versification import Versification
@@ -14,7 +14,7 @@ __path__ = __import__("pkgutil").extend_path(__path__, __name__)
 
 __all__ = [
     "BibleRef",
-    "SimpleBibleRef",
+    "RefPoint",
     "VerseRange",
     "RefParser",
     "Sensitivity",

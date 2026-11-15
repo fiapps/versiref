@@ -1,671 +1,820 @@
 """Tests for the bible_ref module."""
 
 import pathlib
+import string
 
 import pytest
-from versiref.bible_ref import BibleRef, SimpleBibleRef, VerseRange
+from versiref.bible_ref import BibleRef, RefPoint, VerseRange
 from versiref.ref_parser import RefParser
 from versiref.ref_style import RefStyle, standard_names
 from versiref.versification import Versification
 
+SBL = RefStyle(names=standard_names("en-sbl_abbreviations"))
+
+
+def _range(
+    book: str,
+    chapter: int | None,
+    verse: int | None,
+    end_chapter: int | None,
+    end_verse: int | None,
+    subverse: str = "",
+    end_subverse: str = "",
+    original_text: str | None = None,
+) -> VerseRange:
+    """Build a VerseRange within one book."""
+    return VerseRange(
+        RefPoint(book, chapter, verse, subverse),
+        RefPoint(book, end_chapter, end_verse, end_subverse),
+        original_text,
+    )
+
+
+def _whole_book(book: str) -> VerseRange:
+    return VerseRange(RefPoint(book), RefPoint(book))
+
+
+def _spans(ref: BibleRef) -> list[tuple[object, ...]]:
+    """Describe each range as (book, chapter, verse, book, chapter, verse)."""
+    return [
+        (r.start.book, r.start.chapter, r.start.verse)
+        + (r.end.book, r.end.chapter, r.end.verse)
+        for r in ref.ranges
+    ]
+
+
+def _parsed(text: str, versification: str = "eng") -> BibleRef:
+    ref = RefParser(SBL, Versification.named(versification)).parse(text)
+    assert ref is not None
+    return ref
+
+
+def _mapped(text: str, source: str, target: str) -> str | None:
+    """Parse text in one versification and format it mapped into another."""
+    mapped = _parsed(text, source).map_to(Versification.named(target))
+    return None if mapped is None else mapped.format(SBL)
+
+
+# --- RefPoint and VerseRange ---
+
+
+def test_ref_point_initialization() -> None:
+    """Test that RefPoint initializes correctly."""
+    point = RefPoint("JHN", 3, 16, "a")
+    assert (point.book, point.chapter, point.verse, point.subverse) == (
+        "JHN",
+        3,
+        16,
+        "a",
+    )
+    whole_book = RefPoint("JHN")
+    assert whole_book.chapter is None
+    assert whole_book.verse is None
+    assert whole_book.subverse == ""
+    assert RefPoint("JHN", 3).verse is None
+    # A verse 0 (a psalm title) is a verse.
+    assert RefPoint("PSA", 51, 0).verse == 0
+
+
+@pytest.mark.parametrize(
+    ("args", "message"),
+    [
+        (("JHN", None, 16), "A verse requires a chapter"),
+        (("JHN", 3, -1), "cannot be negative"),
+        (("JHN", -1), "cannot be negative"),
+        (("PSAS", 1, 1), '"PSAS" is not a book ID'),
+    ],
+)
+def test_ref_point_rejects_impossible_values(
+    args: tuple[str, int | None, int | None], message: str
+) -> None:
+    """A point cannot have a verse without a chapter, or a negative number."""
+    with pytest.raises(ValueError, match=message):
+        RefPoint(*args)
+
 
 def test_verse_range_initialization() -> None:
     """Test that VerseRange initializes correctly."""
-    # Simple case: just a single verse
-    vr = VerseRange(3, 16, "", 3, 16, "")
-    assert vr.start_chapter == 3
-    assert vr.start_verse == 16
-    assert vr.end_chapter == 3
-    assert vr.end_verse == 16
-    assert vr.start_subverse == ""
-    assert vr.end_subverse == ""
+    vr = _range("JHN", 3, 16, 3, 16)
+    assert vr.start == RefPoint("JHN", 3, 16)
+    assert vr.end == vr.start
     assert vr.original_text is None
 
-    # Complex case: full range with subverses
-    vr = VerseRange(1, 2, "a", 3, 4, "b", "1:2a-3:4b")
-    assert vr.start_chapter == 1
-    assert vr.start_verse == 2
-    assert vr.start_subverse == "a"
-    assert vr.end_chapter == 3
-    assert vr.end_verse == 4
-    assert vr.end_subverse == "b"
+    vr = _range("GEN", 1, 2, 3, 4, "a", "b", original_text="1:2a-3:4b")
+    assert vr.start == RefPoint("GEN", 1, 2, "a")
+    assert vr.end == RefPoint("GEN", 3, 4, "b")
     assert vr.original_text == "1:2a-3:4b"
 
 
-def test_verse_range_is_valid() -> None:
-    """Test the is_valid method of VerseRange."""
-    # Valid ranges
-    assert (
-        VerseRange(1, 1, "", 1, 5, "").is_valid() is True
-    )  # Simple range in same chapter
-    assert VerseRange(1, -1, "", 1, -1, "").is_valid() is True  # Whole chapter
-    assert VerseRange(1, -1, "", 3, -1, "").is_valid() is True  # Multiple chapters
-    assert VerseRange(1, 1, "", 2, 3, "").is_valid() is True  # Cross-chapter range
-    assert (
-        VerseRange(1, 5, "", 1, -1, "").is_valid() is True
-    )  # "ff" notation in same chapter
-
-    # Invalid ranges
-    assert (
-        VerseRange(1, 5, "", 2, -1, "").is_valid() is False
-    )  # "ff" notation across chapters
-    assert (
-        VerseRange(1, -1, "", 1, 5, "").is_valid() is False
-    )  # Unspecified start, specified end
-    assert VerseRange(1, 5, "", 1, 3, "").is_valid() is False  # Start verse > end verse
-    assert (
-        VerseRange(2, 1, "", 1, 5, "").is_valid() is False
-    )  # Start chapter > end chapter
-
-
-def test_verse_range_is_valid_with_subverses() -> None:
-    """Test the is_valid method with subverses."""
-    # Subverses don't affect validity checks
-    assert (
-        VerseRange(1, 1, "a", 1, 1, "b").is_valid() is True
-    )  # Same verse, different subverses
-    assert (
-        VerseRange(1, 5, "c", 1, -1, "").is_valid() is True
-    )  # "ff" notation with subverse
-
-    # Invalid ranges with subverses
-    assert (
-        VerseRange(2, 1, "a", 1, 5, "b").is_valid() is False
-    )  # Start chapter > end chapter
-    assert (
-        VerseRange(1, 5, "a", 1, 3, "b").is_valid() is False
-    )  # Start verse > end verse
+@pytest.mark.parametrize(
+    "verse_range",
+    [
+        _range("GEN", 1, 1, 1, 5),  # Simple range in same chapter
+        _range("GEN", 1, None, 1, None),  # Whole chapter
+        _range("GEN", 1, None, 3, None),  # Multiple chapters
+        _range("GEN", 1, 1, 2, 3),  # Cross-chapter range
+        _range("GEN", 1, 5, 1, None),  # "ff" notation in same chapter
+        _range("GEN", 1, None, 2, 4),  # From a chapter to a verse
+        _range("GEN", 1, None, 1, 5),  # From a chapter to a verse of it
+        _whole_book("GEN"),
+        _range("GEN", 1, 1, 1, 1, "a", "b"),  # Same verse, different subverses
+        _range("GEN", 1, 5, 1, None, "c"),  # "ff" notation with subverse
+        # A range that spans books has no structural constraint.
+        VerseRange(RefPoint("MAT"), RefPoint("JHN")),
+        VerseRange(RefPoint("1SA", 31, 1), RefPoint("2SA", 1, 27)),
+        VerseRange(RefPoint("MAT", 28, 16), RefPoint("MRK", 1)),
+        VerseRange(RefPoint("MAT"), RefPoint("MRK", 3)),
+    ],
+)
+def test_verse_range_is_valid(verse_range: VerseRange) -> None:
+    """Test structurally valid ranges."""
+    assert verse_range.is_valid() is True
+    assert verse_range.invalid_reason() is None
 
 
-def test_verse_range_invalid_reason() -> None:
-    """Test the invalid_reason method of VerseRange."""
-    # Valid ranges have no reason.
-    assert VerseRange(1, 1, "", 1, 5, "").invalid_reason() is None
-    assert VerseRange(1, -1, "", 1, -1, "").invalid_reason() is None
-    assert VerseRange(1, 5, "", 1, -1, "").invalid_reason() is None
+@pytest.mark.parametrize(
+    ("verse_range", "reason"),
+    [
+        (
+            _range("GEN", 2, 1, 1, 5),
+            "range ends in an earlier chapter than it starts",
+        ),
+        (
+            _range("GEN", 2, 1, 1, 5, "a", "b"),
+            "range ends in an earlier chapter than it starts",
+        ),
+        (_range("GEN", 1, 5, 2, None), "'ff' range spans more than one chapter"),
+        (_range("GEN", 1, 5, 1, 3), "range ends at an earlier verse than it starts"),
+        (
+            _range("GEN", 1, 5, 1, 3, "a", "b"),
+            "range ends at an earlier verse than it starts",
+        ),
+        (
+            VerseRange(RefPoint("GEN"), RefPoint("GEN", 3)),
+            "range joins the whole book with a part of it",
+        ),
+        (
+            VerseRange(RefPoint("GEN", 3), RefPoint("GEN")),
+            "range joins the whole book with a part of it",
+        ),
+    ],
+)
+def test_verse_range_invalid_reason(verse_range: VerseRange, reason: str) -> None:
+    """Each structural failure returns an explanatory string."""
+    assert verse_range.is_valid() is False
+    assert verse_range.invalid_reason() == reason
 
-    # Each structural failure returns an explanatory string.
-    assert (
-        VerseRange(2, 1, "", 1, 5, "").invalid_reason()
-        == "range ends in an earlier chapter than it starts"
+
+def test_verse_range_kinds() -> None:
+    """Test the predicates that describe the form of a range."""
+    verse = _range("JHN", 3, 16, 3, 16)
+    following = _range("JHN", 3, 16, 3, None)
+    chapters = _range("JHN", 3, None, 5, None)
+    book = _whole_book("JHN")
+    books = VerseRange(RefPoint("MAT"), RefPoint("JHN"))
+
+    assert [r.is_whole_chapters() for r in (verse, following, chapters, book)] == [
+        False,
+        False,
+        True,
+        True,
+    ]
+    assert [r.is_whole_books() for r in (verse, chapters, book, books)] == [
+        False,
+        False,
+        True,
+        True,
+    ]
+    assert [r.has_following_verses() for r in (verse, following, chapters)] == [
+        False,
+        True,
+        False,
+    ]
+    assert book.is_single_book() is True
+    assert books.is_single_book() is False
+
+
+def test_equality_ignores_original_text() -> None:
+    """Ranges and references compare by what they cite, not how it was written."""
+    assert _range("JHN", 3, 16, 3, 16, original_text="Jn 3:16") == _range(
+        "JHN", 3, 16, 3, 16
     )
+    eng = Versification.named("eng")
+    constructed = BibleRef.for_range("JHN", 3, 16, versification=eng)
+    assert _parsed("John 3:16") == constructed
+    assert _parsed("John 3:16") != _parsed("John 3:17")
+    # The versification is part of what a reference is.
+    assert constructed != BibleRef.for_range("JHN", 3, 16)
+
+
+def test_references_are_hashable() -> None:
+    """References can be collected in sets and used as dictionary keys."""
+    refs = {_parsed("John 3:16"), _parsed("John 3:16; Rom 8:28"), _parsed("John 3:16")}
+    assert len(refs) == 2
+    counts = {_parsed("John 3:16"): 1}
     assert (
-        VerseRange(1, 5, "", 2, -1, "").invalid_reason()
-        == "'ff' range spans more than one chapter"
+        counts[
+            BibleRef.for_range(
+                "JHN", 3, 16, versification=_parsed("Gen 1").versification
+            )
+        ]
+        == 1
     )
-    assert (
-        VerseRange(1, -1, "", 1, 5, "").invalid_reason()
-        == "unspecified start verse with a specified end verse"
-    )
-    assert (
-        VerseRange(1, 5, "", 1, 3, "").invalid_reason()
-        == "range ends at an earlier verse than it starts"
-    )
+    assert hash(RefPoint("JHN", 3, 16)) == hash(RefPoint("JHN", 3, 16))
 
 
-def test_simple_bible_ref() -> None:
-    """Test that SimpleBibleRef initializes correctly."""
-    # Reference to entire book
-    ref = SimpleBibleRef("JHN")
-    assert ref.book_id == "JHN"
-    assert len(ref.ranges) == 0
-    assert ref.is_whole_book() is True
-
-    # Reference with a single verse range
-    ref = SimpleBibleRef(
-        "JHN", [VerseRange(3, 16, "", 3, 16, "", original_text="3:16")]
-    )
-    assert ref.book_id == "JHN"
-    assert len(ref.ranges) == 1
-    assert ref.ranges[0].start_chapter == 3
-    assert ref.ranges[0].start_verse == 16
-    assert ref.ranges[0].end_chapter == 3
-    assert ref.ranges[0].end_verse == 16
-    assert ref.is_whole_book() is False
-
-    # Reference with multiple verse ranges
-    ref = SimpleBibleRef(
-        "ROM",
-        [
-            VerseRange(1, 1, "", 1, 5, "", "1:1-5"),
-            VerseRange(3, 23, "", 3, 24, "", "3:23-24"),
-            VerseRange(5, 8, "", 5, 8, "", "5:8"),
-        ],
-        "Rom.",
-    )
-    assert ref.book_id == "ROM"
-    assert len(ref.ranges) == 3
-    assert ref.original_text == "Rom."
+# --- BibleRef construction ---
 
 
-def test_simple_bible_ref_for_range() -> None:
-    """Test the for_range class method of SimpleBibleRef."""
+def test_bible_ref_initialization() -> None:
+    """Test that BibleRef initializes correctly."""
+    ref = BibleRef()
+    assert ref.ranges == ()
+    assert ref.versification is None
+    assert ref.original_text is None
+
+    versification = Versification.named("eng")
+    ref = BibleRef(versification=versification)
+    assert ref.ranges == ()
+    assert ref.versification is versification
+
+    # Ranges may be given as a list and are stored as a tuple.
+    verse_range = _range("JHN", 3, 16, 3, 16)
+    ref = BibleRef([verse_range], versification, original_text="John 3:16")
+    assert ref.ranges == (verse_range,)
+    assert ref.versification is versification
+    assert ref.original_text == "John 3:16"
+
+
+def test_bible_ref_for_range() -> None:
+    """Test the for_range class method of BibleRef."""
+    versification = Versification.named("eng")
+
     # Basic usage with just book, chapter, and verse
-    ref1 = SimpleBibleRef.for_range("JHN", 3, 16)
-    assert ref1.book_id == "JHN"
-    assert len(ref1.ranges) == 1
-    assert ref1.ranges[0].start_chapter == 3
-    assert ref1.ranges[0].start_verse == 16
-    assert ref1.ranges[0].end_chapter == 3
-    assert ref1.ranges[0].end_verse == 16
-    assert ref1.ranges[0].start_subverse == ""
-    assert ref1.ranges[0].end_subverse == ""
+    ref = BibleRef.for_range("JHN", 3, 16, versification=versification)
+    assert _spans(ref) == [("JHN", 3, 16, "JHN", 3, 16)]
+    assert ref.ranges[0].start.subverse == ""
+    assert ref.ranges[0].end.subverse == ""
+    assert ref.versification is versification
+    assert ref.original_text is None
 
     # With end verse specified
-    ref2 = SimpleBibleRef.for_range("ROM", 8, 28, end_verse=39)
-    assert ref2.book_id == "ROM"
-    assert len(ref2.ranges) == 1
-    assert ref2.ranges[0].start_chapter == 8
-    assert ref2.ranges[0].start_verse == 28
-    assert ref2.ranges[0].end_chapter == 8
-    assert ref2.ranges[0].end_verse == 39
+    ref = BibleRef.for_range("ROM", 8, 28, end_verse=39)
+    assert _spans(ref) == [("ROM", 8, 28, "ROM", 8, 39)]
+    assert ref.versification is None
 
     # Cross-chapter reference
-    ref3 = SimpleBibleRef.for_range("JHN", 7, 53, end_chapter=8, end_verse=11)
-    assert ref3.book_id == "JHN"
-    assert len(ref3.ranges) == 1
-    assert ref3.ranges[0].start_chapter == 7
-    assert ref3.ranges[0].start_verse == 53
-    assert ref3.ranges[0].end_chapter == 8
-    assert ref3.ranges[0].end_verse == 11
+    ref = BibleRef.for_range("JHN", 7, 53, end_chapter=8, end_verse=11)
+    assert _spans(ref) == [("JHN", 7, 53, "JHN", 8, 11)]
 
     # With subverses
-    ref4 = SimpleBibleRef.for_range(
+    ref = BibleRef.for_range(
         "MRK", 5, 3, end_verse=5, start_subverse="b", end_subverse="a"
     )
-    assert ref4.book_id == "MRK"
-    assert len(ref4.ranges) == 1
-    assert ref4.ranges[0].start_chapter == 5
-    assert ref4.ranges[0].start_verse == 3
-    assert ref4.ranges[0].start_subverse == "b"
-    assert ref4.ranges[0].end_chapter == 5
-    assert ref4.ranges[0].end_verse == 5
-    assert ref4.ranges[0].end_subverse == "a"
+    assert ref.ranges[0].start == RefPoint("MRK", 5, 3, "b")
+    assert ref.ranges[0].end == RefPoint("MRK", 5, 5, "a")
+
+    # A single verse's subverse is that of both ends.
+    ref = BibleRef.for_range("MRK", 5, 3, start_subverse="b")
+    assert ref.ranges[0].end == RefPoint("MRK", 5, 3, "b")
+    assert ref.format(SBL) == "Mark 5:3b"
 
     # With original text
-    ref5 = SimpleBibleRef.for_range("PSA", 23, 1, original_text="Psalm 23:1")
-    assert ref5.book_id == "PSA"
-    assert ref5.original_text == "Psalm 23:1"
-    assert ref5.ranges[0].original_text == "Psalm 23:1"
+    ref = BibleRef.for_range("PSA", 23, 1, original_text="Psalm 23:1")
+    assert ref.original_text == "Psalm 23:1"
+    assert ref.ranges[0].original_text == "Psalm 23:1"
+
+    # Whole chapters
+    assert _spans(BibleRef.for_range("JHN", 6)) == [("JHN", 6, None, "JHN", 6, None)]
+    assert _spans(BibleRef.for_range("ISA", 1, end_chapter=39)) == [
+        ("ISA", 1, None, "ISA", 39, None)
+    ]
+
+    # From a verse to the end of its chapter ("ff") has no shorthand.
+    ref = BibleRef([_range("ROM", 8, 28, 8, None)])
+    assert ref.ranges[0].has_following_verses()
+
+    # Into another book
+    ref = BibleRef.for_range("1SA", 31, 1, end_book="2SA", end_chapter=1, end_verse=27)
+    assert _spans(ref) == [("1SA", 31, 1, "2SA", 1, 27)]
+    assert _spans(BibleRef.for_range("MAT", 28, 16, end_book="MRK")) == [
+        ("MAT", 28, 16, "MRK", None, None)
+    ]
 
 
-def test_simple_bible_ref_is_valid() -> None:
-    """Test the is_valid method of SimpleBibleRef."""
-    # Create a versification
+def test_bible_ref_for_book() -> None:
+    """Test the for_book class method of BibleRef."""
     versification = Versification.named("eng")
+    ref = BibleRef.for_book("JHN", versification=versification)
+    assert _spans(ref) == [("JHN", None, None, "JHN", None, None)]
+    assert ref.versification is versification
+    assert ref.is_whole_books()
 
-    # Valid whole book reference
-    ref = SimpleBibleRef("GEN")
-    assert ref.is_valid(versification) is True
+    ref = BibleRef.for_book("MAT", "JHN", original_text="the Gospels")
+    assert _spans(ref) == [("MAT", None, None, "JHN", None, None)]
+    assert ref.original_text == "the Gospels"
 
-    # Invalid book
-    ref = SimpleBibleRef("XYZ")
-    assert ref.is_valid(versification) is False
 
-    # Valid single verse
-    ref = SimpleBibleRef.for_range("JHN", 3, 16)
-    assert ref.is_valid(versification) is True
+def test_books_and_single_range() -> None:
+    """Test the books and is_single_range methods."""
+    ref = _parsed("John 3:16; Rom 8:28; John 1:1; 1 Sam 31:1–2 Sam 1:27")
+    assert ref.books() == ["JHN", "ROM", "1SA", "2SA"]
+    assert ref.is_single_range() is False
+    assert _parsed("John 3:16").is_single_range() is True
+    assert BibleRef().books() == []
+    assert BibleRef().is_single_range() is False
 
-    # Valid verse range
-    ref = SimpleBibleRef.for_range("PSA", 119, 1, end_verse=176)
-    assert ref.is_valid(versification) is True
 
-    # Valid with plural form of PSA
-    ref = SimpleBibleRef(
-        "PSAS", [VerseRange(18, 7, "", 18, 7, ""), VerseRange(77, 18, "", 77, 18, "")]
+def test_bible_ref_str() -> None:
+    """Test the string representation of a BibleRef."""
+    assert str(_parsed("John 3:16")) == (
+        'BibleRef("John 3:16", versification=Versification.named("eng"))'
     )
-    assert ref.is_valid(versification) is True
-
-    # Valid chapter range
-    ref = SimpleBibleRef.for_range("ISA", 1, -1, end_chapter=66)
-    assert ref.is_valid(versification) is True
-
-    # Valid "ff" notation
-    ref = SimpleBibleRef.for_range("ROM", 8, 28, end_chapter=8, end_verse=-1)
-    assert ref.is_valid(versification) is True
-
-    # Invalid chapter
-    ref = SimpleBibleRef.for_range("JHN", 30, 1, end_verse=10)
-    assert ref.is_valid(versification) is False
-
-    # Invalid verse (exceeds chapter limit)
-    ref = SimpleBibleRef.for_range("JHN", 3, 40, end_verse=50)
-    assert ref.is_valid(versification) is False
-
-    # Invalid verse range (start verse exceeds chapter limit)
-    ref = SimpleBibleRef.for_range("JHN", 3, 40, end_chapter=3, end_verse=-1)
-    assert ref.is_valid(versification) is False
-
-    # Invalid verse range structure (end verse before start verse)
-    ref = SimpleBibleRef.for_range("JHN", 3, 40, end_verse=10)
-    assert ref.is_valid(versification) is False
+    assert str(BibleRef.for_range("JHN", 3, 16)) == 'BibleRef("John 3:16")'
 
 
-def test_simple_bible_ref_invalid_reason() -> None:
-    """Test the invalid_reason method of SimpleBibleRef."""
-    versification = Versification.named("eng")
-    style = RefStyle(names=standard_names("en-sbl_abbreviations"))
+# --- Whole books and chapters ---
 
-    # Valid references have no reason, whether or not a style is given.
-    assert SimpleBibleRef("GEN").invalid_reason(versification) is None
-    assert SimpleBibleRef.for_range("JHN", 3, 16).invalid_reason(versification) is None
+
+def test_bible_ref_is_whole_books() -> None:
+    """Test the is_whole_books method of BibleRef."""
+    # Empty BibleRef is vacuously whole books
+    assert BibleRef().is_whole_books() is True
+    assert BibleRef.for_book("GEN").is_whole_books() is True
+    assert BibleRef([_whole_book("GEN"), _whole_book("EXO")]).is_whole_books() is True
+    assert BibleRef.for_book("MAT", "JHN").is_whole_books() is True
+    # Mixed whole book and verse references
+    mixed = BibleRef([_whole_book("GEN"), _range("JHN", 3, 16, 3, 16)])
+    assert mixed.is_whole_books() is False
+    assert BibleRef.for_range("JHN", 3, 16).is_whole_books() is False
+    assert BibleRef.for_range("JHN", 3).is_whole_books() is False
+
+
+def test_bible_ref_is_whole_chapters() -> None:
+    """Test the is_whole_chapters method of BibleRef."""
+    # Empty BibleRef is vacuously whole chapters
+    assert BibleRef().is_whole_chapters() is True
+    # A whole book is whole chapters
+    assert BibleRef.for_book("GEN").is_whole_chapters() is True
+    assert BibleRef.for_range("JHN", 6).is_whole_chapters() is True
+    assert BibleRef.for_range("ISA", 1, end_chapter=39).is_whole_chapters() is True
     assert (
-        SimpleBibleRef.for_range("JHN", 3, 16).invalid_reason(versification, style)
-        is None
+        BibleRef(
+            [_whole_book("GEN"), _range("ISA", 1, None, 39, None)]
+        ).is_whole_chapters()
+        is True
     )
-
-    # Book not in the versification. The message names the versification, and
-    # the book label defaults to its ID but comes from the style when given.
+    # Verses are not whole chapters, even alongside them or across chapters
+    assert BibleRef.for_range("JHN", 3, 16).is_whole_chapters() is False
+    assert BibleRef.for_range("ROM", 8, 28, end_verse=39).is_whole_chapters() is False
     assert (
-        SimpleBibleRef("XYZ").invalid_reason(versification)
-        == "XYZ is not in versification 'eng'"
+        BibleRef.for_range("PSA", 1, 1, end_chapter=2, end_verse=12).is_whole_chapters()
+        is False
     )
-
-    # Nonexistent chapter, with and without a style for the book name.
-    ref = SimpleBibleRef.for_range("JHN", 30, 1, end_verse=10)
-    assert (
-        ref.invalid_reason(versification) == "JHN has no chapter 30 (only 21 chapters)"
-    )
-    assert (
-        ref.invalid_reason(versification, style)
-        == "John has no chapter 30 (only 21 chapters)"
-    )
-
-    # Nonexistent verse.
-    ref = SimpleBibleRef.for_range("JHN", 3, 40, end_verse=50)
-    assert (
-        ref.invalid_reason(versification, style)
-        == "John 3 has no verse 40 (only 36 verses)"
-    )
-
-    # A structural problem is reported ahead of any range check.
-    ref = SimpleBibleRef.for_range("JHN", 3, 40, end_verse=10)
-    assert (
-        ref.invalid_reason(versification, style)
-        == "John: range ends at an earlier verse than it starts"
-    )
-
-    # The plural PSA form resolves to PSA for the versification lookup.
-    ref = SimpleBibleRef("PSAS", [VerseRange(200, 1, "", 200, 1, "")])
-    assert "no chapter 200 (only 150 chapters)" in (
-        ref.invalid_reason(versification, style) or ""
-    )
-
-    # Every offending range is reported, joined by "; ".
-    ref = SimpleBibleRef(
-        "PSA",
-        [VerseRange(200, 1, "", 200, 1, ""), VerseRange(2, 99, "", 2, 99, "")],
-    )
-    reason = ref.invalid_reason(versification, style)
-    assert reason == (
-        "Ps has no chapter 200 (only 150 chapters); "
-        "Ps 2 has no verse 99 (only 12 verses)"
-    )
+    mixed = BibleRef([_range("MAT", 5, None, 5, None), _range("MAT", 6, 9, 6, 13)])
+    assert mixed.is_whole_chapters() is False
+    assert _parsed("Gen 1–2:4").is_whole_chapters() is False
 
 
-def test_simple_bible_ref_is_whole_chapters() -> None:
-    """Test the is_whole_chapters method of SimpleBibleRef."""
-    # Whole book reference should be considered whole chapters
-    ref1 = SimpleBibleRef("JHN")
-    assert ref1.is_whole_chapters() is True
-
-    # Chapter reference without verse specification should be whole chapters
-    ref2 = SimpleBibleRef.for_range("JHN", 6, -1)
-    assert ref2.is_whole_chapters() is True
-
-    # Chapter range without verse specification should be whole chapters
-    ref3 = SimpleBibleRef.for_range("ISA", 1, -1, end_chapter=39)
-    assert ref3.is_whole_chapters() is True
-
-    # Reference with verse specification should not be whole chapters
-    ref4 = SimpleBibleRef.for_range("JHN", 3, 16)
-    assert ref4.is_whole_chapters() is False
-
-    # Reference with verse range should not be whole chapters
-    ref5 = SimpleBibleRef.for_range("ROM", 8, 28, end_verse=39)
-    assert ref5.is_whole_chapters() is False
-
-    # Reference with chapter range but specific verses should not be whole chapters
-    ref6 = SimpleBibleRef.for_range("PSA", 1, 1, end_chapter=2, end_verse=12)
-    assert ref6.is_whole_chapters() is False
-
-    # Mixed reference with both whole chapter and specific verses should not be whole chapters
-    ref7 = SimpleBibleRef(
-        "MAT",
-        [
-            VerseRange(5, -1, "", 5, -1, ""),  # Whole chapter
-            VerseRange(6, 9, "", 6, 13, ""),  # Specific verses
-        ],
-    )
-    assert ref7.is_whole_chapters() is False
+# --- Validity ---
 
 
-def test_format_simple_reference() -> None:
-    """Test formatting a simple Bible reference."""
-    # Create a style
-    names = standard_names("en-sbl_abbreviations")
-    style = RefStyle(names=names)
-
-    # Create a reference for Genesis 1:1-5
-    ref = SimpleBibleRef.for_range("GEN", 1, 1, end_verse=5)
-
-    # Format the reference
-    formatted = ref.format(style)
-    assert formatted == "Gen 1:1–5"
-
-
-def test_format_whole_book() -> None:
-    """Test formatting a whole book reference."""
-    # Create a style
-    names = standard_names("en-sbl_abbreviations")
-    style = RefStyle(names=names)
-
-    # Create a whole book reference
-    ref = SimpleBibleRef(book_id="GEN")
-
-    # Format the reference
-    formatted = ref.format(style)
-    assert formatted == "Gen"
+@pytest.mark.parametrize(
+    "ref",
+    [
+        BibleRef(),  # Empty BibleRef is vacuously valid
+        BibleRef.for_book("GEN"),
+        BibleRef.for_range("JHN", 3, 16),
+        BibleRef.for_range("PSA", 119, 1, end_verse=176),
+        BibleRef([_range("PSA", 18, 7, 18, 7), _range("PSA", 77, 18, 77, 18)]),
+        BibleRef.for_range("ISA", 1, end_chapter=66),
+        BibleRef([_range("ROM", 8, 28, 8, None)]),  # "ff" notation
+        BibleRef([_range("JHN", 3, 16, 3, 16), _range("ROM", 8, 28, 8, 28)]),
+        BibleRef([_range("GEN", 1, None, 2, 4)]),
+        BibleRef.for_book("MAT", "JHN"),
+        BibleRef.for_range("1SA", 31, 1, end_book="2SA", end_chapter=1, end_verse=27),
+    ],
+)
+def test_bible_ref_is_valid(ref: BibleRef) -> None:
+    """Test references that are valid in eng."""
+    ref = BibleRef(ref.ranges, Versification.named("eng"))
+    assert ref.is_valid() is True
+    assert ref.invalid_reason() is None
+    assert ref.invalid_reason(SBL) is None
 
 
-def test_format_multiple_ranges() -> None:
-    """Test formatting a reference with multiple verse ranges."""
-    # Create a style
-    names = standard_names("en-sbl_abbreviations")
-    style = RefStyle(names=names)
-
-    # Create a reference for John 3:16, 18-20
-    vr1 = VerseRange(
-        start_chapter=3,
-        start_verse=16,
-        start_subverse="",
-        end_chapter=3,
-        end_verse=16,
-        end_subverse="",
-    )
-    vr2 = VerseRange(
-        start_chapter=3,
-        start_verse=18,
-        start_subverse="",
-        end_chapter=3,
-        end_verse=20,
-        end_subverse="",
-    )
-    ref = SimpleBibleRef(book_id="JHN", ranges=[vr1, vr2])
-
-    # Format the reference
-    formatted = ref.format(style)
-    assert formatted == "John 3:16, 18–20"
-
-
-def test_format_multiple_chapters() -> None:
-    """Test formatting a reference spanning multiple chapters."""
-    # Create a style
-    names = standard_names("en-sbl_abbreviations")
-    style = RefStyle(names=names)
-
-    # Create a reference for Romans 1:18-32; 2:1-5
-    vr1 = VerseRange(
-        start_chapter=1,
-        start_verse=18,
-        start_subverse="",
-        end_chapter=1,
-        end_verse=32,
-        end_subverse="",
-    )
-    vr2 = VerseRange(
-        start_chapter=2,
-        start_verse=1,
-        start_subverse="",
-        end_chapter=2,
-        end_verse=5,
-        end_subverse="",
-    )
-    ref = SimpleBibleRef(book_id="ROM", ranges=[vr1, vr2])
-
-    # Format the reference
-    formatted = ref.format(style)
-    assert formatted == "Rom 1:18–32; 2:1–5"
-
-
-def test_format_with_subverses() -> None:
-    """Test formatting a reference with subverses."""
-    # Create a style
-    names = standard_names("en-sbl_abbreviations")
-    style = RefStyle(names=names)
-
-    # Create a reference for Mark 5:3b-5a
-    ref = SimpleBibleRef.for_range(
-        "MRK", 5, 3, start_subverse="b", end_verse=5, end_subverse="a"
-    )
-
-    # Format the reference
-    formatted = ref.format(style)
-    assert formatted == "Mark 5:3b–5a"
-
-
-def test_format_cross_chapter_range() -> None:
-    """Test formatting a reference that spans across chapters."""
-    # Create a style
-    names = standard_names("en-sbl_abbreviations")
-    style = RefStyle(names=names)
-
-    # Create a reference for John 7:53-8:11 (the pericope adulterae)
-    ref = SimpleBibleRef.for_range("JHN", 7, 53, end_chapter=8, end_verse=11)
-
-    # Format the reference
-    formatted = ref.format(style)
-    assert formatted == "John 7:53–8:11"
-
-
-def test_format_whole_chapter_range() -> None:
-    """Test formatting a reference that spans multiple whole chapters."""
-    # Create a style
-    names = standard_names("en-sbl_abbreviations")
-    style = RefStyle(names=names)
-
-    # Create a reference for Isaiah 1-39
-    ref = SimpleBibleRef.for_range("ISA", 1, -1, end_chapter=39)
-
-    # Format the reference
-    formatted = ref.format(style)
-    assert formatted == "Isa 1–39"
+@pytest.mark.parametrize(
+    ("ref", "reason", "styled"),
+    [
+        # Book not in the versification. The message names the versification.
+        (
+            BibleRef.for_book("XYZ"),
+            "XYZ is not in versification 'eng'",
+            "XYZ is not in versification 'eng'",
+        ),
+        # Nonexistent chapter
+        (
+            BibleRef.for_range("JHN", 30, 1, end_verse=10),
+            "JHN has no chapter 30 (only 21 chapters)",
+            "John has no chapter 30 (only 21 chapters)",
+        ),
+        (
+            BibleRef.for_range("JHN", 30),
+            "JHN has no chapter 30 (only 21 chapters)",
+            "John has no chapter 30 (only 21 chapters)",
+        ),
+        # Nonexistent verse, at the start or at the end
+        (
+            BibleRef.for_range("JHN", 3, 40, end_verse=50),
+            "JHN 3 has no verse 40 (only 36 verses)",
+            "John 3 has no verse 40 (only 36 verses)",
+        ),
+        (
+            BibleRef.for_range("JHN", 3, 30, end_verse=50),
+            "JHN 3 has no verse 50 (only 36 verses)",
+            "John 3 has no verse 50 (only 36 verses)",
+        ),
+        (
+            BibleRef([_range("JHN", 3, 40, 3, None)]),
+            "JHN 3 has no verse 40 (only 36 verses)",
+            "John 3 has no verse 40 (only 36 verses)",
+        ),
+        # A structural problem is reported ahead of any range check.
+        (
+            BibleRef.for_range("JHN", 3, 40, end_verse=10),
+            "JHN: range ends at an earlier verse than it starts",
+            "John: range ends at an earlier verse than it starts",
+        ),
+        # Every offending range is reported, joined by "; ".
+        (
+            BibleRef([_range("PSA", 200, 1, 200, 1), _range("PSA", 2, 99, 2, 99)]),
+            "PSA has no chapter 200 (only 150 chapters); "
+            "PSA 2 has no verse 99 (only 12 verses)",
+            "Ps has no chapter 200 (only 150 chapters); "
+            "Ps 2 has no verse 99 (only 12 verses)",
+        ),
+        # Valid ranges contribute nothing.
+        (
+            BibleRef(
+                [
+                    _range("JHN", 3, 16, 3, 16),
+                    _range("JHN", 30, 1, 30, 1),
+                    _whole_book("XYZ"),
+                ]
+            ),
+            "JHN has no chapter 30 (only 21 chapters); "
+            "XYZ is not in versification 'eng'",
+            "John has no chapter 30 (only 21 chapters); "
+            "XYZ is not in versification 'eng'",
+        ),
+        # A range that spans books must run forward in the versification.
+        (
+            BibleRef.for_book("JHN", "MAT"),
+            "JHN: range ends in an earlier book (MAT) than it starts",
+            "John: range ends in an earlier book (Matt) than it starts",
+        ),
+        (
+            BibleRef.for_range("MAT", 28, 16, end_book="MRK", end_chapter=20),
+            "MRK has no chapter 20 (only 16 chapters)",
+            "Mark has no chapter 20 (only 16 chapters)",
+        ),
+        (
+            BibleRef.for_book("MAT", "XYZ"),
+            "XYZ is not in versification 'eng'",
+            "XYZ is not in versification 'eng'",
+        ),
+    ],
+)
+def test_bible_ref_invalid_reason(ref: BibleRef, reason: str, styled: str) -> None:
+    """The reason names the book by its ID, or as a style names it."""
+    ref = BibleRef(ref.ranges, Versification.named("eng"))
+    assert ref.is_valid() is False
+    assert ref.invalid_reason() == reason
+    assert ref.invalid_reason(SBL) == styled
 
 
-def test_format_ff_reference() -> None:
-    """Test formatting a reference with 'ff' notation."""
-    # Create a style
-    names = standard_names("en-sbl_abbreviations")
-    style = RefStyle(names=names)
+def test_bible_ref_without_versification_is_invalid() -> None:
+    """A missing versification is itself the reason."""
+    ref = BibleRef.for_range("JHN", 3, 16)
+    assert ref.is_valid() is False
+    assert ref.invalid_reason() == "no versification is set"
 
-    # Create a reference for Philippians 2:5ff
-    # Unspecified end verse means "ff"
-    ref = SimpleBibleRef.for_range("PHP", 2, 5, end_chapter=2, end_verse=-1)
 
-    # Format the reference
-    formatted = ref.format(style)
-    assert formatted == "Phil 2:5ff"
+def test_invalid_reason_unnamed_versification(tmp_path: pathlib.Path) -> None:
+    """A versification with no identifier is not named in the message."""
+    path = tmp_path / "v.json"
+    path.write_text('{"maxVerses": {"GEN": [31]}}')
+    versification = Versification.from_file(str(path))
+    ref = BibleRef.for_book("XYZ", versification=versification)
+    assert ref.invalid_reason() == "XYZ is not in versification"
+
+
+def test_invalid_reason_excluded_verses() -> None:
+    """A range may not begin or end on an excluded verse, but may span one."""
+
+    def reason(text: str, versification: str) -> str | None:
+        return _parsed(text, versification).invalid_reason()
+
+    assert reason("Ps 147:1", "vulgata") == "PSA 147 has no verse 1"
+    assert reason("Ps 147:1–20", "vulgata") == "PSA 147 has no verse 1"
+    assert reason("Ps 147:12", "vulgata") is None
+    assert reason("Ps 114:9–115:10", "vulgata") is None
+    assert reason("Matt 17:21", "nabre") == "MAT 17 has no verse 21"
+    assert reason("Matt 17:22", "nabre") is None
+    assert reason("Tob 11:11–13", "nabre") is None
+    assert reason("Tob 11:12–13", "nabre") == "TOB 11 has no verse 12"
+    # Whole chapters name no verse.
+    assert reason("Ps 147", "vulgata") is None
+
+
+# --- Formatting ---
+
+
+@pytest.mark.parametrize(
+    ("ref", "expected"),
+    [
+        (BibleRef(), ""),
+        (BibleRef.for_range("GEN", 1, 1, end_verse=5), "Gen 1:1–5"),
+        (BibleRef.for_book("GEN"), "Gen"),
+        (
+            BibleRef([_range("JHN", 3, 16, 3, 16), _range("JHN", 3, 18, 3, 20)]),
+            "John 3:16, 18–20",
+        ),
+        (
+            BibleRef([_range("ROM", 1, 18, 1, 32), _range("ROM", 2, 1, 2, 5)]),
+            "Rom 1:18–32; 2:1–5",
+        ),
+        (
+            BibleRef.for_range(
+                "MRK", 5, 3, start_subverse="b", end_verse=5, end_subverse="a"
+            ),
+            "Mark 5:3b–5a",
+        ),
+        (BibleRef([_range("GEN", 1, 1, 1, 1, "a", "c")]), "Gen 1:1a–c"),
+        # The pericope adulterae
+        (
+            BibleRef.for_range("JHN", 7, 53, end_chapter=8, end_verse=11),
+            "John 7:53–8:11",
+        ),
+        (BibleRef.for_range("ISA", 1, end_chapter=39), "Isa 1–39"),
+        # Unspecified end verse means "ff"
+        (BibleRef([_range("PHP", 2, 5, 2, None)]), "Phil 2:5ff"),
+        (
+            BibleRef([_range("JHN", 3, 16, 3, 16), _range("ROM", 8, 28, 8, 39)]),
+            "John 3:16; Rom 8:28–39",
+        ),
+        (
+            BibleRef(
+                [
+                    _range("JHN", 3, 16, 3, 16),
+                    _range("JHN", 3, 18, 3, 20),
+                    _range("ROM", 8, 28, 8, 39),
+                ]
+            ),
+            "John 3:16, 18–20; Rom 8:28–39",
+        ),
+        # A book is named again when it returns after another.
+        (
+            BibleRef(
+                [
+                    _range("JHN", 3, 16, 3, 16),
+                    _range("ROM", 8, 28, 8, 28),
+                    _range("JHN", 1, 1, 1, 1),
+                ]
+            ),
+            "John 3:16; Rom 8:28; John 1:1",
+        ),
+        (BibleRef([_whole_book("GEN"), _whole_book("EXO")]), "Gen; Exod"),
+        (
+            BibleRef([_whole_book("JHN"), _range("JHN", 3, 16, 3, 16)]),
+            "John; John 3:16",
+        ),
+        # Whole chapters mixed with verses
+        (
+            BibleRef([_range("GEN", 1, None, 1, None), _range("GEN", 2, 4, 2, 4)]),
+            "Gen 1; 2:4",
+        ),
+        (BibleRef([_range("GEN", 1, None, 2, 4)]), "Gen 1–2:4"),
+        (
+            BibleRef([_range("JHN", 3, 16, 3, 16), _range("JHN", 4, None, 4, None)]),
+            "John 3:16; 4",
+        ),
+        (
+            BibleRef([_range("JHN", 3, None, 3, None), _range("JHN", 3, 5, 3, 5)]),
+            "John 3; 3:5",
+        ),
+        (BibleRef([_range("JHN", 3, None, 3, 5)]), "John 3–3:5"),
+        (
+            BibleRef([_range("JHN", 3, 16, 3, None), _range("JHN", 3, 20, 3, 20)]),
+            "John 3:16ff, 20",
+        ),
+        # The Psalms are plural when more than one is cited under the name.
+        (BibleRef.for_range("PSA", 23, 1), "Ps 23:1"),
+        (BibleRef.for_range("PSA", 23), "Ps 23"),
+        (BibleRef.for_range("PSA", 1, end_chapter=2), "Pss 1–2"),
+        (BibleRef.for_book("PSA"), "Pss"),
+        (
+            BibleRef([_range("PSA", 2, 1, 2, 3), _range("PSA", 2, 7, 2, 9)]),
+            "Ps 2:1–3, 7–9",
+        ),
+        (
+            BibleRef([_range("PSA", 2, 1, 2, 3), _range("PSA", 110, 1, 110, 1)]),
+            "Pss 2:1–3; 110:1",
+        ),
+        (
+            BibleRef(
+                [
+                    _range("PSA", 2, 1, 2, 1),
+                    _range("JHN", 1, 1, 1, 1),
+                    _range("PSA", 3, 1, 3, 1),
+                ]
+            ),
+            "Ps 2:1; John 1:1; Ps 3:1",
+        ),
+        # Ranges that span books
+        (BibleRef.for_book("MAT", "JHN"), "Matt–John"),
+        (BibleRef.for_book("PSA", "PRO"), "Pss–Prov"),
+        (
+            BibleRef.for_range(
+                "1SA", 31, 1, end_book="2SA", end_chapter=1, end_verse=27
+            ),
+            "1 Sam 31:1–2 Sam 1:27",
+        ),
+        (
+            BibleRef.for_range("GEN", 50, end_book="EXO", end_chapter=2),
+            "Gen 50–Exod 2",
+        ),
+        (BibleRef([VerseRange(RefPoint("MAT"), RefPoint("MRK", 3))]), "Matt–Mark 3"),
+        (BibleRef.for_range("JOB", 42, end_book="PSA", end_chapter=3), "Job 42–Ps 3"),
+        # What follows such a range is in the book where it ended.
+        (
+            BibleRef(
+                [
+                    VerseRange(RefPoint("1SA", 31), RefPoint("2SA", 1)),
+                    _range("2SA", 3, 1, 3, 1),
+                ]
+            ),
+            "1 Sam 31–2 Sam 1; 3:1",
+        ),
+    ],
+)
+def test_format(ref: BibleRef, expected: str) -> None:
+    """Test formatting references that have no versification."""
+    assert ref.format(SBL) == expected
 
 
 def test_format_with_custom_style() -> None:
     """Test formatting with a custom style."""
-    # Create a custom style
-    names = {"GEN": "Genesi", "EXO": "Esodo"}
     style = RefStyle(
-        names=names,
+        names={"GEN": "Genesi", "EXO": "Esodo"},
         chapter_verse_separator=", ",
         range_separator="-",  # Use hyphen instead of en dash
         verse_range_separator=".",
         chapter_separator="; ",
     )
+    ref = BibleRef([_range("GEN", 1, 1, 1, 5), _range("GEN", 1, 8, 1, 10, "b", "a")])
+    assert ref.format(style) == "Genesi 1, 1-5.8b-10a"
 
-    # Create a reference for Genesis 1:1-5
-    vr1 = VerseRange(
-        start_chapter=1,
-        start_verse=1,
-        start_subverse="",
-        end_chapter=1,
-        end_verse=5,
-        end_subverse="",
+    style = RefStyle(
+        names={"JHN": "Giovanni", "ROM": "Romani"},
+        chapter_verse_separator=",",
+        range_separator="-",
+        verse_range_separator="; ",
+        chapter_separator=" e ",
     )
-    vr2 = VerseRange(
-        start_chapter=1,
-        start_verse=8,
-        start_subverse="b",
-        end_chapter=1,
-        end_verse=10,
-        end_subverse="a",
+    ref = BibleRef(
+        [
+            _range("JHN", 3, 16, 3, 16),
+            _range("JHN", 3, 18, 3, 20),
+            _range("ROM", 8, 28, 8, 39),
+        ]
     )
-    ref = SimpleBibleRef(book_id="GEN", ranges=[vr1, vr2])
-
-    # Format the reference
-    formatted = ref.format(style)
-    assert formatted == "Genesi 1, 1-5.8b-10a"
+    assert ref.format(style) == "Giovanni 3,16; 18-20 e Romani 8,28-39"
 
 
 def test_format_unknown_book() -> None:
     """Test formatting with an unknown book ID."""
-    # Create a style
-    names = standard_names("en-sbl_abbreviations")
-    style = RefStyle(names=names)
-
-    # Create a reference with an unknown book ID
-    ref = SimpleBibleRef(book_id="XYZ")
-
-    # Formatting should raise a ValueError
-    with pytest.raises(ValueError):
-        ref.format(style)
+    with pytest.raises(ValueError, match="Unknown book ID"):
+        BibleRef.for_book("XYZ").format(SBL)
 
 
-def test_format_single_chapter_book_with_versification() -> None:
-    """Test formatting a reference to a single-chapter book with versification."""
-    # Create a style
-    names = standard_names("en-sbl_abbreviations")
-    style = RefStyle(names=names)
+@pytest.mark.parametrize(
+    ("ref", "with_versification", "without"),
+    [
+        (BibleRef.for_range("PHM", 1, 6), "Phlm 6", "Phlm 1:6"),
+        (BibleRef.for_range("JUD", 1, 3, end_verse=5), "Jude 3–5", "Jude 1:3–5"),
+        (
+            BibleRef(
+                [
+                    _range("JUD", 1, 1, 1, 1),
+                    _range("JUD", 1, 4, 1, 4),
+                    _range("JUD", 1, 17, 1, 17),
+                ]
+            ),
+            "Jude 1, 4, 17",
+            "Jude 1:1, 4, 17",
+        ),
+        (BibleRef([_range("JUD", 1, 3, 1, None)]), "Jude 3ff", "Jude 1:3ff"),
+        # The whole chapter of a one-chapter book is named by the book alone.
+        (BibleRef.for_range("JUD", 1), "Jude", "Jude 1"),
+        # A verse after the whole book needs the name again.
+        (
+            BibleRef([_range("JUD", 1, None, 1, None), _range("JUD", 1, 5, 1, 5)]),
+            "Jude; Jude 5",
+            "Jude 1; 1:5",
+        ),
+        (
+            BibleRef.for_range(
+                "2JN", 1, 12, end_book="3JN", end_chapter=1, end_verse=4
+            ),
+            "2 John 12–3 John 4",
+            "2 John 1:12–3 John 1:4",
+        ),
+    ],
+)
+def test_format_single_chapter_book(
+    ref: BibleRef, with_versification: str, without: str
+) -> None:
+    """A versification lets the chapter of a one-chapter book be omitted."""
+    assert ref.format(SBL) == without
+    known = BibleRef(ref.ranges, Versification.named("eng"))
+    assert known.format(SBL) == with_versification
 
-    # Create a versification where Philemon (PHM) is a single-chapter book
-    versification = Versification.named("eng")
 
-    # Create a reference for Philemon 6
-    ref = SimpleBibleRef.for_range("PHM", 1, 6)
-
-    # Format with versification - should omit chapter number
-    formatted = ref.format(style, versification)
-    assert formatted == "Phlm 6"
-
-    # Format without versification - should include chapter number
-    formatted_without_versification = ref.format(style)
-    assert formatted_without_versification == "Phlm 1:6"
+# --- Mapping between versifications ---
 
 
-def test_format_single_chapter_book_verse_range() -> None:
-    """Test formatting a verse range in a single-chapter book."""
-    # Create a style
-    names = standard_names("en-sbl_abbreviations")
-    style = RefStyle(names=names)
-
-    # Create a versification
-    versification = Versification.named("eng")
-
-    # Create a reference for Jude 3-5
-    ref = SimpleBibleRef.for_range("JUD", 1, 3, end_verse=5)
-
-    # Format with versification
-    formatted = ref.format(style, versification)
-    assert formatted == "Jude 3–5"
-
-
-def test_simple_map_with_mapping() -> None:
-    """Test mapping a SimpleBibleRef where verses have explicit mappings."""
+def test_map_to_with_mapping() -> None:
+    """Test mapping a verse range where verses have explicit mappings."""
     eng = Versification.named("eng")
     org = Versification.named("org")
     # eng GEN 32:1-32 maps to org GEN 32:2-33
-    ref = SimpleBibleRef.for_range("GEN", 32, 1, end_verse=32)
-    mapped = ref.map(eng, org)
+    ref = BibleRef.for_range("GEN", 32, 1, end_verse=32, versification=eng)
+    mapped = ref.map_to(org)
     assert mapped is not None
-    assert mapped.book_id == "GEN"
-    vr = mapped.ranges[0]
-    assert vr.start_chapter == 32
-    assert vr.start_verse == 2
-    assert vr.end_verse == 33
+    assert mapped.versification is org
+    assert _spans(mapped) == [("GEN", 32, 2, "GEN", 32, 33)]
 
 
-def test_simple_map_identity() -> None:
-    """Test mapping a SimpleBibleRef with no mapping entry (identity)."""
+def test_map_to_identity() -> None:
+    """Test mapping a verse with no mapping entry passes through unchanged."""
     eng = Versification.named("eng")
-    org = Versification.named("org")
-    ref = SimpleBibleRef.for_range("GEN", 1, 1, end_verse=5)
-    mapped = ref.map(eng, org)
+    ref = BibleRef.for_range("GEN", 1, 1, end_verse=5, versification=eng)
+    mapped = ref.map_to(Versification.named("org"))
     assert mapped is not None
-    vr = mapped.ranges[0]
-    assert vr.start_chapter == 1
-    assert vr.start_verse == 1
-    assert vr.end_verse == 5
+    assert _spans(mapped) == [("GEN", 1, 1, "GEN", 1, 5)]
 
 
-def test_simple_map_same_versification() -> None:
+def test_map_to_same_versification() -> None:
     """Test mapping to the same versification returns equivalent ref."""
     eng = Versification.named("eng")
-    ref = SimpleBibleRef.for_range("GEN", 32, 1, end_verse=32)
-    mapped = ref.map(eng, eng)
+    ref = BibleRef.for_range("GEN", 32, 1, end_verse=32, versification=eng)
+    mapped = ref.map_to(eng)
+    assert mapped == ref
     assert mapped is not None
-    vr = mapped.ranges[0]
-    assert vr.start_verse == 1
-    assert vr.end_verse == 32
+    assert mapped.versification is eng
 
 
-def test_simple_map_cross_book() -> None:
-    """Test mapping a SimpleBibleRef that changes book ID."""
-    eng = Versification.named("eng")
-    org = Versification.named("org")
+def test_map_to_cross_book() -> None:
+    """Test mapping a verse range that changes book ID."""
     # eng BAR 6:1-5 maps to org LJE 1:1-5
-    ref = SimpleBibleRef.for_range("BAR", 6, 1, end_verse=5)
-    mapped = ref.map(eng, org)
+    ref = BibleRef.for_range(
+        "BAR", 6, 1, end_verse=5, versification=Versification.named("eng")
+    )
+    mapped = ref.map_to(Versification.named("org"))
     assert mapped is not None
-    assert mapped.book_id == "LJE"
-    vr = mapped.ranges[0]
-    assert vr.start_chapter == 1
-    assert vr.start_verse == 1
-    assert vr.end_verse == 5
+    assert _spans(mapped) == [("LJE", 1, 1, "LJE", 1, 5)]
 
 
-def test_simple_map_between_non_org() -> None:
+def test_map_to_between_non_org() -> None:
     """Test mapping between two non-org versifications."""
-    eng = Versification.named("eng")
     vul = Versification.named("vulgata")
-    ref = SimpleBibleRef.for_range("GEN", 32, 1, end_verse=5)
-    mapped = ref.map(eng, vul)
+    ref = BibleRef.for_range(
+        "GEN", 32, 1, end_verse=5, versification=Versification.named("eng")
+    )
+    mapped = ref.map_to(vul)
     assert mapped is not None
-    assert mapped.book_id == "GEN"
+    assert mapped.versification is vul
+    assert mapped.books() == ["GEN"]
 
 
-def test_simple_map_whole_chapter() -> None:
+def test_map_to_whole_chapter() -> None:
     """A whole chapter that is whole chapters in the target stays so."""
-    eng = Versification.named("eng")
-    org = Versification.named("org")
-    ref = SimpleBibleRef.for_range("GEN", 1, -1)
-    mapped = ref.map(eng, org)
+    ref = BibleRef.for_range("GEN", 1, versification=Versification.named("eng"))
+    mapped = ref.map_to(Versification.named("org"))
     assert mapped is not None
-    assert mapped.book_id == "GEN"
-    vr = mapped.ranges[0]
-    assert vr.start_chapter == 1
-    assert vr.start_verse == -1
-    assert vr.end_verse == -1
+    assert _spans(mapped) == [("GEN", 1, None, "GEN", 1, None)]
 
 
-def test_simple_map_whole_chapter_to_verses() -> None:
+def test_map_to_whole_chapter_to_verses() -> None:
     """A whole chapter that is not whole chapters in the target becomes verses.
 
     eng Gen 31:55 is org Gen 32:1, so eng Gen 32 is org Gen 32:2-33.
     """
-    eng = Versification.named("eng")
-    org = Versification.named("org")
-    ref = SimpleBibleRef.for_range("GEN", 32, -1)
-    mapped = ref.map(eng, org)
+    ref = BibleRef.for_range("GEN", 32, versification=Versification.named("eng"))
+    mapped = ref.map_to(Versification.named("org"))
     assert mapped is not None
-    vr = mapped.ranges[0]
-    assert (vr.start_chapter, vr.start_verse) == (32, 2)
-    assert (vr.end_chapter, vr.end_verse) == (32, 33)
+    assert _spans(mapped) == [("GEN", 32, 2, "GEN", 32, 33)]
 
 
 @pytest.mark.parametrize(
@@ -674,13 +823,13 @@ def test_simple_map_whole_chapter_to_verses() -> None:
         # Renumbered psalms stay whole.
         ("vulgata", "Ps 50", "org", "Ps 51"),
         ("org", "Ps 51", "vulgata", "Ps 50"),
-        ("vulgata", "Ps 50-52", "org", "Ps 51–53"),
+        ("vulgata", "Ps 50-52", "org", "Pss 51–53"),
         ("org", "Ps 119", "vulgata", "Ps 118"),
         # One psalm that is two, and two that are one.
-        ("vulgata", "Ps 9", "org", "Ps 9–10"),
+        ("vulgata", "Ps 9", "org", "Pss 9–10"),
         ("org", "Ps 9-10", "vulgata", "Ps 9"),
-        ("vulgata", "Ps 113", "org", "Ps 114–115"),
-        ("org", "Ps 116", "vulgata", "Ps 114–115"),
+        ("vulgata", "Ps 113", "org", "Pss 114–115"),
+        ("org", "Ps 116", "vulgata", "Pss 114–115"),
         # Part of a chapter. The Clementine's Ps 115 begins at verse 10, and
         # its Ps 147 at verse 12, continuing Ps 114 and 146.
         ("org", "Ps 10", "vulgata", "Ps 9:22–39"),
@@ -698,301 +847,214 @@ def test_simple_map_whole_chapter_to_verses() -> None:
         ("eng", "Ps 51", "org", "Ps 51"),
         ("org", "Ps 51", "eng", "Ps 51"),
         ("vulgata", "Ps 12", "org", "Ps 13"),
+        # Psalms cited in the plural are renumbered like the singular.
+        ("vulgata", "Pss 50:3-5", "org", "Ps 51:3–5"),
+        ("vulgata", "Pss 50-51", "org", "Pss 51–52"),
+        # A range from a chapter to a verse keeps its form where it can.
+        ("eng", "Gen 1–2:4", "org", "Gen 1–2:4"),
+        ("eng", "Gen 31–32:5", "org", "Gen 31–32:6"),
     ],
 )
 def test_map_whole_chapters(
     source: str, reference: str, target: str, expected: str
 ) -> None:
     """Whole chapters are mapped through their first and last verses."""
-    style = RefStyle(names=standard_names("en-sbl_abbreviations"))
-    ref = RefParser(style, Versification.named(source)).parse(reference)
-    assert ref is not None
-    mapped = ref.map_to(Versification.named(target))
-    assert mapped is not None
-    assert mapped.format(style) == expected
+    assert _mapped(reference, source, target) == expected
 
 
-def test_simple_map_whole_book_passes_through() -> None:
-    """A whole-book reference is not mapped."""
-    vul = Versification.named("vulgata")
-    org = Versification.named("org")
-    mapped = SimpleBibleRef("PSA", []).map(vul, org)
-    assert mapped is not None
-    assert mapped.book_id == "PSA"
-    assert mapped.ranges == []
+@pytest.mark.parametrize(
+    ("source", "reference", "target", "expected"),
+    [
+        # A book the target numbers differently is still the whole book.
+        ("vulgata", "Ps", "org", "Pss"),
+        ("eng", "Gen", "org", "Gen"),
+        # Vulgate Daniel holds what org divides among four books.
+        (
+            "vulgata",
+            "Dan",
+            "org",
+            "Dan 1:1–3:23; Sg Three; Dan 3:24–12:13; Sus; Bel",
+        ),
+        # And org's Daniel is only part of the Vulgate's.
+        ("org", "Dan", "vulgata", "Dan 1–12"),
+        ("org", "Bel", "vulgata", "Dan 13:65–14:41"),
+    ],
+)
+def test_map_whole_book(
+    source: str, reference: str, target: str, expected: str
+) -> None:
+    """A whole book is mapped as its chapters are."""
+    assert _mapped(reference, source, target) == expected
 
 
-def test_simple_map_nonexistent_in_target() -> None:
-    """Test that map returns None when a verse doesn't exist in the target."""
-    eng = Versification.named("eng")
-    org = Versification.named("org")
+def test_map_whole_book_missing_from_source() -> None:
+    """A book the source does not have cannot be mapped."""
+    ref = BibleRef.for_book("XYZ", versification=Versification.named("eng"))
+    assert ref.map_to(Versification.named("org")) is None
+
+
+def test_map_to_nonexistent_in_target() -> None:
+    """Test that map_to returns None when a verse doesn't exist in the target."""
     # BAR 6:73 maps to LJE 1:73 but LJE only has 72 verses in org
-    ref = SimpleBibleRef.for_range("BAR", 6, 70, end_verse=73)
-    mapped = ref.map(eng, org)
-    assert mapped is None
+    ref = BibleRef.for_range(
+        "BAR", 6, 70, end_verse=73, versification=Versification.named("eng")
+    )
+    assert ref.map_to(Versification.named("org")) is None
 
 
-def test_simple_map_ff_notation() -> None:
+def test_map_to_ff_notation() -> None:
     """Test mapping a reference with ff notation."""
-    eng = Versification.named("eng")
-    org = Versification.named("org")
     # eng GEN 32:1ff -> org GEN 32:2ff
-    ref = SimpleBibleRef.for_range("GEN", 32, 1, end_verse=-1)
-    mapped = ref.map(eng, org)
+    ref = BibleRef([_range("GEN", 32, 1, 32, None)], Versification.named("eng"))
+    mapped = ref.map_to(Versification.named("org"))
     assert mapped is not None
-    vr = mapped.ranges[0]
-    assert vr.start_verse == 2
-    assert vr.end_verse == -1
+    assert _spans(mapped) == [("GEN", 32, 2, "GEN", 32, None)]
+    assert mapped.ranges[0].has_following_verses()
+
+
+def _subverse_versification(tmp_path: pathlib.Path) -> Versification:
+    """Build a Versification that maps a plain verse to a subverse location."""
+    path = tmp_path / "sub.json"
+    path.write_text(
+        '{"maxVerses": {"ESG": [39, 23, 22, 47, 28, 14, 10, 41, 32, 14]},'
+        ' "mappedVerses": {"ESG 8:13": "ESG 8:12a"}}'
+    )
+    return Versification.from_file(str(path), "sub")
+
+
+def test_map_to_with_subverse(tmp_path: pathlib.Path) -> None:
+    """Test mapping to a subverse location and back."""
+    sub = _subverse_versification(tmp_path)
+    org = Versification.named("org")
+    # sub ESG 8:13 maps to org ESG 8:12a (single verse)
+    ref = BibleRef.for_range("ESG", 8, 13, versification=sub)
+    mapped = ref.map_to(org)
+    assert mapped is not None
+    assert mapped.ranges[0].start == RefPoint("ESG", 8, 12, "a")
+
+    back = mapped.map_to(sub)
+    assert back is not None
+    assert back.ranges[0].start == RefPoint("ESG", 8, 13)
+
+
+def test_map_to_1_to_n() -> None:
+    """Test mapping with a 1:N verse mapping."""
+    # rsc PSA 141:0 maps to org PSA 142:0-1
+    ref = BibleRef.for_range("PSA", 141, 0, versification=Versification.named("rsc"))
+    mapped = ref.map_to(Versification.named("org"))
+    assert mapped is not None
+    assert _spans(mapped) == [("PSA", 142, 0, "PSA", 142, 1)]
+
+
+def test_map_to_n_to_1() -> None:
+    """Test mapping with an N:1 verse mapping."""
+    # rsc PSA 89:1-2 (the title, then the first line) maps to org PSA 90:1
+    ref = BibleRef.for_range(
+        "PSA", 89, 1, end_verse=2, versification=Versification.named("rsc")
+    )
+    mapped = ref.map_to(Versification.named("org"))
+    assert mapped is not None
+    assert _spans(mapped) == [("PSA", 90, 1, "PSA", 90, 1)]
+
+
+def test_map_to_no_versification() -> None:
+    """Test that map_to returns None when versification is not set."""
+    ref = BibleRef.for_range("GEN", 1, 1)
+    assert ref.map_to(Versification.named("org")) is None
+
+
+@pytest.mark.parametrize(
+    ("source", "reference", "target", "expected"),
+    [
+        # Susanna and Bel are Vulgate Dan 13-14, and the seam falls at 13:65.
+        ("vulgata", "Dan 13", "org", "Sus; Bel 1"),
+        ("vulgata", "Dan 13:60-65", "org", "Sus 60–64; Bel 1"),
+        ("vulgata", "Dan 13:60ff", "org", "Sus 60–64; Bel 1"),
+        ("vulgata", "Dan 13:65-14:3", "org", "Bel 1–4"),
+        ("vulgata", "Dan 12-14", "org", "Dan 12; Sus; Bel"),
+        ("org", "Bel 1:1-3", "vulgata", "Dan 13:65–14:2"),
+        # A range can leave a book and come back: the Song of the Three is
+        # Vulgate Dan 3:24-90.
+        ("vulgata", "Dan 3", "org", "Dan 3:1–23; Sg Three; Dan 3:24–33"),
+        ("vulgata", "Dan 3:1-30", "org", "Dan 3:1–23; Sg Three 1–7"),
+        ("vulgata", "Dan 3:50", "org", "Sg Three 27"),
+        # Ranges of one reference that map into one book stay together.
+        ("vulgata", "Ps 50:3; 51:4", "org", "Pss 51:3; 52:4"),
+    ],
+)
+def test_map_into_several_books(
+    source: str, reference: str, target: str, expected: str
+) -> None:
+    """A range that maps into more than one book becomes a range in each."""
+    assert _mapped(reference, source, target) == expected
+
+
+@pytest.mark.parametrize(
+    ("source", "reference", "target", "expected"),
+    [
+        # Books that are consecutive in the target too remain one range.
+        ("eng", "Matt–John", "org", "Matt–John"),
+        ("eng", "Gen–Deut", "vulgata", "Gen–Deut"),
+        ("eng", "Gen 50–Exod 2:3", "org", "Gen 50–Exod 2:3"),
+        ("eng", "Gen 31:1–Exod 2", "org", "Gen 31:1–Exod 2"),
+        # Each end is renumbered: eng Mal 4 is org Mal 3:19-24.
+        ("eng", "Mal 4–Matt 1", "org", "Mal 3:19–Matt 1"),
+        ("org", "Mal 3–Matt 1", "eng", "Mal 3–Matt 1"),
+        # The books between the ends are those of the source's order, which
+        # the target may not keep together: nabre sets Tobit and Judith
+        # between Nehemiah and Esther, and eng sets them after Revelation.
+        # The books that are still consecutive are rejoined.
+        ("nabre", "Neh–Jdt", "eng", "Neh; Tob–Jdt"),
+        ("nabre", "Ezra 9–Jdt 2:3", "eng", "Ezra 9–Neh 13; Tob–Jdt 2:3"),
+        ("nabre", "Ezra 9:1–Jdt 2:3", "eng", "Ezra 9:1–Neh 13:31; Tob–Jdt 2:3"),
+        # eng has no place for the deuterocanonical books among the others.
+        (
+            "eng",
+            "Gen–Rev",
+            "nabre",
+            "Gen–Neh; Esth; Job–Song; Isa–Lam; Ezek–Dan 12; Hos–Rev",
+        ),
+    ],
+)
+def test_map_range_that_spans_books(
+    source: str, reference: str, target: str, expected: str
+) -> None:
+    """A range that spans books is mapped book by book and rejoined where it can be."""
+    assert _mapped(reference, source, target) == expected
+
+
+def test_map_range_that_spans_books_backwards() -> None:
+    """A range that ends in an earlier book than it starts cannot be mapped."""
+    ref = BibleRef.for_book("JHN", "MAT", versification=Versification.named("eng"))
+    assert ref.map_to(Versification.named("org")) is None
+
+
+# --- Following verses and ranges ---
 
 
 def test_resolve_following_verses() -> None:
     """Test resolving ff ranges to definite references."""
-    # Create a style and versification.
-    names = standard_names("en-sbl_abbreviations")
-    style = RefStyle(names=names)
     versification = Versification.named("eng")
 
-    ref1 = SimpleBibleRef.for_range("MAT", 12, 46, end_verse=-1)
-    ref1.resolve_following_verses(versification)
-    assert ref1.format(style, versification) == "Matt 12:46–50"
+    ref = BibleRef([_range("MAT", 12, 46, 12, None)], versification, "Matt 12:46ff")
+    resolved = ref.resolve_following_verses()
+    assert resolved.format(SBL) == "Matt 12:46–50"
+    assert resolved.original_text == "Matt 12:46ff"
+    # The original is unchanged.
+    assert ref.format(SBL) == "Matt 12:46ff"
 
-    vr1 = VerseRange(
-        start_chapter=8,
-        start_verse=48,
-        start_subverse="",
-        end_chapter=8,
-        end_verse=-1,
-        end_subverse="",
-    )
-    vr2 = VerseRange(
-        start_chapter=10,
-        start_verse=22,
-        start_subverse="",
-        end_chapter=10,
-        end_verse=-1,
-        end_subverse="",
-    )
-    ref2 = SimpleBibleRef("JHN", [vr1, vr2])
-    ref2.resolve_following_verses(versification)
-    assert ref2.format(style, versification) == "John 8:48–59; 10:22–42"
-
-
-def test_bible_ref_initialization() -> None:
-    """Test that BibleRef initializes correctly."""
-    # Empty initialization
-    ref = BibleRef()
-    assert ref.simple_refs == []
-    assert ref.versification is None
-    assert ref.original_text is None
-
-    # With versification
-    versification = Versification.named("eng")
-    ref = BibleRef(versification=versification)
-    assert ref.simple_refs == []
-    assert ref.versification is versification
-    assert ref.original_text is None
-
-    # With simple refs
-    simple_ref = SimpleBibleRef.for_range("JHN", 3, 16)
-    ref = BibleRef(simple_refs=[simple_ref], versification=versification)
-    assert len(ref.simple_refs) == 1
-    assert ref.simple_refs[0] == simple_ref
-    assert ref.versification is versification
-    assert ref.original_text is None
-
-    # With original text
     ref = BibleRef(
-        simple_refs=[simple_ref], versification=versification, original_text="John 3:16"
+        [_range("JHN", 8, 48, 8, None), _range("JHN", 10, 22, 10, None)],
+        versification,
     )
-    assert ref.original_text == "John 3:16"
+    assert ref.resolve_following_verses().format(SBL) == "John 8:48–59; 10:22–42"
 
-
-def test_bible_ref_for_range() -> None:
-    """Test the for_range class method of BibleRef."""
-    versification = Versification.named("eng")
-
-    # Basic usage
-    ref = BibleRef.for_range("JHN", 3, 16, versification=versification)
-    assert len(ref.simple_refs) == 1
-    assert ref.simple_refs[0].book_id == "JHN"
-    assert len(ref.simple_refs[0].ranges) == 1
-    assert ref.simple_refs[0].ranges[0].start_chapter == 3
-    assert ref.simple_refs[0].ranges[0].start_verse == 16
-    assert ref.simple_refs[0].ranges[0].end_chapter == 3
-    assert ref.simple_refs[0].ranges[0].end_verse == 16
-    assert ref.versification is versification
-    assert ref.original_text is None
-
-    # With original text
-    ref = BibleRef.for_range(
-        "JHN", 3, 16, original_text="John 3:16", versification=versification
+    # Other ranges are left alone, as is a reference with no versification.
+    assert _parsed("John 3; 4:1–5").resolve_following_verses() == _parsed(
+        "John 3; 4:1–5"
     )
-    assert ref.original_text == "John 3:16"
-    assert ref.simple_refs[0].original_text == "John 3:16"
-
-    # With range
-    ref = BibleRef.for_range("ROM", 8, 28, end_verse=39, versification=versification)
-    assert len(ref.simple_refs) == 1
-    assert ref.simple_refs[0].book_id == "ROM"
-    assert len(ref.simple_refs[0].ranges) == 1
-    assert ref.simple_refs[0].ranges[0].start_chapter == 8
-    assert ref.simple_refs[0].ranges[0].start_verse == 28
-    assert ref.simple_refs[0].ranges[0].end_chapter == 8
-    assert ref.simple_refs[0].ranges[0].end_verse == 39
-    assert ref.versification is versification
-
-    # Cross-chapter reference
-    ref = BibleRef.for_range(
-        "JHN", 7, 53, end_chapter=8, end_verse=11, versification=versification
-    )
-    assert len(ref.simple_refs) == 1
-    assert ref.simple_refs[0].book_id == "JHN"
-    assert len(ref.simple_refs[0].ranges) == 1
-    assert ref.simple_refs[0].ranges[0].start_chapter == 7
-    assert ref.simple_refs[0].ranges[0].start_verse == 53
-    assert ref.simple_refs[0].ranges[0].end_chapter == 8
-    assert ref.simple_refs[0].ranges[0].end_verse == 11
-    assert ref.versification is versification
-
-
-def test_bible_ref_is_whole_books() -> None:
-    """Test the is_whole_books method of BibleRef."""
-    versification = Versification.named("eng")
-
-    # Empty BibleRef is vacuously whole books
-    ref = BibleRef(versification=versification)
-    assert ref.is_whole_books() is True
-
-    # Single whole book reference
-    simple_ref = SimpleBibleRef("GEN")
-    ref = BibleRef(simple_refs=[simple_ref], versification=versification)
-    assert ref.is_whole_books() is True
-
-    # Multiple whole book references
-    simple_ref1 = SimpleBibleRef("GEN")
-    simple_ref2 = SimpleBibleRef("EXO")
-    ref = BibleRef(simple_refs=[simple_ref1, simple_ref2], versification=versification)
-    assert ref.is_whole_books() is True
-
-    # Mixed whole book and verse references
-    simple_ref1 = SimpleBibleRef("GEN")
-    simple_ref2 = SimpleBibleRef.for_range("JHN", 3, 16)
-    ref = BibleRef(simple_refs=[simple_ref1, simple_ref2], versification=versification)
-    assert ref.is_whole_books() is False
-
-    # Only verse references
-    ref = BibleRef.for_range("JHN", 3, 16, versification=versification)
-    assert ref.is_whole_books() is False
-
-
-def test_bible_ref_is_whole_chapters() -> None:
-    """Test the is_whole_chapters method of BibleRef."""
-    versification = Versification.named("eng")
-
-    # Empty BibleRef is vacuously whole chapters
-    ref = BibleRef(versification=versification)
-    assert ref.is_whole_chapters() is True
-
-    # Whole book reference is whole chapters
-    simple_ref = SimpleBibleRef("GEN")
-    ref = BibleRef(simple_refs=[simple_ref], versification=versification)
-    assert ref.is_whole_chapters() is True
-
-    # Chapter reference is whole chapters
-    ref = BibleRef.for_range("JHN", 6, -1, versification=versification)
-    assert ref.is_whole_chapters() is True
-
-    # Chapter range is whole chapters
-    ref = BibleRef.for_range("ISA", 1, -1, end_chapter=39, versification=versification)
-    assert ref.is_whole_chapters() is True
-
-    # Multiple whole chapter references
-    simple_ref1 = SimpleBibleRef("GEN")
-    simple_ref2 = SimpleBibleRef.for_range("ISA", 1, -1, end_chapter=39)
-    ref = BibleRef(simple_refs=[simple_ref1, simple_ref2], versification=versification)
-    assert ref.is_whole_chapters() is True
-
-    # Mixed whole chapter and verse references
-    simple_ref1 = SimpleBibleRef.for_range("ISA", 1, -1, end_chapter=39)
-    simple_ref2 = SimpleBibleRef.for_range("JHN", 3, 16)
-    ref = BibleRef(simple_refs=[simple_ref1, simple_ref2], versification=versification)
-    assert ref.is_whole_chapters() is False
-
-    # Only verse references
-    ref = BibleRef.for_range("JHN", 3, 16, versification=versification)
-    assert ref.is_whole_chapters() is False
-
-
-def test_bible_ref_is_valid() -> None:
-    """Test the is_valid method of BibleRef."""
-    versification = Versification.named("eng")
-
-    # Empty BibleRef is vacuously valid
-    ref = BibleRef(versification=versification)
-    assert ref.is_valid() is True
-
-    # Valid reference with versification
-    ref = BibleRef.for_range("JHN", 3, 16, versification=versification)
-    assert ref.is_valid() is True
-
-    # Invalid reference with versification
-    ref = BibleRef.for_range(
-        "JHN", 30, 1, versification=versification
-    )  # Chapter 30 doesn't exist
-    assert ref.is_valid() is False
-
-    # Multiple valid references
-    simple_ref1 = SimpleBibleRef.for_range("JHN", 3, 16)
-    simple_ref2 = SimpleBibleRef.for_range("ROM", 8, 28)
-    ref = BibleRef(simple_refs=[simple_ref1, simple_ref2], versification=versification)
-    assert ref.is_valid() is True
-
-    # Mixed valid and invalid references
-    simple_ref1 = SimpleBibleRef.for_range("JHN", 3, 16)
-    simple_ref2 = SimpleBibleRef.for_range("JHN", 30, 1)  # Invalid chapter
-    ref = BibleRef(simple_refs=[simple_ref1, simple_ref2], versification=versification)
-    assert ref.is_valid() is False
-
-    # Reference without versification
-    ref = BibleRef.for_range("JHN", 3, 16, versification=None)
-    assert ref.is_valid() is False
-
-
-def test_bible_ref_invalid_reason() -> None:
-    """Test the invalid_reason method of BibleRef."""
-    versification = Versification.named("eng")
-    style = RefStyle(names=standard_names("en-sbl_abbreviations"))
-
-    # An empty BibleRef with a versification is vacuously valid.
-    assert BibleRef(versification=versification).invalid_reason() is None
-
-    # A valid reference has no reason.
-    assert (
-        BibleRef.for_range("JHN", 3, 16, versification=versification).invalid_reason()
-        is None
-    )
-
-    # A missing versification is itself the reason.
-    assert (
-        BibleRef.for_range("JHN", 3, 16, versification=None).invalid_reason()
-        == "no versification is set"
-    )
-
-    # A single invalid reference reports the underlying reason.
-    ref = BibleRef.for_range("JHN", 30, 1, versification=versification)
-    assert ref.invalid_reason(style) == "John has no chapter 30 (only 21 chapters)"
-
-    # Reasons across multiple books are joined by "; "; valid refs contribute none.
-    simple_ref1 = SimpleBibleRef.for_range("JHN", 3, 16)
-    simple_ref2 = SimpleBibleRef.for_range("JHN", 30, 1)
-    simple_ref3 = SimpleBibleRef("XYZ")
-    ref = BibleRef(
-        simple_refs=[simple_ref1, simple_ref2, simple_ref3],
-        versification=versification,
-    )
-    assert ref.invalid_reason(style) == (
-        "John has no chapter 30 (only 21 chapters); XYZ is not in versification 'eng'"
-    )
+    naive = BibleRef([_range("MAT", 12, 46, 12, None)])
+    assert naive.resolve_following_verses() is naive
 
 
 def test_bible_ref_range_refs() -> None:
@@ -1000,333 +1062,116 @@ def test_bible_ref_range_refs() -> None:
     versification = Versification.named("eng")
 
     # Empty BibleRef yields nothing
-    ref = BibleRef(versification=versification)
-    assert list(ref.range_refs()) == []
+    assert list(BibleRef(versification=versification).range_refs()) == []
 
-    # Single reference with single range
+    # Single range
     ref = BibleRef.for_range(
         "JHN", 3, 16, original_text="John 3:16", versification=versification
     )
-    range_refs = list(ref.range_refs())
-    assert len(range_refs) == 1
-    assert isinstance(range_refs[0], BibleRef)
-    assert range_refs[0].simple_refs[0].book_id == "JHN"
-    assert range_refs[0].simple_refs[0].ranges[0].start_chapter == 3
-    assert range_refs[0].simple_refs[0].ranges[0].start_verse == 16
-    assert range_refs[0].versification is versification
-    assert range_refs[0].original_text == "John 3:16"
+    (only,) = ref.range_refs()
+    assert isinstance(only, BibleRef)
+    assert only == ref
+    assert only.versification is versification
+    assert only.original_text == "John 3:16"
 
-    # Single reference with multiple ranges
-    vr1 = VerseRange(3, 16, "", 3, 16, "", original_text="John 3:16")
-    vr2 = VerseRange(3, 18, "", 3, 20, "", original_text="18-20")
-    simple_ref = SimpleBibleRef("JHN", [vr1, vr2])
+    # Several ranges, each with the text it was parsed from
     ref = BibleRef(
-        simple_refs=[simple_ref],
-        versification=versification,
-        original_text="John 3:16, 18-20",
+        [
+            _range("JHN", 3, 16, 3, 16, original_text="John 3:16"),
+            _range("JHN", 3, 18, 3, 20, original_text="18-20"),
+            _range("ROM", 8, 28, 8, 39, original_text="Rom 8:28-39"),
+            _whole_book("JUD"),
+        ],
+        versification,
+        original_text="John 3:16, 18-20; Rom 8:28-39; Jude",
     )
     range_refs = list(ref.range_refs())
-    assert len(range_refs) == 2
-    assert all(isinstance(r, BibleRef) for r in range_refs)
-    assert range_refs[0].simple_refs[0].book_id == "JHN"
-    assert range_refs[0].simple_refs[0].ranges[0].start_verse == 16
-    assert range_refs[0].original_text == "John 3:16"
-    assert range_refs[1].simple_refs[0].book_id == "JHN"
-    assert range_refs[1].simple_refs[0].ranges[0].start_verse == 18
-    assert range_refs[1].original_text == "18-20"
-
-    # Multiple references with multiple ranges
-    vr1 = VerseRange(3, 16, "", 3, 16, "")
-    vr2 = VerseRange(3, 18, "", 3, 20, "")
-    simple_ref1 = SimpleBibleRef("JHN", [vr1, vr2])
-    vr3 = VerseRange(8, 28, "", 8, 39, "")
-    simple_ref2 = SimpleBibleRef("ROM", [vr3])
-    ref = BibleRef(simple_refs=[simple_ref1, simple_ref2], versification=versification)
-    range_refs = list(ref.range_refs())
-    assert len(range_refs) == 3
-    assert all(isinstance(r, BibleRef) for r in range_refs)
-    assert range_refs[0].simple_refs[0].book_id == "JHN"
-    assert range_refs[0].simple_refs[0].ranges[0].start_verse == 16
-    assert range_refs[1].simple_refs[0].book_id == "JHN"
-    assert range_refs[1].simple_refs[0].ranges[0].start_verse == 18
-    assert range_refs[2].simple_refs[0].book_id == "ROM"
-    assert range_refs[2].simple_refs[0].ranges[0].start_verse == 28
+    assert [r.format(SBL) for r in range_refs] == [
+        "John 3:16",
+        "John 3:18–20",
+        "Rom 8:28–39",
+        "Jude",
+    ]
+    assert [r.original_text for r in range_refs] == [
+        "John 3:16",
+        "18-20",
+        "Rom 8:28-39",
+        None,
+    ]
+    assert all(r.versification is versification for r in range_refs)
+    assert all(r.is_single_range() for r in range_refs)
 
 
-def test_bible_ref_format() -> None:
-    """Test the format method of BibleRef."""
-    versification = Versification.named("eng")
-    names = standard_names("en-sbl_abbreviations")
-    style = RefStyle(names=names)
-
-    # Empty BibleRef formats to empty string
-    ref = BibleRef(versification=versification)
-    assert ref.format(style) == ""
-
-    # Single reference
-    ref = BibleRef.for_range("JHN", 3, 16, versification=versification)
-    assert ref.format(style) == "John 3:16"
-
-    # Multiple references
-    simple_ref1 = SimpleBibleRef.for_range("JHN", 3, 16)
-    simple_ref2 = SimpleBibleRef.for_range("ROM", 8, 28, end_verse=39)
-    ref = BibleRef(simple_refs=[simple_ref1, simple_ref2], versification=versification)
-    assert ref.format(style) == "John 3:16; Rom 8:28–39"
-
-    # Reference with single-chapter book
-    ref = BibleRef.for_range("PHM", 1, 6, versification=versification)
-    assert ref.format(style) == "Phlm 6"
-
-    # Complex reference with multiple ranges
-    vr1 = VerseRange(3, 16, "", 3, 16, "")
-    vr2 = VerseRange(3, 18, "", 3, 20, "")
-    simple_ref1 = SimpleBibleRef("JHN", [vr1, vr2])
-    vr3 = VerseRange(8, 28, "", 8, 39, "")
-    simple_ref2 = SimpleBibleRef("ROM", [vr3])
-    ref = BibleRef(simple_refs=[simple_ref1, simple_ref2], versification=versification)
-    assert ref.format(style) == "John 3:16, 18–20; Rom 8:28–39"
-
-    # Custom style
-    custom_style = RefStyle(
-        names={"JHN": "Giovanni", "ROM": "Romani"},
-        chapter_verse_separator=",",
-        range_separator="-",
-        verse_range_separator="; ",
-        chapter_separator=" e ",
-    )
-    assert ref.format(custom_style) == "Giovanni 3,16; 18-20 e Romani 8,28-39"
+# --- Verse keys ---
 
 
-def test_bible_ref_range_keys_single_verse() -> None:
-    """Test range_keys for a single verse reference."""
-    versification = Versification.named("eng")
-
-    # John 3:16 - John is book 43
-    ref = BibleRef.for_range("JHN", 3, 16, versification=versification)
-    keys = list(ref.range_keys())
-    assert len(keys) == 1
-    start_key, end_key = keys[0]
-    # 43 (John) | 003 (chapter 3) | 016 (verse 16) | 00 (base verse)
-    assert start_key == 4300301600
-    assert end_key == 4300301600
-
-
-def test_bible_ref_range_keys_verse_range() -> None:
-    """Test range_keys for a range of verses within a chapter."""
-    versification = Versification.named("eng")
-
-    # Genesis 1:1-5 - Genesis is book 1
-    ref = BibleRef.for_range("GEN", 1, 1, end_verse=5, versification=versification)
-    keys = list(ref.range_keys())
-    assert len(keys) == 1
-    start_key, end_key = keys[0]
-    assert start_key == 100100100  # 01 (Genesis) | 001 (ch 1) | 001 (v 1) | 00
-    assert end_key == 100100500  # 01 (Genesis) | 001 (ch 1) | 005 (v 5) | 00
-
-
-def test_bible_ref_range_keys_cross_chapter() -> None:
-    """Test range_keys for a range spanning multiple chapters."""
-    versification = Versification.named("eng")
-
-    # John 7:53-8:11 - the pericope adulterae
-    ref = BibleRef.for_range(
-        "JHN", 7, 53, end_chapter=8, end_verse=11, versification=versification
-    )
-    keys = list(ref.range_keys())
-    assert len(keys) == 1
-    start_key, end_key = keys[0]
-    assert start_key == 4300705300  # John 7:53
-    assert end_key == 4300801100  # John 8:11
-
-
-def test_bible_ref_range_keys_isaiah() -> None:
-    """Test range_keys using Isaiah as specified in the requirements."""
-    versification = Versification.named("eng")
-
-    # Isaiah 7:14 - Isaiah is book 23
-    ref = BibleRef.for_range("ISA", 7, 14, versification=versification)
-    keys = list(ref.range_keys())
-    assert len(keys) == 1
-    start_key, end_key = keys[0]
-    # 23 (Isaiah) | 007 (chapter 7) | 014 (verse 14) | 00 (base verse)
-    assert start_key == 2300701400
-    assert end_key == 2300701400
-
-
-def test_bible_ref_range_keys_multiple_ranges() -> None:
-    """Test range_keys for a reference with multiple verse ranges."""
-    versification = Versification.named("eng")
-
-    # John 3:16, 18-20
-    vr1 = VerseRange(3, 16, "", 3, 16, "")
-    vr2 = VerseRange(3, 18, "", 3, 20, "")
-    simple_ref = SimpleBibleRef("JHN", [vr1, vr2])
-    ref = BibleRef(simple_refs=[simple_ref], versification=versification)
-
-    keys = list(ref.range_keys())
-    assert len(keys) == 2
-    assert keys[0] == (4300301600, 4300301600)
-    assert keys[1] == (4300301800, 4300302000)
+@pytest.mark.parametrize(
+    ("ref", "keys"),
+    [
+        # 43 (John) | 003 (chapter 3) | 016 (verse 16) | 00 (base verse)
+        (BibleRef.for_range("JHN", 3, 16), [(4300301600, 4300301600)]),
+        # Genesis is book 1
+        (BibleRef.for_range("GEN", 1, 1, end_verse=5), [(100100100, 100100500)]),
+        # The pericope adulterae
+        (
+            BibleRef.for_range("JHN", 7, 53, end_chapter=8, end_verse=11),
+            [(4300705300, 4300801100)],
+        ),
+        # Isaiah is book 23
+        (BibleRef.for_range("ISA", 7, 14), [(2300701400, 2300701400)]),
+        (
+            BibleRef([_range("JHN", 3, 16, 3, 16), _range("JHN", 3, 18, 3, 20)]),
+            [(4300301600, 4300301600), (4300301800, 4300302000)],
+        ),
+        (
+            BibleRef([_range("JHN", 3, 16, 3, 16), _range("ROM", 8, 28, 8, 39)]),
+            [(4300301600, 4300301600), (4500802800, 4500803900)],
+        ),
+        # A whole chapter starts at verse 0. The last verse of John 6 is 71,
+        # and a whole-chapter end spreads to ordinal 99.
+        (BibleRef.for_range("JHN", 6), [(4300600000, 4300607199)]),
+        # The last verse of Matthew 12 is 50; an "ff" end spreads likewise.
+        (BibleRef([_range("MAT", 12, 46, 12, None)]), [(4001204600, 4001205099)]),
+        # A whole book starts as a whole chapter does. John ends at 21:25.
+        (BibleRef.for_book("JHN"), [(4300100000, 4302102599)]),
+        (
+            BibleRef([_whole_book("GEN"), _whole_book("REV")]),
+            [(100100000, 105002699), (6600100000, 6602202199)],
+        ),
+        # From a chapter to a verse
+        (BibleRef([_range("GEN", 1, None, 2, 4)]), [(100100000, 100200400)]),
+        # A range that spans books is one pair of keys.
+        (BibleRef.for_book("MAT", "JHN"), [(4000100000, 4302102599)]),
+        (
+            BibleRef.for_range(
+                "1SA", 31, 1, end_book="2SA", end_chapter=1, end_verse=27
+            ),
+            [(903100100, 1000102700)],
+        ),
+        (
+            BibleRef.for_range("GEN", 50, end_book="EXO", end_chapter=2),
+            [(105000000, 200202599)],
+        ),
+        # An unknown book yields nothing, at either end of a range.
+        (BibleRef.for_range("XYZ", 1, 1), []),
+        (BibleRef.for_book("XYZ"), []),
+        (BibleRef.for_book("MAT", "XYZ"), []),
+        (
+            BibleRef([_range("JHN", 3, 16, 3, 16), _range("XYZ", 1, 1, 1, 1)]),
+            [(4300301600, 4300301600)],
+        ),
+        (BibleRef(), []),
+    ],
+)
+def test_range_keys(ref: BibleRef, keys: list[tuple[int, int]]) -> None:
+    """Test range_keys in the eng versification."""
+    ref = BibleRef(ref.ranges, Versification.named("eng"))
+    assert list(ref.range_keys()) == keys
 
 
-def test_bible_ref_range_keys_multiple_books() -> None:
-    """Test range_keys for a reference spanning multiple books."""
-    versification = Versification.named("eng")
-
-    # John 3:16; Romans 8:28-39
-    simple_ref1 = SimpleBibleRef.for_range("JHN", 3, 16)
-    simple_ref2 = SimpleBibleRef.for_range("ROM", 8, 28, end_verse=39)
-    ref = BibleRef(simple_refs=[simple_ref1, simple_ref2], versification=versification)
-
-    keys = list(ref.range_keys())
-    assert len(keys) == 2
-    assert keys[0] == (4300301600, 4300301600)  # John 3:16
-    assert keys[1] == (4500802800, 4500803900)  # Romans 8:28-39
-
-
-def test_bible_ref_range_keys_whole_chapter() -> None:
-    """Test range_keys for a whole chapter reference."""
-    versification = Versification.named("eng")
-
-    # John 6 (whole chapter, represented as 6:-1 to 6:-1)
-    ref = BibleRef.for_range("JHN", 6, -1, versification=versification)
-    keys = list(ref.range_keys())
-    assert len(keys) == 1
-    start_key, end_key = keys[0]
-    # -1 verses should resolve to the first and last verses of the chapter
-    assert start_key == 4300600000  # first verse assumed to be 0
-    # last verse of John 6 is 71; a whole-chapter end spreads to ordinal 99
-    assert end_key == 4300607199
-
-
-def test_bible_ref_range_keys_without_versification() -> None:
+def test_range_keys_without_versification() -> None:
     """Test range_keys when no versification is set."""
-    ref = BibleRef.for_range("JHN", 3, 16, versification=None)
-    keys = list(ref.range_keys())
-    assert len(keys) == 0
-
-
-def test_bible_ref_range_keys_unknown_book() -> None:
-    """Test range_keys with an unknown book ID in versification."""
-    versification = Versification.named("eng")
-
-    # Create a reference with an unknown book ID
-    simple_ref = SimpleBibleRef("XYZ", [VerseRange(1, 1, "", 1, 1, "")])
-    ref = BibleRef(simple_refs=[simple_ref], versification=versification)
-
-    keys = list(ref.range_keys())
-    assert len(keys) == 0
-
-
-def test_bible_ref_range_keys_mixed_known_unknown() -> None:
-    """Test range_keys with a mix of known and unknown book IDs."""
-    versification = Versification.named("eng")
-
-    # Mix of known (John) and unknown (XYZ) books
-    simple_ref1 = SimpleBibleRef.for_range("JHN", 3, 16)
-    simple_ref2 = SimpleBibleRef("XYZ", [VerseRange(1, 1, "", 1, 1, "")])
-    ref = BibleRef(simple_refs=[simple_ref1, simple_ref2], versification=versification)
-
-    keys = list(ref.range_keys())
-    # Only the John reference should be yielded
-    assert len(keys) == 1
-    assert keys[0] == (4300301600, 4300301600)
-
-
-def test_bible_ref_range_keys_empty_reference() -> None:
-    """Test range_keys for an empty BibleRef."""
-    versification = Versification.named("eng")
-    ref = BibleRef(versification=versification)
-    keys = list(ref.range_keys())
-    assert len(keys) == 0
-
-
-def test_bible_ref_range_keys_ff_notation() -> None:
-    """Test range_keys for ff (following verses) notation."""
-    versification = Versification.named("eng")
-
-    # Matthew 12:46ff (46 to end of chapter)
-    ref = BibleRef.for_range(
-        "MAT", 12, 46, end_chapter=12, end_verse=-1, versification=versification
-    )
-    keys = list(ref.range_keys())
-    assert len(keys) == 1
-    start_key, end_key = keys[0]
-    # Matthew is book 40
-    assert start_key == 4001204600  # Matthew 12:46
-    # last verse of Matthew 12 is 50; an "ff" end spreads to ordinal 99
-    assert end_key == 4001205099
-
-
-def test_simple_bible_ref_range_keys_single_verse() -> None:
-    """Test SimpleBibleRef.range_keys for a single verse."""
-    versification = Versification.named("eng")
-    ref = SimpleBibleRef.for_range("JHN", 3, 16)
-    keys = list(ref.range_keys(versification))
-    assert len(keys) == 1
-    start_key, end_key = keys[0]
-    assert start_key == 4300301600
-    assert end_key == 4300301600
-
-
-def test_simple_bible_ref_range_keys_whole_book() -> None:
-    """Test SimpleBibleRef.range_keys for a whole-book reference (no ranges)."""
-    versification = Versification.named("eng")
-    ref = SimpleBibleRef("JHN")
-    keys = list(ref.range_keys(versification))
-    assert len(keys) == 1
-    start_key, end_key = keys[0]
-    # John is book 43; it starts at 43 001 000 00, as a whole chapter does;
-    # last chapter 21, last verse 25, a whole-book end spreading to ordinal 99
-    assert start_key == 4300100000
-    assert end_key == 4302102599
-
-
-def test_simple_bible_ref_range_keys_whole_book_genesis() -> None:
-    """Test SimpleBibleRef.range_keys for Genesis whole-book reference."""
-    versification = Versification.named("eng")
-    ref = SimpleBibleRef("GEN")
-    keys = list(ref.range_keys(versification))
-    assert len(keys) == 1
-    start_key, end_key = keys[0]
-    # Genesis is book 1; first verse 1 001 001 00; last chapter 50, last verse 26,
-    # a whole-book end spreading to ordinal 99
-    assert start_key == 100100000
-    assert end_key == 105002699
-
-
-def test_simple_bible_ref_range_keys_unknown_book() -> None:
-    """Test SimpleBibleRef.range_keys yields nothing for unknown book."""
-    versification = Versification.named("eng")
-    ref = SimpleBibleRef("XXX")
-    keys = list(ref.range_keys(versification))
-    assert len(keys) == 0
-
-
-def test_bible_ref_range_keys_whole_book() -> None:
-    """Test BibleRef.range_keys for a whole-book reference."""
-    versification = Versification.named("eng")
-    ref = BibleRef(simple_refs=[SimpleBibleRef("JHN")], versification=versification)
-    keys = list(ref.range_keys())
-    assert len(keys) == 1
-    start_key, end_key = keys[0]
-    assert start_key == 4300100000
-    assert end_key == 4302102599
-
-
-def test_bible_ref_range_keys_whole_books_multi() -> None:
-    """Test BibleRef.range_keys for multiple whole-book references."""
-    versification = Versification.named("eng")
-    ref = BibleRef(
-        simple_refs=[SimpleBibleRef("GEN"), SimpleBibleRef("REV")],
-        versification=versification,
-    )
-    keys = list(ref.range_keys())
-    assert len(keys) == 2
-    # Genesis: book 1, 50 chapters, last verse Gen 50:26
-    assert keys[0] == (100100000, 105002699)
-    # Revelation: book 66, 22 chapters, last verse Rev 22:21
-    assert keys[1] == (6600100000, 6602202199)
+    assert list(BibleRef.for_range("JHN", 3, 16).range_keys()) == []
 
 
 def test_range_keys_inserted_verse_distinct_from_base() -> None:
@@ -1339,12 +1184,7 @@ def test_range_keys_inserted_verse_distinct_from_base() -> None:
 
     def start(subverse: str, verse: int = 17) -> int:
         ref = BibleRef.for_range(
-            "ESG",
-            4,
-            verse,
-            start_subverse=subverse,
-            end_subverse=subverse,
-            versification=lxx,
+            "ESG", 4, verse, start_subverse=subverse, versification=lxx
         )
         return list(ref.range_keys())[0][0]
 
@@ -1365,8 +1205,6 @@ def test_range_keys_inserted_verses_sort_in_reading_order() -> None:
     insertions (the Esther additions skip both 'j' and 'v'), so the test does
     not assume a particular alphabet.
     """
-    import string
-
     lxx = Versification.named("lxx")
     letters = [
         c for c in string.ascii_lowercase if lxx.partial_ordinal("ESG", 4, 17, c) > 0
@@ -1375,12 +1213,7 @@ def test_range_keys_inserted_verses_sort_in_reading_order() -> None:
 
     def start(subverse: str) -> int:
         ref = BibleRef.for_range(
-            "ESG",
-            4,
-            17,
-            start_subverse=subverse,
-            end_subverse=subverse,
-            versification=lxx,
+            "ESG", 4, 17, start_subverse=subverse, versification=lxx
         )
         return list(ref.range_keys())[0][0]
 
@@ -1401,12 +1234,7 @@ def test_range_keys_portion_of_uninserted_verse_collapses() -> None:
 
     def key(subverse: str) -> tuple[int, int]:
         ref = BibleRef.for_range(
-            "ROM",
-            8,
-            1,
-            start_subverse=subverse,
-            end_subverse=subverse,
-            versification=eng,
+            "ROM", 8, 1, start_subverse=subverse, versification=eng
         )
         return list(ref.range_keys())[0]
 
@@ -1416,7 +1244,6 @@ def test_range_keys_portion_of_uninserted_verse_collapses() -> None:
 
 def test_range_keys_inserted_verse_range() -> None:
     """A range across insertions (ESG 4:17a-4:17e) keys start-to-end correctly."""
-    lxx = Versification.named("lxx")
     ref = BibleRef.for_range(
         "ESG",
         4,
@@ -1424,7 +1251,7 @@ def test_range_keys_inserted_verse_range() -> None:
         end_verse=17,
         start_subverse="a",
         end_subverse="e",
-        versification=lxx,
+        versification=Versification.named("lxx"),
     )
     (start_key, end_key) = list(ref.range_keys())[0]
     assert end_key - start_key == 4  # a=1 .. e=5
@@ -1444,254 +1271,3 @@ def test_partial_ordinal_direct() -> None:
     assert lxx.partial_ordinal("ROM", 8, 1, "a") == 0
     # A verse absent from this versification's partialVerses.
     assert Versification.named("eng").partial_ordinal("ESG", 4, 17, "k") == 0
-
-
-def test_map_to_with_mapping() -> None:
-    """Test mapping a verse range where verses have explicit mappings."""
-    eng = Versification.named("eng")
-    org = Versification.named("org")
-    # eng GEN 32:1-32 maps to org GEN 32:2-33
-    ref = BibleRef.for_range("GEN", 32, 1, end_verse=32, versification=eng)
-    mapped = ref.map_to(org)
-    assert mapped is not None
-    assert mapped.versification is org
-    assert mapped.simple_refs[0].book_id == "GEN"
-    vr = mapped.simple_refs[0].ranges[0]
-    assert vr.start_chapter == 32
-    assert vr.start_verse == 2
-    assert vr.end_chapter == 32
-    assert vr.end_verse == 33
-
-
-def test_map_to_identity() -> None:
-    """Test mapping a verse with no mapping entry passes through unchanged."""
-    eng = Versification.named("eng")
-    org = Versification.named("org")
-    ref = BibleRef.for_range("GEN", 1, 1, end_verse=5, versification=eng)
-    mapped = ref.map_to(org)
-    assert mapped is not None
-    vr = mapped.simple_refs[0].ranges[0]
-    assert vr.start_chapter == 1
-    assert vr.start_verse == 1
-    assert vr.end_verse == 5
-
-
-def test_map_to_same_versification() -> None:
-    """Test mapping to the same versification returns equivalent ref."""
-    eng = Versification.named("eng")
-    ref = BibleRef.for_range("GEN", 32, 1, end_verse=32, versification=eng)
-    mapped = ref.map_to(eng)
-    assert mapped is not None
-    assert mapped.versification is eng
-    vr = mapped.simple_refs[0].ranges[0]
-    assert vr.start_verse == 1
-    assert vr.end_verse == 32
-
-
-def test_map_to_cross_book() -> None:
-    """Test mapping a verse range that changes book ID."""
-    eng = Versification.named("eng")
-    org = Versification.named("org")
-    # eng BAR 6:1-5 maps to org LJE 1:1-5
-    ref = BibleRef.for_range("BAR", 6, 1, end_verse=5, versification=eng)
-    mapped = ref.map_to(org)
-    assert mapped is not None
-    assert mapped.simple_refs[0].book_id == "LJE"
-    vr = mapped.simple_refs[0].ranges[0]
-    assert vr.start_chapter == 1
-    assert vr.start_verse == 1
-    assert vr.end_verse == 5
-
-
-def test_map_to_between_non_org() -> None:
-    """Test mapping between two non-org versifications."""
-    eng = Versification.named("eng")
-    vul = Versification.named("vulgata")
-    ref = BibleRef.for_range("GEN", 32, 1, end_verse=5, versification=eng)
-    mapped = ref.map_to(vul)
-    assert mapped is not None
-    assert mapped.versification is vul
-
-
-def test_map_to_whole_chapter() -> None:
-    """Test that a whole-chapter reference maps to the verses it covers."""
-    eng = Versification.named("eng")
-    org = Versification.named("org")
-    ref = BibleRef.for_range("GEN", 32, -1, versification=eng)
-    mapped = ref.map_to(org)
-    assert mapped is not None
-    vr = mapped.simple_refs[0].ranges[0]
-    assert vr.start_chapter == 32
-    assert vr.start_verse == 2
-    assert vr.end_verse == 33
-
-
-def _subverse_versification(tmp_path: pathlib.Path) -> Versification:
-    """Build a Versification that maps a plain verse to a subverse location."""
-    path = tmp_path / "sub.json"
-    path.write_text(
-        '{"maxVerses": {"ESG": [39, 23, 22, 47, 28, 14, 10, 41, 32, 14]},'
-        ' "mappedVerses": {"ESG 8:13": "ESG 8:12a"}}'
-    )
-    return Versification.from_file(str(path), "sub")
-
-
-def test_simple_map_with_subverse(tmp_path: pathlib.Path) -> None:
-    """Test mapping a SimpleBibleRef that maps to a subverse location."""
-    sub = _subverse_versification(tmp_path)
-    org = Versification.named("org")
-    # sub ESG 8:13 maps to org ESG 8:12a (single verse)
-    ref = SimpleBibleRef("ESG", [VerseRange(8, 13, "", 8, 13, "")])
-    mapped = ref.map(sub, org)
-    assert mapped is not None
-    assert mapped.book_id == "ESG"
-    vr = mapped.ranges[0]
-    assert vr.start_chapter == 8
-    assert vr.start_verse == 12
-    assert vr.start_subverse == "a"
-
-
-def test_simple_map_subverse_roundtrip(tmp_path: pathlib.Path) -> None:
-    """Test round-tripping a subverse mapping through SimpleBibleRef.map()."""
-    sub = _subverse_versification(tmp_path)
-    org = Versification.named("org")
-    ref = SimpleBibleRef("ESG", [VerseRange(8, 13, "", 8, 13, "")])
-    mapped = ref.map(sub, org)
-    assert mapped is not None
-    back = mapped.map(org, sub)
-    assert back is not None
-    assert back.book_id == "ESG"
-    vr = back.ranges[0]
-    assert vr.start_chapter == 8
-    assert vr.start_verse == 13
-    assert vr.start_subverse == ""
-
-
-def test_simple_map_1_to_n() -> None:
-    """Test mapping a SimpleBibleRef with a 1:N verse mapping."""
-    rsc = Versification.named("rsc")
-    org = Versification.named("org")
-    # rsc PSA 141:0 maps to org PSA 142:0-1
-    ref = SimpleBibleRef.for_range("PSA", 141, 0)
-    mapped = ref.map(rsc, org)
-    assert mapped is not None
-    assert mapped.book_id == "PSA"
-    vr = mapped.ranges[0]
-    assert vr.start_chapter == 142
-    assert vr.start_verse == 0
-    assert vr.end_chapter == 142
-    assert vr.end_verse == 1
-
-
-def test_simple_map_n_to_1() -> None:
-    """Test mapping a SimpleBibleRef with an N:1 verse mapping."""
-    rsc = Versification.named("rsc")
-    org = Versification.named("org")
-    # rsc PSA 89:1-2 (the title, then the first line) maps to org PSA 90:1
-    ref = SimpleBibleRef.for_range("PSA", 89, 1, end_verse=2)
-    mapped = ref.map(rsc, org)
-    assert mapped is not None
-    assert mapped.book_id == "PSA"
-    vr = mapped.ranges[0]
-    assert vr.start_chapter == 90
-    assert vr.start_verse == 1
-    assert vr.end_chapter == 90
-    assert vr.end_verse == 1
-
-
-def test_map_to_no_versification() -> None:
-    """Test that map_to returns None when versification is not set."""
-    ref = BibleRef.for_range("GEN", 1, 1)
-    org = Versification.named("org")
-    assert ref.map_to(org) is None
-
-
-def test_invalid_reason_excluded_verses() -> None:
-    """A range may not begin or end on an excluded verse, but may span one."""
-    vul = Versification.named("vulgata")
-    nab = Versification.named("nabre")
-    assert (
-        SimpleBibleRef.for_range("PSA", 147, 1).invalid_reason(vul)
-        == "PSA 147 has no verse 1"
-    )
-    assert (
-        SimpleBibleRef.for_range("PSA", 147, 1, end_verse=20).invalid_reason(vul)
-        == "PSA 147 has no verse 1"
-    )
-    assert SimpleBibleRef.for_range("PSA", 147, 12).invalid_reason(vul) is None
-    assert SimpleBibleRef.for_range("PSA", 114, 9, 115, 10).invalid_reason(vul) is None
-    assert not SimpleBibleRef.for_range("MAT", 17, 21).is_valid(nab)
-    assert SimpleBibleRef.for_range("MAT", 17, 22).is_valid(nab)
-    assert SimpleBibleRef.for_range("TOB", 11, 11, end_verse=13).is_valid(nab)
-    assert not SimpleBibleRef.for_range("TOB", 11, 12, end_verse=13).is_valid(nab)
-    # Whole chapters name no verse.
-    assert SimpleBibleRef.for_range("PSA", 147, -1).is_valid(vul)
-
-
-@pytest.mark.parametrize(
-    ("source", "reference", "target", "expected"),
-    [
-        # Susanna and Bel are Vulgate Dan 13-14, and the seam falls at 13:65.
-        ("vulgata", "Dan 13", "org", "Sus; Bel 1"),
-        ("vulgata", "Dan 13:60-65", "org", "Sus 60–64; Bel 1"),
-        ("vulgata", "Dan 13:60ff", "org", "Sus 60–64; Bel 1"),
-        ("vulgata", "Dan 13:65-14:3", "org", "Bel 1–4"),
-        ("vulgata", "Dan 12-14", "org", "Dan 12; Sus; Bel"),
-        ("org", "Bel 1:1-3", "vulgata", "Dan 13:65–14:2"),
-        # A range can leave a book and come back: the Song of the Three is
-        # Vulgate Dan 3:24-90.
-        ("vulgata", "Dan 3", "org", "Dan 3:1–23; Sg Three; Dan 3:24–33"),
-        ("vulgata", "Dan 3:1-30", "org", "Dan 3:1–23; Sg Three 1–7"),
-        ("vulgata", "Dan 3:50", "org", "Sg Three 27"),
-        # Ranges of one reference that map into one book stay together.
-        ("vulgata", "Ps 50:3; 51:4", "org", "Ps 51:3; 52:4"),
-    ],
-)
-def test_map_across_books(
-    source: str, reference: str, target: str, expected: str
-) -> None:
-    """A range that maps into more than one book becomes a reference to each."""
-    style = RefStyle(names=standard_names("en-sbl_abbreviations"))
-    ref = RefParser(style, Versification.named(source)).parse(reference)
-    assert ref is not None
-    mapped = ref.map_to(Versification.named(target))
-    assert mapped is not None
-    assert mapped.format(style) == expected
-
-
-def test_simple_map_across_books() -> None:
-    """SimpleBibleRef.map cannot express two books; map_parts can."""
-    vul = Versification.named("vulgata")
-    org = Versification.named("org")
-    ref = SimpleBibleRef.for_range("DAN", 13, 60, end_verse=65)
-    assert ref.map(vul, org) is None
-    parts = ref.map_parts(vul, org)
-    assert parts is not None
-    assert [p.book_id for p in parts] == ["SUS", "BEL"]
-    assert (parts[0].ranges[0].start_verse, parts[0].ranges[0].end_verse) == (60, 64)
-    assert (parts[1].ranges[0].start_verse, parts[1].ranges[0].end_verse) == (1, 1)
-
-
-def test_map_plural_psalms() -> None:
-    """Psalms cited in the plural are renumbered like the singular."""
-    style = RefStyle(names=standard_names("en-sbl_abbreviations"))
-    parser = RefParser(style, Versification.named("vulgata"))
-    org = Versification.named("org")
-    for reference, expected in [
-        ("Pss 50:3-5", "Pss 51:3–5"),
-        ("Pss 50-51", "Pss 51–52"),
-    ]:
-        ref = parser.parse(reference)
-        assert ref is not None
-        assert ref.simple_refs[0].book_id == "PSAS"
-        mapped = ref.map_to(org)
-        assert mapped is not None
-        assert mapped.format(style) == expected
-
-
-def test_format_whole_single_chapter_book() -> None:
-    """The whole chapter of a one-chapter book is named by the book alone."""
-    style = RefStyle(names=standard_names("en-sbl_abbreviations"))
-    org = Versification.named("org")
-    assert SimpleBibleRef.for_range("JUD", 1, -1).format(style, org) == "Jude"
-    assert SimpleBibleRef.for_range("JUD", 1, 3).format(style, org) == "Jude 3"

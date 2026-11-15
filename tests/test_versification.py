@@ -8,11 +8,12 @@ from versiref.versification import Versification
 
 
 def test_empty_versification() -> None:
-    """Test that an empty Versification returns 99 for any book and chapter."""
+    """Test that an empty Versification has no books, chapters, or verses."""
     v = Versification()
-    assert v.last_verse("XYZ", 1) == 99
-    assert v.last_verse("GEN", 100) == 99
-    assert v.last_verse("REV", 0) == 99
+    assert not v.includes("GEN")
+    assert v.last_verse("XYZ", 1) == -1
+    assert v.last_verse("GEN", 100) == -1
+    assert v.last_verse("REV", 0) == -1
 
 
 def test_standard_versification_eng() -> None:

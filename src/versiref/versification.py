@@ -25,6 +25,9 @@ _VerseLocRange = tuple[_VerseLoc, _VerseLoc]
 _PARALLEL_BOOKS = frozenset({"DAG"})
 
 
+_named: dict[str, "Versification"] = {}
+
+
 def _map_stage(
     mapping: dict[_VerseLoc, _VerseLocRange],
     multi: set[_VerseLoc],
@@ -62,13 +65,18 @@ def _map_stage(
     return (mapped[0], mapped[1], mapped[2], mapped[3] or subverse), True
 
 
-@dataclass
+@dataclass(eq=False)
 class Versification:
     """Represents a way of dividing the text of the Bible into chapters and verses.
 
     Versifications are defined by JSON data that is loaded from a file when an instance is created.
     The class provides methods to query information about the versification, such as the last verse
     of a given chapter in a given book.
+
+    Two versifications are equal only if they are the same object, which makes
+    them hashable and cheap to compare. :meth:`named` returns the same object
+    each time it is called with an identifier, so standard versifications
+    compare as expected. An instance should not be modified once it is in use.
 
     Attributes:
         max_verses: last valid verse number for each chapter of each book
@@ -252,8 +260,9 @@ class Versification:
     def named(cls, identifier: str) -> "Versification":
         """Create an instance of a standard versification.
 
-        Constructs an instance by loading JSON data from the package's data
-        directory.
+        The instance is constructed by loading JSON data from the package's
+        data directory the first time an identifier is requested, and the same
+        instance is returned thereafter.
 
         Args:
             identifier: Standard versification identifier. Some common values:
@@ -282,11 +291,17 @@ class Versification:
             A newly constructed Versification
 
         """
+        cached = _named.get(identifier)
+        if cached is not None:
+            return cached
+
         filename = f"{identifier.lower()}.json"
 
         path = resources.files("versiref").joinpath("data", "versifications", filename)
         if path.is_file():
-            return cls.from_file(str(path), identifier)
+            versification = cls.from_file(str(path), identifier)
+            _named[identifier] = versification
+            return versification
         else:
             raise FileNotFoundError(f"Unknown versification identifier: {identifier}")
 
@@ -349,10 +364,6 @@ class Versification:
             The number of the last verse, or -1 if the book or chapter doesn't exist
 
         """
-        # Trivial implementation returns 99 for any book and chapter
-        if not self.max_verses:
-            return 99
-
         # Check if the book exists in the versification
         if book == "PSAS":  # plural of PSA
             book = "PSA"

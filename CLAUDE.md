@@ -84,19 +84,21 @@ When asked to make a release, Claude performs steps 1–8; publishing and pushin
 
 ### Core Classes
 
-The package has a layered architecture with five main classes:
+The package has a layered architecture with six main classes:
 
-1. **`VerseRange`** (dataclass) - The atomic unit representing a range of verses within a single book. Contains start/end chapter/verse/subverse fields. A verse number < 0 means "unspecified" (used for whole chapters or "ff" notation).
+1. **`RefPoint`** (frozen dataclass) - One end of a range: a book ID (Paratext three-letter codes like "GEN", "1CO", "JHN"), a chapter, a verse, and a subverse. A chapter or verse of None means "unspecified": a point with no verse is a whole chapter, and one with no chapter is a whole book. At the start of a range that means the beginning of the chapter or book, and at the end it means the end of it.
 
-2. **`SimpleBibleRef`** - Represents a sequence of verse ranges within a single book. Contains a book ID (Paratext three-letter codes like "GEN", "1CO", "JHN") and a list of `VerseRange`s. This is "naive" (like Python's naive datetime) because it has no versification system - you must supply one for operations that need it.
+2. **`VerseRange`** (frozen dataclass) - A range from a start `RefPoint` to an end `RefPoint`. The two are equal for a single verse, chapter, or book, and may name different books ("Matt–John", "1 Sam 31:1–2 Sam 1:27"). "John 3:16ff" starts at John 3:16 and ends at John 3.
 
-3. **`BibleRef`** - Represents verse ranges across one or more books. Contains a `Versification` and a list of `SimpleBibleRef`s. This is the main class for multi-book references.
+3. **`BibleRef`** (frozen dataclass) - A tuple of `VerseRange`s and a `Versification`, which may be None (like Python's naive datetime): such a reference can be formatted but not validated, mapped, or given verse keys. Equality and hashing ignore `original_text`.
 
-4. **`Versification`** - Represents how the Bible is divided into chapters and verses. Different texts (BHS, UBS GNT, LXX, Vulgate, English Bibles) divide things differently. Loaded from JSON data files in `src/versiref/data/versifications/`. Standard versifications include "org" (original languages), "eng" (typical English), "lxx", and "vulgata".
+4. **`Versification`** - Represents how the Bible is divided into chapters and verses. Different texts (BHS, UBS GNT, LXX, Vulgate, English Bibles) divide things differently. Loaded from JSON data files in `src/versiref/data/versifications/`. Standard versifications include "org" (original languages), "eng" (typical English), "lxx", and "vulgata". Compared and hashed by identity; `Versification.named()` caches, so it returns the same object for an identifier each time.
 
 5. **`RefStyle`** - Defines separators and book names/abbreviations for formatting and parsing. Controls things like ":" vs "," for chapter-verse separator, "–" vs "-" for ranges, etc.
 
 6. **`RefParser`** - Creates PEG parsers (using pyparsing) based on a `RefStyle` and `Versification`. Can parse single references or scan long strings for all references.
+
+The order of books in a versification's `maxVerses` decides which books lie inside a range that spans books. Most of the bundled versifications use Paratext's order, with the deuterocanonical books after Revelation; `nabre` and `cei` use their Bibles' own order.
 
 ### Data Files
 
@@ -107,8 +109,8 @@ The package has a layered architecture with five main classes:
 
 ### Special Book ID Handling
 
-- **PSA/PSAS**: Psalm vs Psalms (singular/plural). PSAS is used in book name dictionaries for plural form.
-- **PS2**: Psalm 151 - uses PSA abbreviation, PS2 entries in name dictionaries are ignored.
+- **PSA/PSAS**: Psalm vs Psalms (singular/plural). PSAS is a key in book name dictionaries for the plural form, never a book ID in a reference: a parser reads a plural name as PSA, and formatting chooses the plural when the ranges under one statement of the name cite more than one psalm.
+- **PS2**: Psalm 151. No bundled name set names it, so it cannot yet be formatted (issue #39).
 - **EST/ESG**: Esther vs Greek Esther (some versifications separate them, NAB uses letters for ESG chapters).
 
 ## Code Conventions
