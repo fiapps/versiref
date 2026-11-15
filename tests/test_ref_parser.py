@@ -1041,3 +1041,24 @@ def test_space_in_book_name_does_not_match_a_blank_line() -> None:
 def test_no_break_and_thin_spaces_separate_tokens(text: str) -> None:
     """The spaces typesetters use within a reference count as whitespace."""
     assert _scan(text) == [(text, "John 3:16, 18")]
+
+
+@pytest.mark.parametrize(
+    ("text", "style", "versification", "expected"),
+    [
+        ("cfr. Mt 5,3-12, dove", "it-cei", "cei", "Mt 5,3-12"),
+        ("cfr. Mt 5,3-12,\u00a0dove", "it-cei", "cei", "Mt 5,3-12"),
+        ("cf. Mt 5, 3-12, ubi", "la-cce", "nova_vulgata", "Mt 5, 3-12"),
+        ("cfr. Mt 5,3-6,2, dove", "it-cei", "cei", "Mt 5,3-6,2"),
+    ],
+)
+def test_range_end_keeps_its_verse_before_a_comma(
+    text: str, style: str, versification: str, expected: str
+) -> None:
+    """A comma after a range is not taken for a chapter-verse separator.
+
+    Where the style writes chapter and verse as "5,3", the 12 of "5,3-12,"
+    once parsed as an end chapter awaiting its verse, and the range was cut
+    back to its first verse.
+    """
+    assert [match for match, _ in _scan(text, style, versification)] == [expected]

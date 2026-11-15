@@ -230,13 +230,17 @@ class RefParser:
                     | (
                         range_separator
                         + (
-                            # Either a full chapter:verse reference
+                            # Either a full chapter:verse reference. The
+                            # lookahead keeps the chapter from claiming an
+                            # end verse that punctuation happens to follow
+                            # ("Mt 5,3-12, dove" in a style that writes 5,3).
                             (
                                 pp.Opt(
                                     chapter_elem.copy().set_results_name("end_chapter")
                                     + separator(
                                         self.style.chapter_verse_separator.strip()
                                     )
+                                    + pp.FollowedBy(verse)
                                 )
                                 + verse.copy().set_results_name("end_verse")
                                 + optional_subverse.copy().set_results_name(
