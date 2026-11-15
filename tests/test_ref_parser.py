@@ -968,3 +968,42 @@ def test_chapter_separator_stops_at_blank_line() -> None:
     assert refs[0][0].format(
         RefStyle(names=standard_names("en-sbl_abbreviations"))
     ) == ("Heb 7:3")
+
+
+def _scan(
+    text: str,
+    style: str = "en-sbl",
+    versification: str = "eng",
+    sensitivity: Sensitivity = Sensitivity.VERSE,
+) -> list[tuple[str, str]]:
+    """Scan text, returning each match's text and its normalized form."""
+    ref_style = RefStyle.named(style)
+    parser = RefParser(ref_style, Versification.named(versification))
+    return [
+        (text[start:end], ref.format(ref_style))
+        for ref, start, end in parser.scan_string(text, sensitivity=sensitivity)
+    ]
+
+
+@pytest.mark.parametrize(
+    "text", ["Marketing is fun", "Marks", "Jobs 3:4", "Actson 2:3", "Lætare"]
+)
+def test_book_name_is_not_the_start_of_a_longer_word(text: str) -> None:
+    """A name that ends in a letter does not match when a letter follows."""
+    assert _scan(text, sensitivity=Sensitivity.BOOK) == []
+    assert _scan(text, style="la-cce", sensitivity=Sensitivity.BOOK) == []
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("Mark's gospel", "Mark"),
+        ("see Mark.", "Mark"),
+        ("(Mark)", "Mark"),
+        ("Mark3:4", "Mark3:4"),
+    ],
+)
+def test_book_name_may_be_followed_by_a_non_letter(text: str, expected: str) -> None:
+    """Punctuation or a digit after a name does not prevent a match."""
+    found = _scan(text, sensitivity=Sensitivity.BOOK)
+    assert [match for match, _ in found] == [expected]

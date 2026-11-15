@@ -39,11 +39,40 @@ def _get_int(tokens: pp.ParseResults, name: str, default: int) -> int:
 
 
 def _get_str(tokens: pp.ParseResults, name: str, default: str) -> str:
-    """Get an integer from the parsed tokens in a type-safe manner."""
+    """Get a string from the parsed tokens in a type-safe manner."""
     if name in tokens:
         return str(tokens[name])
     else:
         return default
+
+
+# Fails when a letter follows, so that a name ending in a letter does not match
+# the start of a longer word ("Mark" in "Marketing"). Unicode-aware, like the
+# leading boundary in _build_parser.
+_NO_LETTER_AHEAD = r"(?![^\W\d_])"
+
+
+def _book_element(name_to_id: dict[str, str]) -> pp.ParserElement:
+    """Build an element that matches a book name and yields its book ID.
+
+    Args:
+        name_to_id: Maps each name or abbreviation to match to a book ID.
+
+    Returns:
+        A parser element that prefers longer names and matches nothing if
+        there are no names.
+
+    """
+    if not name_to_id:
+        return pp.NoMatch()
+    ids = dict(name_to_id)
+    alternatives = [
+        re.escape(name) + (_NO_LETTER_AHEAD if name[-1].isalpha() else "")
+        for name in sorted(ids, key=len, reverse=True)
+    ]
+    element = pp.Regex("|".join(alternatives))
+    element.set_parse_action(lambda t: ids[str(t[0])])
+    return element
 
 
 class RefParser:
@@ -91,9 +120,7 @@ class RefParser:
     def _build_parser(self) -> None:
         """Build the pyparsing parser based on the style and versification."""
         # Define basic elements
-        book = pp.one_of(list(self.style.recognized_names.keys()))
-        # Parse name to book ID.
-        book.set_parse_action(lambda t: self.style.recognized_names[t[0]])
+        book = _book_element(self.style.recognized_names)
         # The lookahead keeps a Roman numeral from matching the start of a
         # longer word ("Cl" in "Clemens"); it counts the æ/œ ligatures common
         # in Latin text as word characters ("Cœna", "Lætitia").
@@ -259,13 +286,9 @@ class RefParser:
             ]
             if not names or not letters:
                 continue
-            # Factory functions give the parse actions a single-argument
+            # A factory function gives the parse action a single-argument
             # signature (pyparsing dispatches on arity) with the loop
-            # variables bound at definition time.
-
-            def make_book_action(book_id: str) -> Callable[[pp.ParseResults], str]:
-                """Return a parse action that yields a fixed book ID."""
-                return lambda t: book_id
+            # variable bound at definition time.
 
             def make_letter_action(
                 letters: list[str],
@@ -274,8 +297,7 @@ class RefParser:
                 letter_list = list(letters)
                 return lambda t: letter_list.index(str(t[0])) + 1
 
-            lettered_book = pp.one_of(names)
-            lettered_book.set_parse_action(make_book_action(lettered_id))
+            lettered_book = _book_element(dict.fromkeys(names, lettered_id))
             # The lookahead keeps a letter from matching the start of a longer
             # word, as with Roman-numeral chapters above.
             letter_chapter = pp.Regex(
@@ -292,13 +314,13 @@ class RefParser:
             lettered_chapter_branches.append(lettered_c)
 
         # The chapter can be omitted for single-chapter (sc) books
-        sc_books = [
-            name
-            for name, id in self.style.recognized_names.items()
-            if self.versification.is_single_chapter(id)
-        ]
-        sc_book = pp.one_of(sc_books).set_results_name("book")
-        sc_book.set_parse_action(lambda t: self.style.recognized_names[t[0]])
+        sc_book = _book_element(
+            {
+                name: id
+                for name, id in self.style.recognized_names.items()
+                if self.versification.is_single_chapter(id)
+            }
+        ).set_results_name("book")
 
         sc_verse_range = (
             verse.copy().set_results_name("start_verse")
