@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `range_keys()` yielded nothing for a reference parsed from a plural name for the Psalms ("Pss 1–2"), whose book ID is `PSAS`.
 - `Versification.last_verse()` returned the length of a book's last chapter for chapter 0. It now returns -1, as for any chapter the book does not have.
+- The `eng` versification had no mapping for Acts 19:41 or 2 Corinthians 13:14, verses that `org` does not have, so neither could be mapped. English Bibles divide in two what the Greek editions number as one verse: `eng` Acts 19:40-41 is `org` 19:40, and `eng` 2 Corinthians 13:12-13 is `org` 13:12, making `eng` 13:14 `org` 13:13.
 
 ## 0.12.0 - 2026-09-27
 

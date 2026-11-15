@@ -102,6 +102,12 @@ It is mapped as `"ISA 9:20": "ISA 9:19-20"` followed by `"ISA 9:21": "ISA 9:20"`
 The same held for Ps 52, 54, and 60, the four psalms whose Hebrew title runs to two verses, and for the Clementine's Ps 12:1, which holds the title and the first line and so is the Hebrew 13:1-2.
 Whole-chapter mapping exposes this kind of error, since it maps a chapter through its first verse.
 
+**A longer chapter with no entry at all.**
+`eng` gave Acts 19 forty-one verses and 2 Corinthians 13 fourteen, one more than `org` in each case, with no mapping for either chapter; the last verse then mapped to itself, a verse `org` does not have, and failed.
+The English tradition divides in two what the Greek editions number as one verse (Acts 19:40, 2 Cor 13:12).
+Comparing each chapter's length with `org`'s, for chapters that no entry touches, finds these.
+More remain, listed in issue #50: the Hebrew Num 25:19 opens 26:1 nearly everywhere else, which needs an entry that crosses a chapter boundary, and `nabre`, `rsc`, `rso`, and `lxx` each have a few that need the text to settle.
+
 ## Greek Esther
 
 Greek Esther (`ESG`) is the most intricate data in the package, and the sources disagree in ways that are invisible until the verses are counted.

@@ -921,3 +921,44 @@ def test_psalter_round_trips_through_org(name: str) -> None:
 def test_last_verse_of_a_chapter_that_does_not_exist(chapter: int) -> None:
     """Chapter 0 is no more a chapter than one past the end of the book."""
     assert Versification.named("eng").last_verse("GEN", chapter) == -1
+
+
+@pytest.mark.parametrize(
+    ("eng_verse", "org_verse"),
+    [
+        (("ACT", 19, 40), ("ACT", 19, 40)),
+        (("ACT", 19, 41), ("ACT", 19, 40)),
+        (("2CO", 13, 12), ("2CO", 13, 12)),
+        (("2CO", 13, 13), ("2CO", 13, 12)),
+        (("2CO", 13, 14), ("2CO", 13, 13)),
+    ],
+)
+def test_eng_verses_that_divide_one_greek_verse(
+    eng_verse: tuple[str, int, int], org_verse: tuple[str, int, int]
+) -> None:
+    """English Acts 19:40-41 and 2 Cor 13:12-13 are each one verse in org."""
+    eng = Versification.named("eng")
+    org = Versification.named("org")
+    mapped = eng.map_verse(*eng_verse, org)
+    assert mapped is not None
+    assert mapped[:3] == org_verse
+
+
+@pytest.mark.parametrize(
+    ("org_verse", "first", "last"),
+    [
+        (("ACT", 19, 40), 40, 41),
+        (("2CO", 13, 12), 12, 13),
+        (("2CO", 13, 13), 14, 14),
+    ],
+)
+def test_org_verses_that_eng_divides(
+    org_verse: tuple[str, int, int], first: int, last: int
+) -> None:
+    """An org verse that eng divides maps back to both of its parts."""
+    eng = Versification.named("eng")
+    org = Versification.named("org")
+    start = org.map_verse(*org_verse, eng)
+    end = org.map_verse(*org_verse, eng, end=True)
+    assert start is not None and end is not None
+    assert (start[2], end[2]) == (first, last)
