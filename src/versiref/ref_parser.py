@@ -87,6 +87,10 @@ _NAME_SPACE = r"(?:[^\S\n]+(?:\n[^\S\n]*)?|\n[^\S\n]*)"
 # leading boundary in _build_parser.
 _NO_LETTER_AHEAD = r"(?![^\W\d_])"
 
+# The most chapters a book is taken to have when the versification names no
+# books: the Psalms, counting Psalm 151.
+_MOST_CHAPTERS = 151
+
 
 def _book_element(name_to_id: dict[str, str]) -> pp.ParserElement:
     """Build an element that matches a book name and yields its book ID.
@@ -190,6 +194,10 @@ class RefParser:
         # A number that begins the name of a numbered book ("1 John") is not a
         # chapter or verse of the book before it.
         not_a_book = pp.NotAny(book)
+        most_chapters = max(
+            (len(chapters) for chapters in self.versification.max_verses.values()),
+            default=_MOST_CHAPTERS,
+        )
         # The lookahead keeps a Roman numeral from matching the start of a
         # longer word ("Cl" in "Clemens"); it counts the æ/œ ligatures common
         # in Latin text as word characters ("Cœna", "Lætitia").
@@ -354,9 +362,18 @@ class RefParser:
                 + end_location
             ).set_parse_action(self._draft_chapters)
 
+            # A chapter that follows without a book name must be one some book
+            # could have: "CCL" after "Prov. IX, 1; " is the Corpus
+            # Christianorum, not chapter 250.
+            plausible_chapter = pp.FollowedBy(
+                chapter_elem.copy().add_condition(
+                    lambda t: not isinstance(t[0], int) or t[0] <= most_chapters
+                )
+            )
             more = pp.ZeroOrMore(
                 separator(chapter_separator)
                 + not_a_book
+                + plausible_chapter
                 + (chapter_and_verses | whole_chapters)
             )
 

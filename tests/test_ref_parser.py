@@ -1188,3 +1188,36 @@ def test_scan_as_ranges_reports_each_range() -> None:
     assert found(Sensitivity.BOOK) == ["John", "Mark 1:1", "3", "2", "Matt–Luke"]
     assert found(Sensitivity.CHAPTER) == ["Mark 1:1", "3", "2"]
     assert found(Sensitivity.VERSE) == ["Mark 1:1", "3"]
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("? Prov. IX, 1; CCL IX, 156.", ["Prov. IX, 1"]),
+        ("1 Ps. CIX, 4; CCL II, 1410.", ["Ps. CIX, 4"]),
+        ("Lc. IV, 35; CC XIV, 30", ["Lc. IV, 35"]),
+        # A chapter some book could have still continues the reference.
+        ("Ps. CIX, 4; CL, 6.", ["Ps. CIX, 4; CL, 6"]),
+        # A chapter that follows the book's name is not held to the limit, so
+        # that a mistaken number is reported as invalid and not passed over.
+        ("Ps. CCL, 1.", ["Ps. CCL, 1"]),
+    ],
+)
+def test_scan_implausible_chapter_ends_the_reference(
+    text: str, expected: list[str]
+) -> None:
+    """A number no book has for a chapter does not continue a reference."""
+    parser = RefParser(RefStyle.named("la-vetus"), Versification.named("vulgata"))
+    found = [text[start:end] for _, start, end in parser.scan_string(text)]
+    assert found == expected
+
+
+def test_scan_implausible_arabic_chapter_ends_the_reference() -> None:
+    """The limit applies to Arabic chapter numbers too."""
+    parser = RefParser(RefStyle.named("en-sbl"), Versification.named("eng"))
+    text = "John 3:16; 200 people came, and Rom 8:28; 12 too"
+    found = [
+        text[start:end]
+        for _, start, end in parser.scan_string(text, sensitivity=Sensitivity.CHAPTER)
+    ]
+    assert found == ["John 3:16", "Rom 8:28; 12"]

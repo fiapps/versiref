@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Fixed
+
+- A number that follows a chapter separator without a book name is taken for a chapter only if some book of the versification has that many chapters. A parser for a style with Roman chapter numbers had read the series abbreviation in "Prov. IX, 1; CCL IX, 156" as chapter 250 of Proverbs, which made the whole reference invalid; it now ends at "Prov. IX, 1". A chapter number that follows a book's name is not limited, so that "Ps. CCL, 1" is still found and reported as invalid.
+
 ## 0.13.0 - 2026-11-15
 
 ### Added
