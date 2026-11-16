@@ -68,7 +68,7 @@ When asked to make a release, Claude performs steps 1–8; publishing and pushin
 2. Update `CHANGELOG.md` following the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format: rename the `## Unreleased` heading to the new version with the release date (`## X.Y.Z - YYYY-MM-DD`).
 3. Run `uv lock` to update the lock file.
 4. Run `pip-audit` (see "Dependency auditing") and verify no unfixed advisories apply.
-5. Run tests, type checking, and linting to verify everything passes.
+5. Run tests, type checking, and linting to verify everything passes, and run `uv run python test_all_versions.py` so that the tests pass under every supported Python and not only the development one.
 6. Make the release commit (subject line `Release X.Y.Z`).
 7. Create an annotated tag named with the bare version number (e.g., `0.5.0`, not `v0.5.0`).
    The tag annotation message is the new version's `CHANGELOG.md` section — its `### Added`/`### Changed`/`### Removed` subsection headings and their entries, but **without** the `## X.Y.Z` version heading line.
