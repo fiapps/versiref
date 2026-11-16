@@ -1,11 +1,12 @@
 """Test parsing and formatting Bible references."""
 
 import pytest
+
 from versiref import BibleRef, RefParser, RefStyle, Versification, standard_names
 
 
 @pytest.mark.parametrize(
-    "sbl_ref,expected_cei_ref",
+    ("sbl_ref", "expected_cei_ref"),
     [
         # Single verse
         ("John 3:16", "Gv 3,16"),
@@ -82,7 +83,7 @@ def test_parse_sbl_and_format_cei(sbl_ref: str, expected_cei_ref: str) -> None:
 
 
 @pytest.mark.parametrize(
-    "cmos_ref,expected_sbl_ref",
+    ("cmos_ref", "expected_sbl_ref"),
     [
         # Single book with multiple references
         ("Rom 8:28-30; 12:1-2", "Rom 8:28–30; 12:1–2"),
@@ -309,7 +310,7 @@ def test_sub_refs_no_change() -> None:
 
 
 @pytest.mark.parametrize(
-    "sbl_ref,expected_latin_ref",
+    ("sbl_ref", "expected_latin_ref"),
     [
         ("Luke 1:35", "Luc. I, 35"),
         ("Isa 7:14", "Isa. VII, 14"),
@@ -336,7 +337,7 @@ def test_parse_sbl_and_format_la_vetus(sbl_ref: str, expected_latin_ref: str) ->
 
 
 @pytest.mark.parametrize(
-    "latin_ref,expected_sbl_ref",
+    ("latin_ref", "expected_sbl_ref"),
     [
         ("Lc. I, 35", "Luke 1:35"),
         ("Ioan. III, 16", "John 3:16"),
@@ -359,7 +360,7 @@ def test_parse_la_vetus_and_format_sbl(latin_ref: str, expected_sbl_ref: str) ->
 
 
 @pytest.mark.parametrize(
-    "cce_ref,expected_sbl_ref",
+    ("cce_ref", "expected_sbl_ref"),
     [
         ("Io 3, 16", "John 3:16"),
         ("Gn 1, 26-28", "Gen 1:26–28"),

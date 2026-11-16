@@ -353,7 +353,8 @@ def _map_chapters(
     """
     book = verse_range.start.book
     start_point, end_point = verse_range.start, verse_range.end
-    assert start_point.chapter is not None and end_point.chapter is not None
+    assert start_point.chapter is not None
+    assert end_point.chapter is not None
     whole = verse_range.is_whole_chapters()
     follows = verse_range.has_following_verses()
     if whole and (

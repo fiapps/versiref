@@ -18,7 +18,6 @@ import fnmatch
 import json
 import sys
 from importlib.resources import files
-from typing import Optional
 
 import click
 
@@ -53,7 +52,7 @@ def _load_style(name: str, also_recognize: tuple[str, ...] = ()) -> RefStyle:
         raise click.BadParameter(
             f"unknown style: {name!r} (see `versiref list styles`)",
             param_hint="--style",
-        )
+        ) from None
     for extra in also_recognize:
         try:
             style.also_recognize(extra)
@@ -61,7 +60,7 @@ def _load_style(name: str, also_recognize: tuple[str, ...] = ()) -> RefStyle:
             raise click.BadParameter(
                 f"unknown book-name set: {extra!r} (see `versiref list book-names`)",
                 param_hint="--also-recognize",
-            )
+            ) from None
     return style
 
 
@@ -75,7 +74,7 @@ def _load_versification(
         raise click.BadParameter(
             f"unknown versification: {name!r} (see `versiref list versifications`)",
             param_hint=param_hint,
-        )
+        ) from None
 
 
 def _point(point: RefPoint) -> dict[str, object]:
@@ -122,7 +121,7 @@ def main() -> None:
 
 @main.command()
 @click.argument("name", required=False)
-def docs(name: Optional[str]) -> None:
+def docs(name: str | None) -> None:
     """Print the filesystem path to the bundled documentation.
 
     With no argument, prints the path to the bundled docs directory. Pass a
@@ -206,7 +205,7 @@ def parse(
     reference: str,
     style: str,
     versification: str,
-    out_style: Optional[str],
+    out_style: str | None,
     also_recognize: tuple[str, ...],
     as_json: bool,
 ) -> None:
@@ -327,7 +326,7 @@ def convert(
     from_vers: str,
     to_vers: str,
     style: str,
-    out_style: Optional[str],
+    out_style: str | None,
     also_recognize: tuple[str, ...],
     as_json: bool,
 ) -> None:
@@ -402,7 +401,7 @@ def scan(
     file: click.utils.LazyFile,
     style: str,
     versification: str,
-    out_style: Optional[str],
+    out_style: str | None,
     sensitivity: str,
     also_recognize: tuple[str, ...],
     as_json: bool,

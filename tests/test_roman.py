@@ -1,11 +1,12 @@
 """Tests for Roman numeral conversion."""
 
 import pytest
+
 from versiref.roman import int_to_roman, roman_to_int
 
 
 @pytest.mark.parametrize(
-    "n,numeral",
+    ("n", "numeral"),
     [
         (1, "I"),
         (4, "IV"),
@@ -46,15 +47,15 @@ def test_roman_to_int_lowercase() -> None:
 
 def test_roman_to_int_invalid() -> None:
     """Test that invalid input raises ValueError."""
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Empty string"):
         roman_to_int("")
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Invalid Roman numeral character"):
         roman_to_int("XIVA")
 
 
 def test_int_to_roman_invalid() -> None:
     """Test that non-positive input raises ValueError."""
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Cannot represent 0"):
         int_to_roman(0)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Cannot represent -7"):
         int_to_roman(-7)

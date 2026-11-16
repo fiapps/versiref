@@ -4,6 +4,7 @@ import pathlib
 import string
 
 import pytest
+
 from versiref.bible_ref import BibleRef, RefPoint, VerseRange
 from versiref.ref_parser import RefParser
 from versiref.ref_style import RefStyle, standard_names
@@ -37,8 +38,14 @@ def _whole_book(book: str) -> VerseRange:
 def _spans(ref: BibleRef) -> list[tuple[object, ...]]:
     """Describe each range as (book, chapter, verse, book, chapter, verse)."""
     return [
-        (r.start.book, r.start.chapter, r.start.verse)
-        + (r.end.book, r.end.chapter, r.end.verse)
+        (
+            r.start.book,
+            r.start.chapter,
+            r.start.verse,
+            r.end.book,
+            r.end.chapter,
+            r.end.verse,
+        )
         for r in ref.ranges
     ]
 
@@ -1191,7 +1198,7 @@ def test_range_keys_inserted_verse_distinct_from_base() -> None:
         ref = BibleRef.for_range(
             "ESG", 4, verse, start_subverse=subverse, versification=lxx
         )
-        return list(ref.range_keys())[0][0]
+        return next(iter(ref.range_keys()))[0]
 
     base = start("")  # ESG 4:17
     ins_k = start("k")  # ESG 4:17k (tenth insertion, j skipped)
@@ -1214,13 +1221,15 @@ def test_range_keys_inserted_verses_sort_in_reading_order() -> None:
     letters = [
         c for c in string.ascii_lowercase if lxx.partial_ordinal("ESG", 4, 17, c) > 0
     ]
-    assert "k" in letters and "j" not in letters and "v" not in letters
+    assert "k" in letters
+    assert "j" not in letters
+    assert "v" not in letters
 
     def start(subverse: str) -> int:
         ref = BibleRef.for_range(
             "ESG", 4, 17, start_subverse=subverse, versification=lxx
         )
-        return list(ref.range_keys())[0][0]
+        return next(iter(ref.range_keys()))[0]
 
     keys = [start("")] + [start(c) for c in letters]
     assert keys == sorted(keys)
@@ -1241,7 +1250,7 @@ def test_range_keys_portion_of_uninserted_verse_collapses() -> None:
         ref = BibleRef.for_range(
             "ROM", 8, 1, start_subverse=subverse, versification=eng
         )
-        return list(ref.range_keys())[0]
+        return next(iter(ref.range_keys()))
 
     assert key("a") == key("")
     assert key("b") == key("")
@@ -1258,7 +1267,7 @@ def test_range_keys_inserted_verse_range() -> None:
         end_subverse="e",
         versification=Versification.named("lxx"),
     )
-    (start_key, end_key) = list(ref.range_keys())[0]
+    (start_key, end_key) = next(iter(ref.range_keys()))
     assert end_key - start_key == 4  # a=1 .. e=5
     assert start_key % 100 == 1
     assert end_key % 100 == 5

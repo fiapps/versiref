@@ -372,7 +372,7 @@ class RefStyle:
             A newly constructed RefStyle
 
         """
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(file_path, encoding="utf-8") as f:
             data = json.load(f)
         style = cls.from_dict(data)
         style.identifier = identifier

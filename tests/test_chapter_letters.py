@@ -1,6 +1,7 @@
 """Test chapter letters (e.g. the NABRE's Esther A–F) in parsing and formatting."""
 
 import pytest
+
 from versiref import BibleRef, RefParser, RefStyle, Versification
 
 ESTHER_LETTERS = ["A", "B", "C", "D", "E", "F"]
@@ -13,7 +14,7 @@ def parser() -> RefParser:
 
 
 @pytest.mark.parametrize(
-    "text,book_id,ranges,formatted",
+    ("text", "book_id", "ranges", "formatted"),
     [
         ("Esth C:12", "ESG", [(3, 12, 3, 12)], "Esth C:12"),
         ("Esth C:12-30", "ESG", [(3, 12, 3, 30)], "Esth C:12–30"),
@@ -138,7 +139,7 @@ def test_letters_without_est_name() -> None:
 
 
 @pytest.mark.parametrize(
-    "chapter,verse,target,expected",
+    ("chapter", "verse", "target", "expected"),
     [
         # A maps in place: org integrates Addition A at the head of chapter 1
         (1, 1, "eng", ("ESG", 1, 1, "")),

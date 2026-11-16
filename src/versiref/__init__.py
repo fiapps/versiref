@@ -14,11 +14,11 @@ __path__ = __import__("pkgutil").extend_path(__path__, __name__)
 
 __all__ = [
     "BibleRef",
-    "RefPoint",
-    "VerseRange",
     "RefParser",
-    "Sensitivity",
+    "RefPoint",
     "RefStyle",
+    "Sensitivity",
+    "VerseRange",
     "Versification",
     "available_standard_names",
     "standard_names",

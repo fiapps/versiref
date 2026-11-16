@@ -13,6 +13,7 @@ import logging
 from importlib import resources
 
 import pytest
+
 from versiref import (
     BibleRef,
     RefParser,

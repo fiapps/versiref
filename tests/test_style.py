@@ -5,6 +5,7 @@ import tempfile
 from pathlib import Path
 
 import pytest
+
 from versiref import RefParser, Versification
 from versiref.ref_style import RefStyle, available_standard_names, standard_names
 

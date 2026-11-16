@@ -143,7 +143,7 @@ class Versification:
             Newly constructed Versification
 
         """
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(file_path, encoding="utf-8") as f:
             data = json.load(f)
         if "maxVerses" not in data:
             raise ValueError("Versification file does not match schema")

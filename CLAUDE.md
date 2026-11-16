@@ -20,7 +20,7 @@ uv run pytest -k test_name       # Run tests matching a pattern
 ### Code Quality
 ```sh
 uv run mypy src/versiref         # Type checking (strict mode enabled)
-uv run ruff check                # Linting (docstring checks enabled)
+uv run ruff check                # Linting
 uv run ruff format               # Code formatting
 ```
 
@@ -121,7 +121,7 @@ Per CONVENTIONS.MD:
 
 Additional conventions observed in the codebase:
 - Uses strict mypy type checking (`strict = true` in pyproject.toml)
-- Ruff linting enforces docstrings (D series rules, ignores D203/D213)
+- Ruff linting enforces docstrings (D series rules, ignores D203/D213) along with the E, W, F, I, B, UP, SIM, C4, PT, and RUF rules; RUF001–RUF003 are off because typeset characters such as en dashes are intended
 - Docstrings use Google style format
 - Imports use absolute imports from versiref package
 - All main classes are re-exported from `versiref/__init__.py`

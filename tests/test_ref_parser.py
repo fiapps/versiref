@@ -1,6 +1,7 @@
 """Tests for the ref_parser module."""
 
-import pytest  # noqa: F401
+import pytest
+
 from versiref.bible_ref import BibleRef
 from versiref.ref_parser import RefParser, Sensitivity
 from versiref.ref_style import RefStyle, standard_names
@@ -486,7 +487,7 @@ def test_scan_default_sensitivity_skips_chapters() -> None:
     refs = list(parser.scan_string(text))
 
     assert len(refs) == 1
-    ref, start, end = refs[0]
+    _ref, start, end = refs[0]
     assert text[start:end] == "Matt 5:3"
 
 
@@ -497,7 +498,7 @@ def test_scan_default_sensitivity_skips_books() -> None:
     refs = list(parser.scan_string(text))
 
     assert len(refs) == 1
-    ref, start, end = refs[0]
+    _ref, start, end = refs[0]
     assert text[start:end] == "John 3:16"
 
 
@@ -780,7 +781,7 @@ def test_parse_roman_chapter() -> None:
 
 
 @pytest.mark.parametrize(
-    "text,book_id,chapter,verse",
+    ("text", "book_id", "chapter", "verse"),
     [
         ("Eccli. XXIV, 5", "SIR", 24, 5),
         ("I Cor. XV, 3", "1CO", 15, 3),
@@ -936,7 +937,7 @@ def test_reference_stops_at_blank_line_with_spaces() -> None:
     text = "See Mark 4:3-9,  \n  \n13 is the footnote."
     refs = list(parser.scan_string(text))
     assert len(refs) == 1
-    ref, start, end = refs[0]
+    _ref, start, end = refs[0]
     assert text[start:end] == "Mark 4:3-9"
 
 
@@ -1053,8 +1054,14 @@ def _spans(text: str, style: str = "en-sbl") -> list[tuple[object, ...]]:
     ref = parser.parse(text)
     assert ref is not None
     return [
-        (r.start.book, r.start.chapter, r.start.verse)
-        + (r.end.book, r.end.chapter, r.end.verse)
+        (
+            r.start.book,
+            r.start.chapter,
+            r.start.verse,
+            r.end.book,
+            r.end.chapter,
+            r.end.verse,
+        )
         for r in ref.ranges
     ]
 

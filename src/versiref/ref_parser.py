@@ -388,7 +388,7 @@ class RefParser:
             lettered_names = [
                 name
                 for name, book_id in self.style.recognized_names.items()
-                if book_id == lettered_id or book_id == partner
+                if book_id in (lettered_id, partner)
             ]
             if not lettered_names or not letters:
                 continue

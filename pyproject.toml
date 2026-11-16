@@ -47,8 +47,15 @@ exclude = [
 ]
 
 [tool.ruff.lint]
-select = ["D"]
-ignore = ["D203", "D213"]
+select = ["D", "E", "W", "F", "I", "B", "UP", "SIM", "C4", "PT", "RUF"]
+ignore = [
+    "D203",
+    "D213",
+    "E501",   # ruff format decides line length
+    "RUF001", # en dashes and other typeset characters are intended
+    "RUF002",
+    "RUF003",
+]
 
 [[tool.uv.index]]
 name = "testpypi"

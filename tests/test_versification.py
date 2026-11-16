@@ -3,7 +3,8 @@
 import logging
 import pathlib
 
-import pytest  # noqa: F401
+import pytest
+
 from versiref.versification import Versification
 
 
@@ -372,10 +373,11 @@ def test_cei_greek_esther_covers_org_exactly_once() -> None:
         covered: list[int] = []
         for verse in range(1, cei.last_verse("ESG", chapter) + 1):
             ordinals = cei._partial_verses.get(("ESG", chapter, verse), {})
-            for subverse in [""] + sorted(ordinals, key=lambda s: ordinals[s]):
+            for subverse in ["", *sorted(ordinals, key=lambda s: ordinals[s])]:
                 start = cei.map_verse("ESG", chapter, verse, org, subverse)
                 end = cei.map_verse("ESG", chapter, verse, org, subverse, end=True)
-                assert start is not None and end is not None
+                assert start is not None
+                assert end is not None
                 covered.extend(range(start[2], end[2] + 1))
         expected = list(range(1, org.last_verse("ESG", chapter) + 1))
         assert sorted(covered) == expected, f"ESG {chapter} does not tile org's"
@@ -394,7 +396,8 @@ def test_map_verse_greek_esther_additions_c_and_d() -> None:
     def span(chapter: int, verse: int, subverse: str = "") -> tuple[int, int]:
         start = cei.map_verse("ESG", chapter, verse, org, subverse)
         end = cei.map_verse("ESG", chapter, verse, org, subverse, end=True)
-        assert start is not None and end is not None
+        assert start is not None
+        assert end is not None
         return start[2], end[2]
 
     assert span(4, 17, "b") == (19, 19)
@@ -540,7 +543,8 @@ def test_nova_vulgata_psalms_divided_differently_from_the_hebrew() -> None:
     def span(chapter: int, verse: int) -> tuple[int, int]:
         start = nov.map_verse("PSA", chapter, verse, org)
         end = nov.map_verse("PSA", chapter, verse, org, end=True)
-        assert start is not None and end is not None
+        assert start is not None
+        assert end is not None
         return start[2], end[2]
 
     assert span(12, 8) == (8, 9)
@@ -589,7 +593,8 @@ def test_clementine_merged_closing_verses() -> None:
     def span(book: str, chapter: int, verse: int) -> tuple[int, int]:
         start = vul.map_verse(book, chapter, verse, org)
         end = vul.map_verse(book, chapter, verse, org, end=True)
-        assert start is not None and end is not None
+        assert start is not None
+        assert end is not None
         return start[2], end[2]
 
     assert vul.last_verse("GEN", 5) == 31
@@ -654,7 +659,8 @@ def _span(
 ) -> tuple[int, int]:
     start = source.map_verse(book, chapter, verse, target)
     end = source.map_verse(book, chapter, verse, target, end=True)
-    assert start is not None and end is not None
+    assert start is not None
+    assert end is not None
     assert start[:2] == end[:2] == (book, chapter)
     return start[2], end[2]
 
@@ -913,7 +919,8 @@ def test_psalter_round_trips_through_org(name: str) -> None:
                 continue
             start = target.map_verse(there[0], there[1], there[2], org)
             end = target.map_verse(there[0], there[1], there[2], org, end=True)
-            assert start is not None and end is not None
+            assert start is not None
+            assert end is not None
             assert start[:2] == end[:2] == ("PSA", chapter)
             assert start[2] <= verse <= end[2]
 
@@ -961,7 +968,8 @@ def test_org_verses_that_eng_divides(
     org = Versification.named("org")
     start = org.map_verse(*org_verse, eng)
     end = org.map_verse(*org_verse, eng, end=True)
-    assert start is not None and end is not None
+    assert start is not None
+    assert end is not None
     assert (start[2], end[2]) == (first, last)
 
 
