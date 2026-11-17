@@ -135,3 +135,108 @@ def test_docs_unknown_file_errors() -> None:
     result = CliRunner().invoke(main, ["docs", "nope.md"])
     assert result.exit_code != 0
     assert "no such doc" in result.output
+
+
+def test_list_versifications_json() -> None:
+    """`list --json` emits the identifiers as a JSON array."""
+    result = CliRunner().invoke(main, ["list", "versifications", "--json"])
+    assert result.exit_code == 0
+    assert {"eng", "org"} <= set(json.loads(result.output))
+
+
+def test_list_book_names_pattern_filters() -> None:
+    """`list book-names` lists the sets accepted by --also-recognize."""
+    result = CliRunner().invoke(main, ["list", "book-names", "--pattern", "en-sbl*"])
+    assert result.exit_code == 0
+    assert result.output.split() == ["en-sbl_abbreviations", "en-sbl_names"]
+
+
+def test_also_recognize_adds_names() -> None:
+    """--also-recognize lets a style parse another set's names."""
+    args = ["parse", "Genesi 1:1", "--style", "en-sbl"]
+    assert CliRunner().invoke(main, args).exit_code == 2
+    result = CliRunner().invoke(main, [*args, "--also-recognize", "it-cei_nomi"])
+    assert result.exit_code == 0
+    assert result.output.strip() == "Gen 1:1"
+
+
+def test_unknown_book_name_set_is_clean_error() -> None:
+    """An unknown --also-recognize set is a usage error, not a traceback."""
+    result = CliRunner().invoke(
+        main, ["parse", "Gen 1:1", "--style", "en-sbl", "--also-recognize", "nope"]
+    )
+    assert result.exit_code == 2
+    assert "unknown book-name set: 'nope'" in result.output
+
+
+def test_unknown_versification_is_clean_error() -> None:
+    """An unknown versification is a usage error naming the option."""
+    result = CliRunner().invoke(
+        main, ["convert", "Gen 1:1", "--style", "en-sbl", "-f", "eng", "-t", "nope"]
+    )
+    assert result.exit_code == 2
+    assert "Invalid value for --to: unknown versification: 'nope'" in result.output
+
+
+def test_validate_json_valid() -> None:
+    """`validate --json` reports a valid reference with no reason."""
+    result = CliRunner().invoke(
+        main, ["validate", "Gen 1:31", "--style", "en-sbl", "-v", "eng", "--json"]
+    )
+    assert result.exit_code == 0
+    assert json.loads(result.output) == {
+        "input": "Gen 1:31",
+        "versification": "eng",
+        "status": "valid",
+        "valid": True,
+        "reason": None,
+    }
+
+
+def test_validate_json_invalid_gives_reason() -> None:
+    """`validate --json` keeps the exit status and gives the reason."""
+    result = CliRunner().invoke(
+        main, ["validate", "Gen 1:99", "--style", "en-sbl", "-v", "eng", "--json"]
+    )
+    assert result.exit_code == 1
+    data = json.loads(result.output)
+    assert data["status"] == "invalid"
+    assert data["valid"] is False
+    assert "no verse 99" in data["reason"]
+
+
+def test_convert_unparseable_exits_2() -> None:
+    """`convert` exits 2 when the reference does not parse."""
+    result = CliRunner().invoke(
+        main, ["convert", "Florble 1", "--style", "en-sbl", "-f", "eng", "-t", "org"]
+    )
+    assert result.exit_code == 2
+    assert "could not parse reference: 'Florble 1'" in result.output
+
+
+def test_convert_json_gives_source_and_result() -> None:
+    """`convert --json` gives the reference in both versifications."""
+    result = CliRunner().invoke(
+        main,
+        ["convert", "Ps 51:1", "--style", "en-sbl", "-f", "eng", "-t", "org", "--json"],
+    )
+    assert result.exit_code == 0
+    data = json.loads(result.output)
+    assert (data["from"], data["to"]) == ("eng", "org")
+    assert data["source"]["formatted"] == "Ps 51:1"
+    assert data["result"]["formatted"] == "Ps 51:3"
+    assert data["result"]["versification"] == "org"
+
+
+def test_scan_text_output_is_tab_separated() -> None:
+    """Without --json, `scan` prints offsets, matched text, and normal form."""
+    result = CliRunner().invoke(
+        main,
+        ["scan", "--style", "en-sbl", "--out-style", "en-cmos_short"],
+        input="See Gen 1:1 and John 3:16.",
+    )
+    assert result.exit_code == 0
+    assert result.output.splitlines() == [
+        "4\t11\tGen 1:1\tGn 1:1",
+        "16\t25\tJohn 3:16\tJn 3:16",
+    ]

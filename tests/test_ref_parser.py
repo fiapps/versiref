@@ -1,5 +1,6 @@
 """Tests for the ref_parser module."""
 
+import pyparsing as pp
 import pytest
 
 from versiref.bible_ref import BibleRef
@@ -1221,3 +1222,41 @@ def test_scan_implausible_arabic_chapter_ends_the_reference() -> None:
         for _, start, end in parser.scan_string(text, sensitivity=Sensitivity.CHAPTER)
     ]
     assert found == ["John 3:16", "Rom 8:28; 12"]
+
+
+def test_strict_parser_accepts_only_the_style_range_separator() -> None:
+    """A strict parser reads the style's en dash but not a hyphen as a range."""
+    style = RefStyle.named("en-sbl")
+    versification = Versification.named("eng")
+    strict = RefParser(style, versification, strict=True)
+    ref = strict.parse("Gen 1:1–3")
+    assert ref is not None
+    assert ref.format(style) == "Gen 1:1–3"
+    assert strict.parse("Gen 1:1-3", silent=True) is None
+    assert RefParser(style, versification).parse("Gen 1:1-3") == ref
+
+
+def test_parse_raises_unless_silent() -> None:
+    """parse() raises on text that is not a reference unless silent."""
+    parser = RefParser(RefStyle.named("en-sbl"), Versification.named("eng"))
+    with pytest.raises(pp.ParseException):
+        parser.parse("not a reference")
+    assert parser.parse("not a reference", silent=True) is None
+
+
+def test_style_without_names_matches_nothing() -> None:
+    """A parser whose style names no books finds no references."""
+    parser = RefParser(RefStyle(names={}), Versification.named("eng"))
+    assert parser.parse("Gen 1:1", silent=True) is None
+    assert list(parser.scan_string("See Gen 1:1 and John 3:16.")) == []
+
+
+def test_unusual_range_separator_is_recognized_beside_the_usual_ones() -> None:
+    """A lenient parser reads the style's own separator, a hyphen, and an en dash."""
+    style = RefStyle(names={"GEN": "Gen"}, range_separator="—")
+    parser = RefParser(style, Versification.named("eng"))
+    ref = parser.parse("Gen 1:1—3")
+    assert ref is not None
+    assert ref.format(style) == "Gen 1:1—3"
+    assert parser.parse("Gen 1:1-3") == ref
+    assert parser.parse("Gen 1:1–3") == ref

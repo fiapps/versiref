@@ -977,3 +977,91 @@ def test_named_ignores_case() -> None:
     """An identifier names the same versification however it is capitalized."""
     assert Versification.named("Vulgata") is Versification.named("vulgata")
     assert Versification.named("Vulgata").identifier == "vulgata"
+
+
+def _versification(tmp_path: pathlib.Path, data: str) -> Versification:
+    """Build an unnamed Versification from JSON text."""
+    path = tmp_path / "v.json"
+    path.write_text(data)
+    return Versification.from_file(str(path))
+
+
+def test_from_file_requires_max_verses(tmp_path: pathlib.Path) -> None:
+    """A file without maxVerses does not match the schema."""
+    with pytest.raises(ValueError, match="does not match schema"):
+        _versification(tmp_path, "{}")
+
+
+def test_str_without_identifier(tmp_path: pathlib.Path) -> None:
+    """An unnamed versification has no concise form to show."""
+    v = _versification(tmp_path, '{"maxVerses": {"GEN": [31]}}')
+    assert str(v) != 'Versification.named("None")'
+    assert "Versification" in str(v)
+
+
+def test_malformed_entries_are_skipped(
+    tmp_path: pathlib.Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Malformed mapping and partial-verse entries are logged and left out."""
+    with caplog.at_level(logging.DEBUG, logger="versiref.versification"):
+        v = _versification(
+            tmp_path,
+            """{
+              "maxVerses": {"GEN": [31, 25]},
+              "mappedVerses": {
+                "bogus": "GEN 1:1",
+                "GEN 1:5-3": "GEN 1:1",
+                "GEN 2:1": "GEN 2:2"
+              },
+              "partialVerses": {"bogus": ["a"], "GEN 1:1": ["-", "a"]}
+            }""",
+        )
+    assert list(v._map_to_org) == [("GEN", 2, 1, "")]
+    assert list(v._partial_verses) == [("GEN", 1, 1)]
+    messages = [(r.levelno, r.getMessage()) for r in caplog.records]
+    assert messages == [
+        (
+            logging.WARNING,
+            "Skipping malformed mappedVerses entry: 'bogus' -> 'GEN 1:1'",
+        ),
+        (
+            logging.DEBUG,
+            "Skipping mappedVerses entry with invalid range: 'GEN 1:5-3' -> 'GEN 1:1'",
+        ),
+        (logging.WARNING, "Skipping malformed partialVerses entry: 'bogus'"),
+    ]
+
+
+def test_parallel_book_range_is_not_mapped_from_org(tmp_path: pathlib.Path) -> None:
+    """A parallel book's unequal range maps to org but nothing maps back to it."""
+    v = _versification(
+        tmp_path,
+        """{
+          "maxVerses": {"DAN": [21], "DAG": [21]},
+          "mappedVerses": {"DAG 1:1-2": "DAN 1:1"}
+        }""",
+    )
+    assert v._map_to_org[("DAG", 1, 2, "")] == (("DAN", 1, 1, ""), ("DAN", 1, 1, ""))
+    assert v._map_from_org == {}
+
+
+def test_plural_psalms_is_read_as_psalms() -> None:
+    """The plural-name key PSAS is taken for the book PSA."""
+    lxx = Versification.named("lxx")
+    assert lxx.last_verse("PSAS", 150) == lxx.last_verse("PSA", 150) > 0
+    assert lxx.first_verse("PSAS", 3) == lxx.first_verse("PSA", 3)
+    assert lxx.partial_ordinal("PSAS", 1, 1, "") == 0
+    assert lxx.verse_parts("PSAS", 1, 1) == [""]
+
+
+def test_map_verse_portion_of_unmapped_lettered_verse(tmp_path: pathlib.Path) -> None:
+    """A portion of a lettered verse with no mapping maps as its base verse."""
+    v = _versification(
+        tmp_path,
+        """{
+          "maxVerses": {"EST": [22, 23, 15, 17]},
+          "partialVerses": {"EST 4:17": ["-", "C1", "C2"]}
+        }""",
+    )
+    org = Versification.named("org")
+    assert v.map_verse("EST", 4, 17, org, subverse="C2a") == ("EST", 4, 17, "C2a")

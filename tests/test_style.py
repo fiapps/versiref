@@ -511,3 +511,55 @@ def test_available_standard_names_latin() -> None:
     assert "la-cce_abbreviationes" in latin
     assert "la-vetus_abbreviationes" in latin
     assert "la-nomina" in latin
+
+
+def test_esther_and_greek_esther_may_share_a_name() -> None:
+    """A name shared by EST and ESG is recognized as EST, whichever comes first."""
+    assert RefStyle(names={"EST": "Esth", "ESG": "Esth"}).recognized_names == {
+        "Esth": "EST"
+    }
+    assert RefStyle(names={"ESG": "Esth", "EST": "Esth"}).recognized_names == {
+        "Esth": "EST"
+    }
+
+
+def test_given_recognized_names_are_kept() -> None:
+    """Recognized names passed to the constructor are not derived from names."""
+    style = RefStyle(names={"GEN": "Gn"}, recognized_names={"Genesis": "GEN"})
+    assert style.recognized_names == {"Genesis": "GEN"}
+
+
+def test_from_dict_base_must_be_a_string() -> None:
+    """from_dict rejects a base that is not an identifier."""
+    with pytest.raises(ValueError, match="'base' must be a string identifier"):
+        RefStyle.from_dict({"base": 3})
+
+
+def test_from_dict_names_must_be_a_string_or_dict() -> None:
+    """from_dict rejects names of any other type."""
+    with pytest.raises(ValueError, match="'names' must be a string or dict"):
+        RefStyle.from_dict({"names": 3})
+
+
+def test_from_dict_also_recognize_skips_other_types() -> None:
+    """An also_recognize entry that is neither a string nor a dict is passed over."""
+    style = RefStyle.from_dict(
+        {"base": "en-sbl", "also_recognize": [3, {"Gene": "GEN"}]}
+    )
+    assert style.recognized_names["Gene"] == "GEN"
+
+
+@pytest.mark.parametrize(
+    ("content", "message"),
+    [
+        ('["GEN"]', "not a dictionary"),
+        ('{"GEN": 1}', "all keys and values must be strings"),
+    ],
+)
+def test_standard_names_rejects_malformed_data(
+    monkeypatch: pytest.MonkeyPatch, content: str, message: str
+) -> None:
+    """standard_names() rejects a file that is not a dict of strings."""
+    monkeypatch.setattr(Path, "read_text", lambda self, *args, **kwargs: content)
+    with pytest.raises(ValueError, match=message):
+        standard_names("en-sbl_names")

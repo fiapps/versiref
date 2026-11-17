@@ -1311,3 +1311,74 @@ def test_partial_ordinal_direct() -> None:
     assert lxx.partial_ordinal("ROM", 8, 1, "a") == 0
     # A verse absent from this versification's partialVerses.
     assert Versification.named("eng").partial_ordinal("ESG", 4, 17, "k") == 0
+
+
+def test_for_range_end_subverse_without_end_verse() -> None:
+    """An end subverse alone ends the range in the start verse."""
+    ref = BibleRef.for_range("GEN", 1, 3, start_subverse="a", end_subverse="b")
+    (verse_range,) = ref.ranges
+    assert verse_range.start == RefPoint("GEN", 1, 3, "a")
+    assert verse_range.end == RefPoint("GEN", 1, 3, "b")
+
+
+def test_lettered_chapter_the_versification_lacks_is_invalid() -> None:
+    """A whole lettered chapter is invalid where there are no lettered chapters."""
+    point = RefPoint("EST", 4, 17, "C")
+    ref = BibleRef((VerseRange(point, point),), Versification.named("eng"))
+    assert ref.invalid_reason() == "EST has no chapter C"
+    assert len(list(ref.range_keys())) == 1
+
+
+def test_map_whole_chapter_ends_before_excluded_verses(tmp_path: pathlib.Path) -> None:
+    """A whole chapter maps through the last verse the versification has."""
+    path = tmp_path / "v.json"
+    path.write_text(
+        '{"maxVerses": {"GEN": [31, 10]}, "excludedVerses": ["GEN 2:9-10"]}'
+    )
+    source = Versification.from_file(str(path))
+    chapter = RefPoint("GEN", 2)
+    mapped = BibleRef((VerseRange(chapter, chapter),), source).map_to(
+        Versification.named("org")
+    )
+    assert mapped is not None
+    assert mapped.format(RefStyle.named("en-sbl")) == "Gen 2:1–8"
+
+
+def test_map_chapter_the_source_lacks_passes_through() -> None:
+    """A whole chapter the source does not have is left as it is."""
+    chapter = RefPoint("GEN", 99)
+    ranges = (VerseRange(chapter, chapter),)
+    mapped = BibleRef(ranges, Versification.named("eng")).map_to(
+        Versification.named("org")
+    )
+    assert mapped is not None
+    assert mapped.ranges == ranges
+
+
+@pytest.mark.parametrize(
+    ("start", "end"),
+    [
+        (RefPoint("GEN", 1), RefPoint("XXX", 2)),
+        (RefPoint("EXO", 1), RefPoint("GEN", 2)),
+        (RefPoint("GEN", 1, 1), RefPoint("EXO", 1, 99)),
+    ],
+    ids=["unknown book", "books out of order", "verse the book lacks"],
+)
+def test_map_unmappable_range_across_books(start: RefPoint, end: RefPoint) -> None:
+    """A range across books does not map if any part of it cannot."""
+    ref = BibleRef((VerseRange(start, end),), Versification.named("eng"))
+    assert ref.map_to(Versification.named("org")) is None
+
+
+def test_map_range_ending_in_book_that_begins_with_lettered_chapter() -> None:
+    """A range into NABRE Esther takes in Esther A, which begins the book."""
+    ref = BibleRef(
+        (VerseRange(RefPoint("JDT", 16, 1), RefPoint("EST", 1, 5)),),
+        Versification.named("nabre"),
+    )
+    mapped = ref.map_to(Versification.named("cei"))
+    assert mapped is not None
+    assert (
+        mapped.format(RefStyle.named("en-sbl"))
+        == "Jdt 16:1–25; Add Esth 1:1a–r; Esth 1:1–5"
+    )

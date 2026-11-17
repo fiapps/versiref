@@ -15,6 +15,7 @@ This project uses [uv](https://github.com/astral-sh/uv) for package management.
 uv run pytest                    # Run all tests
 uv run pytest tests/test_*.py    # Run a specific test file
 uv run pytest -k test_name       # Run tests matching a pattern
+uv run pytest --cov              # Report branch coverage, with the lines missed
 ```
 
 ### Code Quality
