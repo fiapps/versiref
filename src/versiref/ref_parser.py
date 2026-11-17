@@ -13,7 +13,7 @@ from enum import Enum
 import pyparsing as pp
 
 from versiref.bible_ref import BibleRef, RefPoint, VerseRange
-from versiref.ref_style import SHARED_NAME_PARTNER, RefStyle
+from versiref.ref_style import RefStyle
 from versiref.roman import roman_to_int
 from versiref.versification import Versification
 
@@ -152,7 +152,9 @@ class RefParser:
 
         Args:
             style: The RefStyle to use for parsing
-            versification: The Versification to use for determining single-chapter books
+            versification: The Versification of the references. It decides
+                which books have a single chapter, and which have lettered
+                chapters (the NABRE's Esther A–F) and where they stand.
             strict: If True, follow the style more closely.
 
         Non-strict parsers currently recognize as range separators hyphens, en
@@ -393,19 +395,16 @@ class RefParser:
 
         verses_first, chapters_first = build_book_branches(book, chapter)
 
-        # A book with chapter letters (e.g. the NABRE's Esther A–F) gets its
-        # own branches whose chapter element matches the letters. The branches
-        # also claim the names of the book it may share a name with (ESG with
-        # EST), so that "Esther C:12" parses as ESG even though "Esther" alone
-        # resolves to EST.
+        # A book with lettered chapters (the NABRE's Esther A–F) gets its own
+        # branches, whose chapter element matches a letter as well as a
+        # number. The letter parses as a negative number, which
+        # _finish_ranges turns into the place the versification gives it.
         lettered_verses_first: list[pp.ParserElement] = []
         lettered_chapters_first: list[pp.ParserElement] = []
-        for lettered_id, letters in self.style.chapter_letters.items():
-            partner = SHARED_NAME_PARTNER.get(lettered_id)
+        for lettered_id in self.versification.max_verses:
+            letters = self.versification.chapter_letters(lettered_id)
             lettered_names = [
-                name
-                for name, book_id in self.style.recognized_names.items()
-                if book_id in (lettered_id, partner)
+                name for name, book_id in names.items() if book_id == lettered_id
             ]
             if not lettered_names or not letters:
                 continue
@@ -417,8 +416,7 @@ class RefParser:
                 letters: list[str],
             ) -> Callable[[pp.ParseResults], int]:
                 """Return a parse action mapping a chapter letter to its number."""
-                letter_list = list(letters)
-                return lambda t: letter_list.index(str(t[0])) + 1
+                return lambda t: -1 - letters.index(str(t[0]))
 
             lettered_book = _book_element(dict.fromkeys(lettered_names, lettered_id))
             # The lookahead keeps a letter from matching the start of a longer
@@ -432,7 +430,9 @@ class RefParser:
                 + r")(?![0-9A-Za-zÆæŒœ])"
             )
             letter_chapter.set_parse_action(make_letter_action(letters))
-            lettered_cv, lettered_c = build_book_branches(lettered_book, letter_chapter)
+            lettered_cv, lettered_c = build_book_branches(
+                lettered_book, letter_chapter | chapter
+            )
             lettered_verses_first.append(lettered_cv)
             lettered_chapters_first.append(lettered_c)
 
@@ -616,6 +616,29 @@ class RefParser:
             The finished verse ranges
 
         """
+
+        def point(
+            book: str,
+            chapter: int | None,
+            verse: int | None,
+            subverse: str,
+        ) -> RefPoint:
+            """Make a point, placing a lettered chapter (a negative number).
+
+            The verses of a lettered chapter are held as verses inserted
+            beside a verse of the numbered text, each with a subverse made of
+            the letter and its verse number; the letter alone is the chapter
+            as a whole.
+            """
+            if chapter is None or chapter >= 0:
+                return RefPoint(book, chapter, verse, subverse)
+            letter = self.versification.chapter_letters(book)[-1 - chapter]
+            located = self.versification.lettered_chapter(book, letter)
+            assert located is not None
+            if verse is None:
+                return RefPoint(book, located[0], located[1], letter)
+            return RefPoint(book, located[0], located[1], f"{letter}{verse}{subverse}")
+
         book = str(tokens["book"])
         drafts = [token for token in tokens if isinstance(token, _Draft)]
         if not drafts:
@@ -638,7 +661,7 @@ class RefParser:
             else:
                 if draft.chapter is not None:
                     chapter = draft.chapter
-                start = RefPoint(book, chapter, draft.verse, draft.subverse)
+                start = point(book, chapter, draft.verse, draft.subverse)
 
             if draft.end_book is not None:
                 end_chapter = draft.end_chapter
@@ -648,16 +671,18 @@ class RefParser:
                 end = RefPoint(
                     draft.end_book, end_chapter, draft.end_verse, draft.end_subverse
                 )
+                book, chapter = end.book, end.chapter
+            elif draft.whole_book:
+                end = start
             elif draft.following == "ff":
-                end = RefPoint(book, chapter)
+                end = point(book, chapter, None, "")
             elif draft.following == "f":
                 assert draft.verse is not None
-                end = RefPoint(book, chapter, draft.verse + 1)
+                end = point(book, chapter, draft.verse + 1, "")
             elif draft.has_end:
-                end_chapter = (
-                    chapter if draft.end_chapter is None else draft.end_chapter
-                )
-                end = RefPoint(book, end_chapter, draft.end_verse, draft.end_subverse)
+                if draft.end_chapter is not None:
+                    chapter = draft.end_chapter
+                end = point(book, chapter, draft.end_verse, draft.end_subverse)
             else:
                 end = start
 
@@ -668,7 +693,6 @@ class RefParser:
                     original_text[draft.start_loc : draft.end_loc].strip(),
                 )
             )
-            book, chapter = end.book, end.chapter
         return ranges
 
     def _make_bible_ref(

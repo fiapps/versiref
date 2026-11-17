@@ -8,8 +8,15 @@ from importlib import resources
 
 logger = logging.getLogger(__name__)
 
-_VERSE_RE = re.compile(r"^([A-Z0-9]{3}) (\d+):(\d+)([a-z])?(?:-(\d+)([a-z])?)?$")
+_VERSE_RE = re.compile(
+    r"^([A-Z0-9]{3}) (\d+):(\d+)([a-z]|[A-Z]+\d+)?(?:-(\d+)([a-z])?)?$"
+)
 _PARTIAL_VERSE_RE = re.compile(r"^([A-Z0-9]{3}) (\d+):(\d+)$")
+
+# The subverse of a verse of a lettered chapter: the chapter's letter, the verse
+# number, and any letters naming a portion of that verse ("C12", "C12a"). The
+# letter alone is the chapter as a whole.
+_LETTERED_SUBVERSE_RE = re.compile(r"^([A-Z]+)(?:(\d+)([a-z]*))?$")
 
 _VerseLoc = tuple[str, int, int, str]
 _VerseLocRange = tuple[_VerseLoc, _VerseLoc]
@@ -26,6 +33,34 @@ _PARALLEL_BOOKS = frozenset({"DAG"})
 
 
 _named: dict[str, "Versification"] = {}
+
+
+def lettered_subverse(subverse: str) -> tuple[str, int | None, str] | None:
+    """Split the subverse of a verse of a lettered chapter into its parts.
+
+    A lettered chapter, such as Addition C to Esther in the NABRE, is held as
+    verses inserted beside a verse of the numbered text, and each has a
+    subverse made of the chapter's letter and its verse number: Esther C:12 is
+    the subverse "C12" of Esther 4:17. Letters after the number name a portion
+    of that verse, as in "C12a". The letter alone, "C", leaves the verse
+    unspecified, as a verse of None does in a numbered chapter: it is the
+    whole chapter, which at the start of a range means its first verse and at
+    the end its last.
+
+    Args:
+        subverse: A subverse string
+
+    Returns:
+        The chapter letter, the verse number (None for the whole chapter), and
+        the portion letters ("" if none), or None if the subverse is not of
+        this form.
+
+    """
+    match = _LETTERED_SUBVERSE_RE.match(subverse)
+    if match is None:
+        return None
+    verse = None if match.group(2) is None else int(match.group(2))
+    return match.group(1), verse, match.group(3) or ""
 
 
 def _map_stage(
@@ -53,6 +88,13 @@ def _map_stage(
         exact = mapping.get(loc)
         if exact is not None:
             return exact[idx], True
+        # A portion of a verse of a lettered chapter maps as that verse does.
+        lettered = lettered_subverse(subverse)
+        if lettered is not None and lettered[2]:
+            whole = mapping.get((book, chapter, verse, f"{lettered[0]}{lettered[1]}"))
+            if whole is not None:
+                mapped = whole[idx]
+                return (mapped[0], mapped[1], mapped[2], lettered[2]), True
     base = (book, chapter, verse, "")
     rng = mapping.get(base)
     if rng is None:
@@ -62,6 +104,8 @@ def _map_stage(
         return (mapped[0], mapped[1], mapped[2], ""), False
     # A subverse on the mapped location is a structural (deuterocanonical)
     # insertion from the data; otherwise carry the input's portion subverse.
+    if mapped[3] and subverse and lettered_subverse(mapped[3]) is not None:
+        return (mapped[0], mapped[1], mapped[2], mapped[3] + subverse), True
     return (mapped[0], mapped[1], mapped[2], mapped[3] or subverse), True
 
 
@@ -113,6 +157,24 @@ class Versification:
     # number never used (the Clementine's Ps 147 begins at verse 12). Loaded
     # from the data's ``excludedVerses``.
     _excluded: set[tuple[str, int, int]] = field(default_factory=set, repr=False)
+    # For each book with lettered chapters, maps each chapter's letter to the
+    # (chapter, verse) its verses are inserted beside and the number of them.
+    # Derived from ``_partial_verses``, in reading order.
+    _lettered: dict[str, dict[str, tuple[int, int, int]]] = field(
+        init=False, default_factory=dict, repr=False
+    )
+
+    def __post_init__(self) -> None:
+        """Index the lettered chapters among the inserted verses."""
+        for book, chapter, verse in sorted(self._partial_verses):
+            parts = self._partial_verses[(book, chapter, verse)]
+            for part in sorted(parts, key=lambda part: parts[part]):
+                lettered = lettered_subverse(part)
+                if lettered is None or lettered[1] is None or lettered[2]:
+                    continue
+                letters = self._lettered.setdefault(book, {})
+                count = letters.get(lettered[0], (chapter, verse, 0))[2]
+                letters[lettered[0]] = (chapter, verse, max(count, lettered[1]))
 
     def __str__(self) -> str:
         """Return a string representation of this versification.
@@ -465,7 +527,71 @@ class Versification:
         parts = self._partial_verses.get((book, chapter, verse))
         if parts is None:
             return 0
+        if subverse not in parts:
+            # A portion of a verse of a lettered chapter sorts with that verse.
+            lettered = lettered_subverse(subverse)
+            if lettered is not None and lettered[1] is not None:
+                subverse = f"{lettered[0]}{lettered[1]}"
         return parts.get(subverse, parts.get("", 0))
+
+    def verse_parts(self, book: str, chapter: int, verse: int) -> list[str]:
+        """Return the subverses of a verse and its inserted verses, in reading order.
+
+        Args:
+            book: The book ID (using Paratext three-letter codes)
+            chapter: The chapter number
+            verse: The verse number
+
+        Returns:
+            The subverse of each inserted verse, with "" for the verse itself,
+            in the order they are read. A verse with no inserted verses yields
+            [""].
+
+        """
+        if book == "PSAS":
+            book = "PSA"
+        parts = self._partial_verses.get((book, chapter, verse))
+        if parts is None:
+            return [""]
+        ordered = sorted(parts, key=lambda part: parts[part])
+        return ordered if "" in parts else ["", *ordered]
+
+    def chapter_letters(self, book: str) -> list[str]:
+        """Return the letters of a book's lettered chapters, in reading order.
+
+        The NABRE prints the Greek additions to Esther as chapters A through F
+        among the numbered chapters translated from the Hebrew.
+
+        Args:
+            book: The book ID (using Paratext three-letter codes)
+
+        Returns:
+            The letters, or an empty list if the book has no lettered chapters
+            in this versification.
+
+        """
+        return list(self._lettered.get(book, {}))
+
+    def lettered_chapter(self, book: str, letter: str) -> tuple[int, int, int] | None:
+        """Locate a lettered chapter among a book's numbered verses.
+
+        The verses of a lettered chapter are held as verses inserted beside a
+        verse of the numbered text, with subverses made of the letter and the
+        verse number: the NABRE's Esther C:12 is the subverse "C12" of Esther
+        4:17, after which Addition C stands. The letter alone, "C", is the
+        chapter as a whole.
+
+        Args:
+            book: The book ID (using Paratext three-letter codes)
+            letter: The chapter's letter
+
+        Returns:
+            The chapter and verse beside which the lettered chapter's verses
+            are inserted and the number of its verses, or None if the book has
+            no such chapter in this versification.
+
+        """
+        return self._lettered.get(book, {}).get(letter)
 
     def map_verse(
         self,

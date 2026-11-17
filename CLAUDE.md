@@ -111,7 +111,7 @@ The order of books in a versification's `maxVerses` decides which books lie insi
 
 - **PSA/PSAS**: Psalm vs Psalms (singular/plural). PSAS is a key in book name dictionaries for the plural form, never a book ID in a reference: a parser reads a plural name as PSA, and formatting chooses the plural when the ranges under one statement of the name cite more than one psalm.
 - **PS2**: Psalm 151. No bundled name set names it, so it cannot yet be formatted (issue #39).
-- **EST/ESG**: Esther vs Greek Esther (some versifications separate them, NAB uses letters for ESG chapters).
+- **EST/ESG**: Esther vs Greek Esther (some versifications separate them). The NABRE has only EST: its lettered chapters A–F are held as verses inserted beside a verse of EST, with a subverse made of the letter and verse number (Esther C:12 is the subverse "C12" of EST 4:17, and "C" alone is the whole chapter). The versification data defines them, not the style; see "Lettered chapters" in `VERSIFICATIONS.md`.
 
 ## Code Conventions
 

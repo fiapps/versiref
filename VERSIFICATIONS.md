@@ -44,6 +44,16 @@ A range that starts with chapter 1 as a whole still takes the addition in, becau
 A subverse cited on a verse that is *not* listed here is treated as a mere portion of that verse and shares the base verse's ordinal, so it collapses onto the same key; so does an unlisted subverse of a listed verse.
 That distinction is the whole point of the table: `ESG 4:17k` is a verse in its own right, while `Rom 8:1a` is half of a verse.
 
+#### Lettered chapters
+
+A part named with a capital letter and a number (`"C12"`) is a verse of a *lettered chapter*: the NABRE prints the Greek additions to Esther as chapters A through F among the numbered chapters it translates from the Hebrew.
+The data holds such a chapter as verses inserted beside the verse it stands next to, so the list for `EST 4:17` in `nabre` is `"-"`, `"C1"`, … `"C30"`, and each lettered verse has its own `mappedVerses` entry (`"EST 4:17C12": "ESG 4:29"`).
+The loader collects the letters from these lists; nothing else declares them.
+In a reference, the subverse `"C12"` is Esther C:12, `"C12a"` is a part of it, and `"C"` alone is the chapter as a whole.
+
+A lettered chapter is a chapter in its own right, which the plain inserted verses of `lxx` and `cei` are not.
+A whole-chapter reference to a numbered chapter therefore leaves out a lettered chapter listed at the edge of it (`nabre` Est 4 ends at 4:17, and Est 5 starts at 5:1 though D is listed before that verse), while it includes one that falls inside (B, after 3:13).
+
 ### `excludedVerses`
 
 A list of verses, or ranges of verses (`"PSA 147:1-11"`), that lie within a chapter's `maxVerses` but that the versification does not have.
@@ -183,6 +193,28 @@ The Vulgate agrees that the preceding boundary is real, beginning its chapter 14
 A versification that has *both* books cannot do this.
 `cei` has both, and inherited `lxx`'s entries wholesale, so `cei` `ESG 1:1` and `cei` `EST 1:1` both landed on `org` `EST 1:1` while `org`'s `ESG` went entirely unused.
 When adapting Esther data from `lxx`, the base-verse entries are exactly the ones that must be reconsidered; the lettered ones usually carry over unchanged.
+
+### The NABRE has one Esther
+
+`nabre` has no `ESG`.
+Its Esther is the Hebrew text in ten numbered chapters with the six additions as lettered chapters A–F, placed where the edition prints them:
+
+| Chapter | Listed with | Position | `org` `ESG` |
+| --- | --- | --- | --- |
+| A (17 verses) | `EST 1:1` | before | 1:1-17 |
+| B (7) | `EST 3:13` | after | 3:14-20 |
+| C (30) | `EST 4:17` | after | 4:18-47 |
+| D (16) | `EST 5:1` | before | 5:1-16 |
+| E (24) | `EST 8:12` | after | 8:13-36 |
+| F (11) | `EST 10:3` | after | 10:4-14 |
+
+The NABRE numbers the additions as Swete does, so every lettered verse answers to exactly one of `org`'s.
+C and D are adjacent, with nothing between 4:17 and 5:1 but the two of them; D is listed with 5:1 because it is the Greek form of 5:1-2, which the NABRE prints after it in brackets, and `org` puts it in chapter 5.
+
+The numbered verses map to `org`'s `EST` by identity, so `org`'s `ESG` *narrative* verses (1:18-39 and the like) have no counterpart in `nabre` and do not map into it.
+The mapping data cannot express a one-way entry that would send them to the NABRE's Hebrew-based verses.
+
+`tests/test_chapter_letters.py::test_nabre_esther_covers_org_exactly_once` checks that the two together account for `org`'s `EST` and its additions with no verse claimed twice.
 
 ### Checking the work
 

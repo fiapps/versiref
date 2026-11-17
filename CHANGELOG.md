@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Changed
+
+- The NABRE's lettered chapters of Esther (`Est A` through `Est F`) belong to Esther itself and stand where the NABRE prints them. They had been chapters 1–6 of a separate book, `ESG`, which put all of them before Esther 1:1 in verse keys and kept a range or a list from passing between a lettered chapter and a numbered one. The `nabre` versification no longer has `ESG`: each lettered verse is held as a verse inserted beside a verse of `EST`, with a subverse made of the letter and the verse number, so that Esther C:12 is `RefPoint("EST", 4, 17, "C12")` and the whole of Esther C is the subverse `"C"`. They parse and format as before, and "Est 4:1–C:30", "Est A:1–1:3", "Est B:1; 3:14", and "Est C:12a" now parse as well.
+  - Verse keys for `nabre` change. Esther and every book after it move down one book number, and the lettered chapters key among the verses of Esther in reading order: A before 1:1, B after 3:13, C after 4:17, D before 5:1, E after 8:12, and F after 10:3. Anything that stores `nabre` verse keys must be rebuilt.
+  - A numbered chapter leaves out a lettered chapter that stands at its edge, so "Est 4" ends at 4:17 and "Est 1" starts at 1:1; B and E lie inside chapters 3 and 8. A whole-book reference, or a range of chapters that passes over a lettered chapter, takes it in.
+  - `map_to()` divides a range where it passes between the Hebrew text and a Greek addition: NABRE "Est 4:1–C:30" is `org` "Esth 4:1–17; Add Esth 4:18–47". A reference to Greek Esther's own narrative verses, which the NABRE does not have, no longer maps into the lettered chapters by accident; it does not map.
+  - Lettered chapters come from the versification, not the style: a parser reads them only when its versification has them, in any style, and `Versification.chapter_letters()`, `lettered_chapter()`, and `verse_parts()` describe them. The `en-nabre` style no longer differs from `en-sbl` except in the names it recognizes, and "Add Esth B:5" is no longer read as a lettered chapter.
+- `map_to()` states the first piece of a divided range as whole chapters when the range starts with a whole chapter, and likewise the last piece of a range that ends with one, where it had stated only a range of whole chapters that way.
+- Validation rejects a range that ends at an earlier inserted verse of the verse it starts in.
+
+### Removed
+
+- `RefStyle.chapter_letters`, the `chapter_letters` key of a style definition, and the `book_id` argument of `RefStyle.format_chapter()`. A style definition that still has the key loads with a `FutureWarning` that says the key is ignored and can be removed.
+
 ### Fixed
 
 - A number that follows a chapter separator without a book name is taken for a chapter only if some book of the versification has that many chapters. A parser for a style with Roman chapter numbers had read the series abbreviation in "Prov. IX, 1; CCL IX, 156" as chapter 250 of Proverbs, which made the whole reference invalid; it now ends at "Prov. IX, 1". A chapter number that follows a book's name is not limited, so that "Ps. CCL, 1" is still found and reported as invalid.

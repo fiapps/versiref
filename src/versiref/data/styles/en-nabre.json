@@ -1,5 +1,4 @@
 {
   "base": "en-sbl",
-  "chapter_letters": {"ESG": ["A", "B", "C", "D", "E", "F"]},
   "also_recognize": ["en-cmos_short", "en-cmos_long"]
 }

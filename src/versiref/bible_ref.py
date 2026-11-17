@@ -5,9 +5,10 @@ This module provides classes for representing and manipulating Bible references.
 
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass, field
+from functools import partial
 
 from versiref.ref_style import RefStyle, standard_names
-from versiref.versification import Versification
+from versiref.versification import Versification, lettered_subverse
 
 # Integer verse keys pack a location as BB CCC VVV SS (book, chapter, verse,
 # subverse ordinal). The trailing subverse field gives inserted verses such as
@@ -112,19 +113,29 @@ def _book_segments(
     segment_start = start
     current_book: str | None = None
     previous = start
+    start_ordinal = source.partial_ordinal(book, *start)
+    end_ordinal = source.partial_ordinal(book, *end)
     for chapter in range(start[0], end[0] + 1):
         first = start[1] if chapter == start[0] else source.first_verse(book, chapter)
         last = end[1] if chapter == end[0] else source.last_verse(book, chapter)
         for verse in range(first, last + 1):
-            mapped = source.map_verse(book, chapter, verse, target)
-            if mapped is not None:
-                if current_book is None:
-                    current_book = mapped[0]
-                elif mapped[0] != current_book:
-                    segments.append((segment_start, previous))
-                    segment_start = (chapter, verse, "")
-                    current_book = mapped[0]
-            previous = (chapter, verse, "")
+            # The verses inserted beside a verse may map into another book, as
+            # the NABRE's lettered chapters of Esther do.
+            for part in source.verse_parts(book, chapter, verse):
+                ordinal = source.partial_ordinal(book, chapter, verse, part)
+                if ((chapter, verse) == start[:2] and ordinal < start_ordinal) or (
+                    (chapter, verse) == end[:2] and ordinal > end_ordinal
+                ):
+                    continue
+                mapped = source.map_verse(book, chapter, verse, target, part)
+                if mapped is not None:
+                    if current_book is None:
+                        current_book = mapped[0]
+                    elif mapped[0] != current_book:
+                        segments.append((segment_start, previous))
+                        segment_start = (chapter, verse, part)
+                        current_book = mapped[0]
+                previous = (chapter, verse, part)
     segments.append((segment_start, end))
     return segments
 
@@ -135,6 +146,87 @@ def _last_present_verse(versification: Versification, book: str, chapter: int) -
     while last > 1 and versification.is_excluded(book, chapter, last):
         last -= 1
     return last
+
+
+def _own_parts(
+    versification: Versification, book: str, chapter: int, verse: int
+) -> list[str]:
+    """Return the parts of a verse that belong to its numbered chapter.
+
+    These are the verse and the verses inserted beside it, in reading order,
+    apart from the verses of a lettered chapter, which is a chapter of its
+    own: the NABRE's Esther 4 ends at 4:17, though Esther C follows that verse
+    and is held as verses inserted after it.
+    """
+    parts = versification.verse_parts(book, chapter, verse)
+    return [part for part in parts if lettered_subverse(part) is None] or [""]
+
+
+def _starts_chapter(
+    versification: Versification, loc: tuple[str, int, int, str]
+) -> bool:
+    """Tell whether nothing of its numbered chapter comes before a location."""
+    book, chapter, verse, subverse = loc
+    first = versification.first_verse(book, chapter)
+    if verse != first:
+        return verse < first
+    first_part = _own_parts(versification, book, chapter, verse)[0]
+    return versification.partial_ordinal(
+        book, chapter, verse, subverse
+    ) <= versification.partial_ordinal(book, chapter, verse, first_part)
+
+
+def _ends_chapter(versification: Versification, loc: tuple[str, int, int, str]) -> bool:
+    """Tell whether nothing of its numbered chapter comes after a location."""
+    book, chapter, verse, subverse = loc
+    last = _last_present_verse(versification, book, chapter)
+    if verse != last:
+        return verse > last
+    last_part = _own_parts(versification, book, chapter, verse)[-1]
+    return versification.partial_ordinal(
+        book, chapter, verse, subverse
+    ) >= versification.partial_ordinal(book, chapter, verse, last_part)
+
+
+def _definite(
+    versification: Versification, book: str, subverse: str, last: bool = False
+) -> str:
+    """Give a whole lettered chapter (the subverse "C") its first or last verse."""
+    lettered = lettered_subverse(subverse)
+    if lettered is None or lettered[1] is not None:
+        return subverse
+    located = versification.lettered_chapter(book, lettered[0])
+    if located is None:
+        return subverse
+    return f"{lettered[0]}{located[2] if last else 1}"
+
+
+@dataclass(frozen=True)
+class _Shown:
+    """One end of a verse range as it is written: a lettered chapter has its letter."""
+
+    book: str
+    chapter: int | str | None = None
+    verse: int | None = None
+    subverse: str = ""
+
+
+def _shown(verse_range: "VerseRange") -> tuple[_Shown, _Shown]:
+    """Return the ends of a verse range as they are written.
+
+    A verse of a lettered chapter is held as a verse inserted beside a verse
+    of the numbered text (the NABRE's Esther C:12 as subverse "C12" of Esther
+    4:17, and the whole of Esther C as its subverse "C") but written with the
+    letter as its chapter.
+    """
+
+    def show(point: RefPoint) -> _Shown:
+        parts = None if point.verse is None else lettered_subverse(point.subverse)
+        if parts is None:
+            return _Shown(point.book, point.chapter, point.verse, point.subverse)
+        return _Shown(point.book, *parts)
+
+    return show(verse_range.start), show(verse_range.end)
 
 
 @dataclass(frozen=True)
@@ -150,7 +242,12 @@ class RefPoint:
         book: The book ID (a Paratext three-letter code such as "JHN")
         chapter: The chapter number, or None for the whole book
         verse: The verse number, or None for the whole chapter
-        subverse: Letters naming a part of the verse, or "" for the whole verse
+        subverse: Letters naming a part of the verse, or "" for the whole verse.
+            A verse of a lettered chapter is held as a verse inserted beside
+            a verse of the numbered text, with a subverse made of the letter
+            and its verse number: the NABRE's Esther C:12 is the subverse
+            "C12" of Esther 4:17, and its first half is "C12a". The letter
+            alone, "C", is the lettered chapter as a whole.
 
     """
 
@@ -215,20 +312,41 @@ class VerseRange:
     def is_whole_chapters(self) -> bool:
         """Return True if this range does not specify verse limits.
 
-        This is also true of a range of whole books.
+        This is also true of a range of whole books. A lettered chapter, such
+        as the NABRE's Esther C, counts as a chapter.
         """
-        return self.start.verse is None and self.end.verse is None
+        start, end = _shown(self)
+        return start.verse is None and end.verse is None
 
     def has_following_verses(self) -> bool:
         """Return True if this range runs from a verse to the end of its chapter.
 
         This is the form written with "ff", as in John 3:16ff.
         """
+        start, end = _shown(self)
         return (
+            start.book == end.book
+            and start.verse is not None
+            and end.verse is None
+            and end.chapter == start.chapter
+        )
+
+    def _numbered(self) -> tuple[bool, bool]:
+        """Tell whether the range is whole numbered chapters, or "ff" in one.
+
+        Unlike :meth:`is_whole_chapters` and :meth:`has_following_verses`,
+        this takes a lettered chapter for what it is held as: verses inserted
+        beside a verse of a numbered chapter.
+        """
+        start, end = self.start, self.end
+        return (
+            start.verse is None and end.verse is None,
             self.is_single_book()
-            and self.start.verse is not None
-            and self.end.verse is None
-            and self.end.chapter == self.start.chapter
+            and start.verse is not None
+            and end.verse is None
+            and end.chapter == start.chapter
+            # A whole lettered chapter is no verse to follow on from.
+            and _shown(self)[0].verse is not None,
         )
 
     def invalid_reason(self) -> str | None:
@@ -261,10 +379,11 @@ class VerseRange:
         if start.chapter > end.chapter:
             return "range ends in an earlier chapter than it starts"
 
+        shown_start, shown_end = _shown(self)
         if (
-            start.verse is not None
-            and end.verse is None
-            and start.chapter != end.chapter
+            shown_start.verse is not None
+            and shown_end.verse is None
+            and shown_start.chapter != shown_end.chapter
         ):
             return "'ff' range spans more than one chapter"
 
@@ -328,6 +447,36 @@ def _range_reason(
             )
             if reason is not None:
                 return reason
+        lettered = None if point.verse is None else lettered_subverse(point.subverse)
+        if lettered is not None:
+            letter, verse, _ = lettered
+            located = versification.lettered_chapter(point.book, letter)
+            if located is None or located[:2] != (point.chapter, point.verse):
+                return f"{label(point.book)} has no chapter {letter}"
+            if verse is not None and (verse < 1 or verse > located[2]):
+                return (
+                    f"{label(point.book)} {letter} has no verse {verse} "
+                    f"(only {_count(located[2], 'verse')})"
+                )
+    if (
+        start.book == end.book
+        and start.chapter is not None
+        and start.verse is not None
+        and (start.chapter, start.verse) == (end.chapter, end.verse)
+        and versification.partial_ordinal(
+            start.book,
+            start.chapter,
+            start.verse,
+            _definite(versification, start.book, start.subverse),
+        )
+        > versification.partial_ordinal(
+            end.book,
+            start.chapter,
+            start.verse,
+            _definite(versification, end.book, end.subverse, last=True),
+        )
+    ):
+        return f"{label(start.book)}: range ends at an earlier verse than it starts"
     if allow_excluded:
         return None
     # A range may span an excluded verse (the NABRE's Tob 11:12-14), but may
@@ -342,21 +491,59 @@ def _range_reason(
     return None
 
 
+def _whole_lettered(
+    piece: VerseRange, target: Versification, starts_chapter: bool, ends_chapter: bool
+) -> VerseRange:
+    """State a piece mapped from whole chapters as whole lettered chapters if it is.
+
+    The piece must run from the first verse of a lettered chapter, or of a
+    numbered one, to the last verse of one.
+    """
+    start, end = piece.start, piece.end
+    if start.verse is None or end.verse is None:
+        return piece
+    first = lettered_subverse(start.subverse)
+    last = lettered_subverse(end.subverse)
+    if first is None and last is None:
+        return piece
+    if first is None:
+        if not starts_chapter:
+            return piece
+        start = RefPoint(start.book, start.chapter)
+    elif first[1:] == (1, ""):
+        start = RefPoint(start.book, start.chapter, start.verse, first[0])
+    else:
+        return piece
+    if last is None:
+        if not ends_chapter:
+            return piece
+        end = RefPoint(end.book, end.chapter)
+    else:
+        located = target.lettered_chapter(end.book, last[0])
+        if located is None or last[1:] != (located[2], ""):
+            return piece
+        end = RefPoint(end.book, end.chapter, end.verse, last[0])
+    return VerseRange(start, end)
+
+
 def _map_chapters(
-    verse_range: VerseRange, source: Versification, target: Versification
+    verse_range: VerseRange,
+    source: Versification,
+    target: Versification,
+    whole_book: bool = False,
 ) -> list[VerseRange] | None:
     """Map a range that names chapters of a single book, as pieces in the target.
 
     Returns None if the start or end of a piece does not exist in the target.
     A whole-chapter range naming a chapter the source does not have passes
-    through unchanged.
+    through unchanged. With whole_book, the range takes in any lettered
+    chapter that stands before its first chapter or after its last.
     """
     book = verse_range.start.book
     start_point, end_point = verse_range.start, verse_range.end
     assert start_point.chapter is not None
     assert end_point.chapter is not None
-    whole = verse_range.is_whole_chapters()
-    follows = verse_range.has_following_verses()
+    whole, follows = verse_range._numbered()
     if whole and (
         source.last_verse(book, start_point.chapter) < 1
         or source.last_verse(book, end_point.chapter) < 1
@@ -367,25 +554,39 @@ def _map_chapters(
             )
         ]
 
+    # A chapter begins and ends with any verses inserted beside its first
+    # and last, unless they are a lettered chapter.
+    parts = source.verse_parts if whole_book else partial(_own_parts, source)
     start: _SourceLoc
     if start_point.verse is None:
+        first_verse = source.first_verse(book, start_point.chapter)
         start = (
             start_point.chapter,
-            source.first_verse(book, start_point.chapter),
-            "",
+            first_verse,
+            parts(book, start_point.chapter, first_verse)[0],
         )
     else:
-        start = (start_point.chapter, start_point.verse, start_point.subverse)
+        start = (
+            start_point.chapter,
+            start_point.verse,
+            _definite(source, book, start_point.subverse),
+        )
     end: _SourceLoc
     if end_point.verse is not None:
-        end = (end_point.chapter, end_point.verse, end_point.subverse)
-    elif follows:
-        end = (end_point.chapter, source.last_verse(book, end_point.chapter), "")
-    else:
         end = (
             end_point.chapter,
-            _last_present_verse(source, book, end_point.chapter),
-            "",
+            end_point.verse,
+            _definite(source, book, end_point.subverse, last=True),
+        )
+    else:
+        if follows:
+            last_verse = source.last_verse(book, end_point.chapter)
+        else:
+            last_verse = _last_present_verse(source, book, end_point.chapter)
+        end = (
+            end_point.chapter,
+            last_verse,
+            parts(book, end_point.chapter, last_verse)[-1],
         )
 
     segments = _book_segments(source, target, book, start, end)
@@ -405,16 +606,30 @@ def _map_chapters(
         if first is None or last is None:
             return None
         mapped_book = first[0]
-        starts_chapter = first[2] <= target.first_verse(mapped_book, first[1])
-        ends_chapter = last[2] >= _last_present_verse(target, last[0], last[1])
+        starts_chapter = _starts_chapter(target, first)
+        ends_chapter = _ends_chapter(target, last)
         # A verse 0 (a psalm title) cannot be cited, so a range that would
         # begin there begins at verse 1.
-        first_verse = max(first[2], 1) if start_point.verse is None else first[2]
-        if whole and starts_chapter and ends_chapter:
+        piece_verse = max(first[2], 1) if start_point.verse is None else first[2]
+        # A piece is whole chapters if the range is. So is the first piece
+        # of a divided range that starts with a whole chapter, and the last
+        # of one that ends with one, as far as the division allows.
+        divided = len(segments) > 1
+        whole_piece = (
+            whole
+            or (divided and index == 0 and start_point.verse is None)
+            or (
+                divided
+                and index == len(segments) - 1
+                and end_point.verse is None
+                and not follows
+            )
+        )
+        if whole_piece and starts_chapter and ends_chapter:
             piece = VerseRange(
                 RefPoint(mapped_book, first[1]), RefPoint(mapped_book, last[1])
             )
-        elif follows and len(segments) == 1:
+        elif follows and len(segments) == 1 and lettered_subverse(first[3]) is None:
             piece = VerseRange(
                 RefPoint(mapped_book, first[1], first[2], first[3]),
                 RefPoint(mapped_book, first[1]),
@@ -426,9 +641,11 @@ def _map_chapters(
             )
         else:
             piece = VerseRange(
-                RefPoint(mapped_book, first[1], first_verse, first[3]),
+                RefPoint(mapped_book, first[1], piece_verse, first[3]),
                 RefPoint(mapped_book, last[1], last[2], last[3]),
             )
+        if whole_piece:
+            piece = _whole_lettered(piece, target, starts_chapter, ends_chapter)
         pieces.append(piece)
     return pieces
 
@@ -448,10 +665,10 @@ def _map_single_book(
     chapters = VerseRange(
         RefPoint(book, 1), RefPoint(book, len(source.max_verses[book]))
     )
-    pieces = _map_chapters(chapters, source, target)
+    pieces = _map_chapters(chapters, source, target, whole_book=True)
     if pieces is None:
         return None
-    if len(pieces) == 1 and pieces[0].is_whole_chapters():
+    if len(pieces) == 1 and pieces[0]._numbered()[0]:
         piece = pieces[0]
         mapped_book = piece.start.book
         if (
@@ -483,15 +700,14 @@ def _divide_by_book(
     if start.chapter is None:
         pieces.append(VerseRange(start, start))
     else:
+        # The rest of the book takes in a lettered chapter that ends it.
         last_chapter = len(versification.max_verses[start.book])
-        if start.verse is None:
+        last_verse = versification.last_verse(start.book, last_chapter)
+        last_part = versification.verse_parts(start.book, last_chapter, last_verse)[-1]
+        if start.verse is None and not last_part:
             book_end = RefPoint(start.book, last_chapter)
         else:
-            book_end = RefPoint(
-                start.book,
-                last_chapter,
-                versification.last_verse(start.book, last_chapter),
-            )
+            book_end = RefPoint(start.book, last_chapter, last_verse, last_part)
         pieces.append(VerseRange(start, book_end))
     pieces.extend(
         VerseRange(RefPoint(book), RefPoint(book)) for book in books[first + 1 : last]
@@ -499,7 +715,13 @@ def _divide_by_book(
     if end.chapter is None:
         pieces.append(VerseRange(end, end))
     else:
-        pieces.append(VerseRange(RefPoint(end.book, 1), end))
+        # Likewise a lettered chapter that begins the book.
+        first_part = versification.verse_parts(end.book, 1, 1)[0]
+        if lettered_subverse(first_part) is None:
+            book_start = RefPoint(end.book, 1)
+        else:
+            book_start = RefPoint(end.book, 1, 1, first_part)
+        pieces.append(VerseRange(book_start, end))
     return pieces
 
 
@@ -542,7 +764,15 @@ def _rejoin(pieces: list[VerseRange], target: Versification) -> list[VerseRange]
         last_chapter = len(target.max_verses[point.book])
         return point.chapter == last_chapter and (
             point.verse is None
-            or point.verse >= _last_present_verse(target, point.book, last_chapter)
+            or _ends_chapter(
+                target,
+                (
+                    point.book,
+                    last_chapter,
+                    point.verse,
+                    _definite(target, point.book, point.subverse, last=True),
+                ),
+            )
         )
 
     def abut(first: VerseRange, second: VerseRange) -> bool:
@@ -727,7 +957,8 @@ class BibleRef:
 
         Note that this regards the form of the reference rather than its
         content. So it returns True for John and John 6 but False for John
-        1:1–51.
+        1:1–51. A lettered chapter counts as a chapter: with the NABRE's
+        versification, it returns True for Esther C.
         """
         return all(verse_range.is_whole_chapters() for verse_range in self.ranges)
 
@@ -803,6 +1034,11 @@ class BibleRef:
         A range that spans books yields a single pair of keys, which takes in
         the books between them in the versification's order.
 
+        A lettered chapter (the NABRE's Esther C) keys among the verses of the
+        numbered chapters, where it is read. A numbered chapter leaves out a
+        lettered chapter that stands before its first verse or after its last,
+        so the NABRE's Esther 4 ends at 4:17, but a whole book takes them in.
+
         Yields:
             (start_key, end_key): integer keys for the start and end of a range in the ref
                 Each key has 2 book digits, 3 chapter digits, 3 verse digits, and
@@ -822,14 +1058,25 @@ class BibleRef:
             if start.book not in books or end.book not in books:
                 continue
 
+            # A numbered chapter leaves out a lettered chapter that stands
+            # before its first verse or after its last, though a whole book
+            # takes them in.
             start_chapter = 1 if start.chapter is None else start.chapter
             start_verse = 0 if start.verse is None else start.verse
+            start_subverse = start.subverse
+            if start.chapter is not None and start.verse is None:
+                own = _own_parts(versification, start.book, start_chapter, 1)[0]
+                if own != versification.verse_parts(start.book, start_chapter, 1)[0]:
+                    start_verse, start_subverse = 1, own
             start_key = _verse_key(
                 books.index(start.book) + 1,
                 start_chapter,
                 start_verse,
                 versification.partial_ordinal(
-                    start.book, start_chapter, start_verse, start.subverse
+                    start.book,
+                    start_chapter,
+                    start_verse,
+                    _definite(versification, start.book, start_subverse),
                 ),
             )
 
@@ -839,10 +1086,22 @@ class BibleRef:
             if end.verse is None:
                 end_verse = versification.last_verse(end.book, end_chapter)
                 end_ordinal = _MAX_SUBVERSE_ORDINAL
+                own = _own_parts(versification, end.book, end_chapter, end_verse)[-1]
+                if (
+                    end.chapter is not None
+                    and own
+                    != (versification.verse_parts(end.book, end_chapter, end_verse)[-1])
+                ):
+                    end_ordinal = versification.partial_ordinal(
+                        end.book, end_chapter, end_verse, own
+                    )
             else:
                 end_verse = end.verse
                 end_ordinal = versification.partial_ordinal(
-                    end.book, end_chapter, end_verse, end.subverse
+                    end.book,
+                    end_chapter,
+                    end_verse,
+                    _definite(versification, end.book, end.subverse, last=True),
                 )
             end_key = _verse_key(
                 books.index(end.book) + 1, end_chapter, end_verse, end_ordinal
@@ -883,11 +1142,19 @@ class BibleRef:
         for verse_range in self.ranges:
             end = verse_range.end
             if verse_range.has_following_verses() and end.chapter is not None:
-                last_verse = versification.last_verse(end.book, end.chapter)
+                if end.verse is None:
+                    last_verse = versification.last_verse(end.book, end.chapter)
+                    end = RefPoint(end.book, end.chapter, last_verse)
+                else:
+                    # The end of a lettered chapter.
+                    end = RefPoint(
+                        end.book,
+                        end.chapter,
+                        end.verse,
+                        _definite(versification, end.book, end.subverse, last=True),
+                    )
                 verse_range = VerseRange(
-                    verse_range.start,
-                    RefPoint(end.book, end.chapter, last_verse),
-                    verse_range.original_text,
+                    verse_range.start, end, verse_range.original_text
                 )
             ranges.append(verse_range)
         return BibleRef(ranges, versification, self.original_text)
@@ -951,19 +1218,32 @@ class BibleRef:
 
         """
         versification = self.versification
+        shown = [_shown(verse_range) for verse_range in self.ranges]
 
         def single_chapter(book: str) -> bool:
             return versification is not None and versification.is_single_chapter(book)
 
-        def chapter_verse(point: RefPoint) -> str:
+        def follows(start: _Shown, end: _Shown) -> bool:
+            """Tell whether a range is written with "ff"."""
+            return (
+                start.book == end.book
+                and start.verse is not None
+                and end.verse is None
+                and end.chapter == start.chapter
+            )
+
+        def chapter_verse(point: _Shown) -> str:
             """Format a point's chapter and verse, as far as it has them."""
             assert point.chapter is not None
-            text = style.format_chapter(point.chapter, point.book)
+            if isinstance(point.chapter, str):
+                text = point.chapter
+            else:
+                text = style.format_chapter(point.chapter)
             if point.verse is not None:
                 text += f"{style.chapter_verse_separator}{point.verse}{point.subverse}"
             return text
 
-        def named(point: RefPoint, plural: bool) -> str:
+        def named(point: _Shown, plural: bool) -> str:
             """Format a point together with the name of its book."""
             name = style.book_name(point.book, plural=plural)
             if point.chapter is None:
@@ -974,49 +1254,48 @@ class BibleRef:
                 return f"{name} {point.verse}{point.subverse}"
             return f"{name} {chapter_verse(point)}"
 
-        def continues(previous: VerseRange, current: VerseRange) -> bool:
+        def continues(
+            previous: tuple[_Shown, _Shown], current: tuple[_Shown, _Shown]
+        ) -> bool:
             """Tell whether a range can rely on the book the last one named."""
+            previous_end, start = previous[1], current[0]
             if (
-                current.start.book != previous.end.book
-                or previous.end.chapter is None
-                or current.start.chapter is None
+                start.book != previous_end.book
+                or previous_end.chapter is None
+                or start.chapter is None
             ):
                 return False
             # A one-chapter book prints no chapter, so only a verse that
             # follows a verse can do without the name.
-            return not single_chapter(current.start.book) or (
-                current.start.verse is not None
-                and (previous.end.verse is not None or previous.has_following_verses())
+            return not single_chapter(start.book) or (
+                start.verse is not None
+                and (previous_end.verse is not None or follows(*previous))
             )
 
         def is_plural(index: int) -> bool:
             """Tell whether the ranges sharing a book name cite several chapters."""
-            chapters: set[int | None] = set()
-            for position in range(index, len(self.ranges)):
-                verse_range = self.ranges[position]
+            chapters: set[int | str | None] = set()
+            for position in range(index, len(shown)):
+                start, end = shown[position]
                 if position > index and not continues(
-                    self.ranges[position - 1], verse_range
+                    shown[position - 1], shown[position]
                 ):
                     break
-                chapters.add(verse_range.start.chapter)
-                if not verse_range.is_single_book():
+                chapters.add(start.chapter)
+                if start.book != end.book:
                     break
-                chapters.add(verse_range.end.chapter)
+                chapters.add(end.chapter)
             return None in chapters or len(chapters) > 1
 
         result = ""
-        previous: VerseRange | None = None
-        for index, verse_range in enumerate(self.ranges):
-            start, end = verse_range.start, verse_range.end
-            if previous is not None and continues(previous, verse_range):
+        previous: tuple[_Shown, _Shown] | None = None
+        for index, (start, end) in enumerate(shown):
+            if previous is not None and continues(previous, (start, end)):
                 assert start.chapter is not None
                 if (
                     start.verse is not None
-                    and start.chapter == previous.end.chapter
-                    and (
-                        previous.end.verse is not None
-                        or previous.has_following_verses()
-                    )
+                    and start.chapter == previous[1].chapter
+                    and (previous[1].verse is not None or follows(*previous))
                 ):
                     result += (
                         f"{style.verse_range_separator}{start.verse}{start.subverse}"
@@ -1032,7 +1311,7 @@ class BibleRef:
                 result += style.range_separator + named(end, end.chapter is None)
             elif end.chapter is None or start.chapter is None:
                 pass
-            elif verse_range.has_following_verses():
+            elif follows(start, end):
                 result += style.following_verses
             elif end.chapter != start.chapter:
                 result += style.range_separator + chapter_verse(end)
@@ -1048,5 +1327,5 @@ class BibleRef:
                 result += f"{style.range_separator}{end.verse}{end.subverse}"
             elif end.subverse != start.subverse:
                 result += style.range_separator + end.subverse
-            previous = verse_range
+            previous = (start, end)
         return result
