@@ -85,6 +85,118 @@ def _chapter_verse_reason(
 
 
 _SourceLoc = tuple[int, int, str]
+_TargetLoc = tuple[str, int, int, str]
+
+
+def _mapped_both_ways(
+    source: Versification, target: Versification, loc: _TargetLoc, certain: bool = False
+) -> tuple[_TargetLoc, _TargetLoc] | None:
+    """Return the start and end of what a verse maps to, if that maps back to it.
+
+    Where the data does not account for a verse, it maps to the verse of the
+    same number, which may be the counterpart of another verse altogether.
+    Such a verse says nothing about what the source range covers in the
+    target. With certain, a verse that does not map back at all is not
+    returned either.
+    """
+    book, chapter, verse, part = loc
+    first = source.map_verse(book, chapter, verse, target, part)
+    last = source.map_verse(book, chapter, verse, target, part, end=True)
+    if first is None or last is None:
+        return None
+    back = target.map_verse(*first[:3], source, first[3])
+    back_end = target.map_verse(*last[:3], source, last[3], end=True)
+    if back is None or back_end is None or (back[0], back_end[0]) != (book, book):
+        return None if certain else (first, last)
+    if certain:
+        returns = _key(source, back) <= _key(source, loc) <= _key(source, back_end)
+    else:
+        # A verse inserted beside a verse may come back as the verse itself.
+        returns = back[1:3] <= (chapter, verse) <= back_end[1:3]
+    return (first, last) if returns else None
+
+
+def _key(versification: Versification, loc: _TargetLoc) -> tuple[int, int, int]:
+    """Return what orders a location among the others of its book."""
+    return (loc[1], loc[2], versification.partial_ordinal(*loc))
+
+
+def _nothing_between(
+    source: Versification,
+    target: Versification,
+    book: str,
+    previous: _TargetLoc,
+    current: _TargetLoc,
+) -> bool:
+    """Tell whether the source's book has nothing between two target locations.
+
+    Args:
+        source: The Versification being mapped from
+        target: The Versification the locations are in
+        book: The book ID of the range in the source
+        previous: A location in the target
+        current: A later location in the same book of the target
+
+    Returns:
+        True if no verse between the two is one the source has in the book.
+        What it has in another book, or not at all, is passed over. A subverse
+        the target does not list is a portion of its verse, and stands
+        wherever in the verse it needs to.
+
+    """
+    target_book, chapter, verse, part = previous
+    parts = target.verse_parts(target_book, chapter, verse)
+    if current[1:3] == (chapter, verse) and (
+        part not in parts or current[3] not in parts
+    ):
+        return True
+    index = parts.index(part) if part in parts else len(parts) - 1
+    while True:
+        index += 1
+        if index == len(parts):
+            verse += 1
+            if verse > target.last_verse(target_book, chapter):
+                chapter += 1
+                # A psalm's title may be cited as a verse 0 it does not own.
+                verse = 0 if current[1:3] == (chapter, 0) else 1
+                verse = min(verse, target.first_verse(target_book, chapter))
+            parts = target.verse_parts(target_book, chapter, verse)
+            index = 0
+        if (chapter, verse) > current[1:3]:
+            return True
+        if (chapter, verse) == current[1:3] and (
+            current[3] not in parts or current[3] == parts[index]
+        ):
+            return True
+        if target.is_excluded(target_book, chapter, verse):
+            continue
+        between = _mapped_both_ways(
+            target, source, (target_book, chapter, verse, parts[index]), certain=True
+        )
+        if between is None or between[0][0] != book:
+            continue
+        _, source_chapter, source_verse, source_part = between[0]
+        if (
+            source.first_verse(book, source_chapter)
+            <= source_verse
+            <= source.last_verse(book, source_chapter)
+            and not source.is_excluded(book, source_chapter, source_verse)
+            and source_part in source.verse_parts(book, source_chapter, source_verse)
+        ):
+            return False
+
+
+@dataclass
+class _Block:
+    """Consecutive verses of the target that verses of a source range map to."""
+
+    order: int
+    first_key: tuple[int, int, int]
+    first: _TargetLoc
+    first_from: _SourceLoc
+    last_key: tuple[int, int, int]
+    last: _TargetLoc
+    last_from: _SourceLoc
 
 
 def _book_segments(
@@ -94,7 +206,14 @@ def _book_segments(
     start: _SourceLoc,
     end: _SourceLoc,
 ) -> list[tuple[_SourceLoc, _SourceLoc]]:
-    """Divide a source range wherever the book it maps into changes.
+    """Divide a source range into what maps to consecutive verses of the target.
+
+    The range is divided wherever the book it maps into changes. What maps
+    into one book is divided again wherever the target has, between two parts
+    of it, verses the source has elsewhere in its book: the Vulgate's Esther
+    11 is the end of the Greek book followed by its beginning. Verses that
+    only stand in a different order, as the commandments do in the Greek
+    Exodus 20, do not divide it.
 
     Args:
         source: The Versification the range is in
@@ -104,15 +223,23 @@ def _book_segments(
         end: The (chapter, verse, subverse) at which it ends
 
     Returns:
-        (start, end) pairs of source locations that cover the range in order,
-        each mapping into a single book. The range's own subverses stay on its
-        first start and last end.
+        (first, last) pairs of source locations, each mapping to the first and
+        last of a run of consecutive verses in a single book of the target, in
+        the order the source reaches them. Together the runs are what the
+        range covers, apart from any verses that have no place in the target.
+        The range's own subverses stay on its start and end.
 
     """
-    segments: list[tuple[_SourceLoc, _SourceLoc]] = []
-    segment_start = start
-    current_book: str | None = None
-    previous = start
+    if (
+        source.map_verse(book, start[0], start[1], target, start[2]) is None
+        or source.map_verse(book, end[0], end[1], target, end[2]) is None
+    ):
+        return [(start, end)]
+
+    # Runs of verses in the order of the source that map into the same book.
+    runs: list[list[_Block]] = []
+    run_book: str | None = None
+    order = 0
     start_ordinal = source.partial_ordinal(book, *start)
     end_ordinal = source.partial_ordinal(book, *end)
     for chapter in range(start[0], end[0] + 1):
@@ -123,20 +250,69 @@ def _book_segments(
             # the NABRE's lettered chapters of Esther do.
             for part in source.verse_parts(book, chapter, verse):
                 ordinal = source.partial_ordinal(book, chapter, verse, part)
-                if ((chapter, verse) == start[:2] and ordinal < start_ordinal) or (
-                    (chapter, verse) == end[:2] and ordinal > end_ordinal
+                at_start = (chapter, verse) == start[:2]
+                at_end = (chapter, verse) == end[:2]
+                if (at_start and ordinal < start_ordinal) or (
+                    at_end and ordinal > end_ordinal
                 ):
                     continue
-                mapped = source.map_verse(book, chapter, verse, target, part)
-                if mapped is not None:
-                    if current_book is None:
-                        current_book = mapped[0]
-                    elif mapped[0] != current_book:
-                        segments.append((segment_start, previous))
-                        segment_start = (chapter, verse, part)
-                        current_book = mapped[0]
-                previous = (chapter, verse, part)
-    segments.append((segment_start, end))
+                # A verse the versification does not have is no part of what
+                # the range covers, even at its ends.
+                if source.is_excluded(book, chapter, verse):
+                    continue
+                at_start = at_start and ordinal == start_ordinal
+                at_end = at_end and ordinal == end_ordinal
+                loc = (chapter, verse, part)
+                mapped = _mapped_both_ways(source, target, (book, *loc))
+                if at_start or at_end:
+                    # The range's own ends are mapped whatever the data says.
+                    own = start if at_start else end
+                    mapped_first = source.map_verse(book, *own[:2], target, own[2])
+                    mapped_last = source.map_verse(
+                        book, *own[:2], target, own[2], end=True
+                    )
+                    if mapped_first is not None and mapped_last is not None:
+                        mapped = (mapped_first, mapped_last)
+                if mapped is None:
+                    continue
+                if mapped[0][0] != run_book:
+                    run_book = mapped[0][0]
+                    runs.append([])
+                runs[-1].append(
+                    _Block(
+                        order,
+                        _key(target, mapped[0]),
+                        mapped[0],
+                        start if at_start else loc,
+                        _key(target, mapped[1]),
+                        mapped[1],
+                        end if at_end else loc,
+                    )
+                )
+                order += 1
+    if not runs:
+        return [(start, end)]
+
+    segments: list[tuple[_SourceLoc, _SourceLoc]] = []
+    for run in runs:
+        blocks: list[_Block] = []
+        for verse_block in sorted(run, key=lambda block: block.first_key):
+            block = blocks[-1] if blocks else None
+            if block is None or not (
+                verse_block.first_key <= block.last_key
+                or _nothing_between(source, target, book, block.last, verse_block.first)
+            ):
+                blocks.append(verse_block)
+                continue
+            block.order = min(block.order, verse_block.order)
+            if verse_block.last_key > block.last_key:
+                block.last_key = verse_block.last_key
+                block.last = verse_block.last
+                block.last_from = verse_block.last_from
+        segments.extend(
+            (block.first_from, block.last_from)
+            for block in sorted(blocks, key=lambda block: block.order)
+        )
     return segments
 
 
@@ -606,8 +782,13 @@ def _map_chapters(
         if first is None or last is None:
             return None
         mapped_book = first[0]
-        starts_chapter = _starts_chapter(target, first)
-        ends_chapter = _ends_chapter(target, last)
+        # A lettered chapter is no part of the numbered chapter it adjoins.
+        starts_chapter = (
+            _starts_chapter(target, first) and lettered_subverse(first[3]) is None
+        )
+        ends_chapter = (
+            _ends_chapter(target, last) and lettered_subverse(last[3]) is None
+        )
         # A verse 0 (a psalm title) cannot be cited, so a range that would
         # begin there begins at verse 1.
         piece_verse = max(first[2], 1) if start_point.verse is None else first[2]
@@ -668,16 +849,36 @@ def _map_single_book(
     pieces = _map_chapters(chapters, source, target, whole_book=True)
     if pieces is None:
         return None
-    if len(pieces) == 1 and pieces[0]._numbered()[0]:
-        piece = pieces[0]
-        mapped_book = piece.start.book
-        if (
-            target.includes(mapped_book)
-            and piece.start.chapter == 1
-            and piece.end.chapter == len(target.max_verses[mapped_book])
-        ):
-            return [VerseRange(RefPoint(mapped_book), RefPoint(mapped_book))]
+    if len(pieces) == 1 and _fills_book(pieces[0], target):
+        mapped_book = pieces[0].start.book
+        return [VerseRange(RefPoint(mapped_book), RefPoint(mapped_book))]
     return pieces
+
+
+def _fills_book(piece: VerseRange, target: Versification) -> bool:
+    """Tell whether a piece mapped from whole chapters is a whole book.
+
+    It is if it runs from the book's first chapter to its last, whether or
+    not it takes in a lettered chapter that begins or ends the book.
+    """
+    start, end = piece.start, piece.end
+    book = start.book
+    if not target.includes(book) or end.book != book:
+        return False
+    last_chapter = len(target.max_verses[book])
+    first_part = target.verse_parts(book, 1, target.first_verse(book, 1))[0]
+    last_part = target.verse_parts(
+        book, last_chapter, target.last_verse(book, last_chapter)
+    )[-1]
+    first_letter = lettered_subverse(first_part)
+    last_letter = lettered_subverse(last_part)
+    begins = (start.chapter, start.verse) == (1, None) or (
+        first_letter is not None and start.subverse == first_letter[0]
+    )
+    ends = (end.chapter, end.verse) == (last_chapter, None) or (
+        last_letter is not None and end.subverse == last_letter[0]
+    )
+    return begins and ends
 
 
 def _divide_by_book(

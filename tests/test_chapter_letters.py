@@ -390,7 +390,15 @@ def test_map_from_nabre(parser: RefParser, reference: str, expected: str) -> Non
         ("vulgata", "Esth 13:1–7", "Esth B:1–7"),
         # A whole chapter that is a lettered chapter stays a whole chapter.
         ("vulgata", "Esth 16", "Esth E"),
-        ("vulgata", "Esth 13–14", "Esth B–C"),
+        # The Vulgate gathers the additions at the end of the book, so what
+        # is consecutive there is not in the NABRE (#52).
+        ("vulgata", "Esth 13–14", "Esth B; C"),
+        ("vulgata", "Esth 12–13", "Esth A:12–17; B; C:1–11"),
+        ("vulgata", "Esth 11", "Esth F:11; A:1–11"),
+        ("vulgata", "Esth 10:1–11:12", "Esth 10:1–F:11; A:1–11"),
+        # A numbered chapter that takes in a lettered one says so.
+        ("vulgata", "Esth 10", "Esth 10:1–F:10"),
+        ("org", "Add Esth", "Esth"),
         ("vulgata", "Esth 14", "Esth C:12–30"),
     ],
 )

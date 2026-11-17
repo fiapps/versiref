@@ -1382,3 +1382,31 @@ def test_map_range_ending_in_book_that_begins_with_lettered_chapter() -> None:
         mapped.format(RefStyle.named("en-sbl"))
         == "Jdt 16:1–25; Add Esth 1:1a–r; Esth 1:1–5"
     )
+
+
+@pytest.mark.parametrize(
+    ("source", "reference", "target", "expected"),
+    [
+        # The Vulgate's Esther 11 is the end of the Greek book and its start.
+        ("vulgata", "Esth 11", "org", "Add Esth 10:14; 1:1–11"),
+        ("vulgata", "Esth 12–13", "org", "Add Esth 1:12–17; 3:14–20; 4:18–28"),
+        # The Greek Jeremiah has the oracles against the nations after 25:13.
+        ("lxx", "Jer 25", "org", "Jer 25:1–12; 49:34–39"),
+        # Verses that only stand in another order do not divide a range.
+        ("lxx", "Exod 20", "org", "Exod 20"),
+        ("lxx", "Jer", "org", "Jer"),
+        # Nor do verses the source or the target excludes, even at its ends.
+        ("nabre", "Matt 17:20–22", "org", "Matt 17:20–22"),
+        ("org", "Matt 17:20–22", "nabre", "Matt 17:20–22"),
+        ("vulgata", "Ps 147:1–14", "org", "Ps 147:12–14"),
+        ("vulgata", "Ps 115:2–18", "eng", "Ps 116:10–18"),
+    ],
+)
+def test_map_divides_where_the_target_is_interrupted(
+    source: str, reference: str, target: str, expected: str
+) -> None:
+    """A range is divided where what it maps to is not consecutive (#52)."""
+    mapped = _parsed(reference, source).map_to(Versification.named(target))
+    assert mapped is not None
+    assert mapped.is_valid()
+    assert mapped.format(SBL) == expected
