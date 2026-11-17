@@ -57,7 +57,11 @@ def _count(n: int, noun: str) -> str:
 
 
 def _chapter_verse_reason(
-    label: str, chapters: list[int], chapter: int, verse: int | None
+    label: str,
+    chapters: list[int],
+    chapter: int,
+    verse: int | None,
+    has_title: bool = False,
 ) -> str | None:
     """Explain why a (chapter, verse) is out of range, or None if it is in range.
 
@@ -66,6 +70,8 @@ def _chapter_verse_reason(
         chapters: The book's last-verse-per-chapter list (from the versification).
         chapter: The chapter number to check.
         verse: The verse number to check, or None for an unspecified verse.
+        has_title: Whether the chapter has a verse 0, as a psalm does whose
+            title the versification numbers 0.
 
     Returns:
         An explanatory string, or None if the chapter (and verse, if specified)
@@ -76,7 +82,7 @@ def _chapter_verse_reason(
         return f"{label} has no chapter {chapter} (only {_count(len(chapters), 'chapter')})"
     if verse is not None:
         max_verse = chapters[chapter - 1]
-        if verse < 1 or verse > max_verse:
+        if verse < (0 if has_title else 1) or verse > max_verse:
             return (
                 f"{label} {chapter} has no verse {verse} "
                 f"(only {_count(max_verse, 'verse')})"
@@ -620,6 +626,7 @@ def _range_reason(
                 versification.max_verses[point.book],
                 point.chapter,
                 point.verse,
+                versification.first_verse(point.book, point.chapter) == 0,
             )
             if reason is not None:
                 return reason
@@ -789,9 +796,6 @@ def _map_chapters(
         ends_chapter = (
             _ends_chapter(target, last) and lettered_subverse(last[3]) is None
         )
-        # A verse 0 (a psalm title) cannot be cited, so a range that would
-        # begin there begins at verse 1.
-        piece_verse = max(first[2], 1) if start_point.verse is None else first[2]
         # A piece is whole chapters if the range is. So is the first piece
         # of a divided range that starts with a whole chapter, and the last
         # of one that ends with one, as far as the division allows.
@@ -822,7 +826,7 @@ def _map_chapters(
             )
         else:
             piece = VerseRange(
-                RefPoint(mapped_book, first[1], piece_verse, first[3]),
+                RefPoint(mapped_book, first[1], first[2], first[3]),
                 RefPoint(mapped_book, last[1], last[2], last[3]),
             )
         if whole_piece:

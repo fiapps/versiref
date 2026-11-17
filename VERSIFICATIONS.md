@@ -98,7 +98,7 @@ What remains is deliberate or beyond the format:
 
 - The Clementine's Dan 14:42, described below, has no Greek counterpart and shares `BEL 1:42` with 14:41 on purpose.
 - Vulgate Isa 8:22 and 9:1 share the Hebrew 8:23, and Isa 63:19 and 64:1 the Hebrew 63:19, but a range cannot cross a chapter boundary, so each pair stays as two entries and the org verse maps back to the second.
-- In `lxx`, `rsc`, and `rso` a psalm's verse 0 shares a target with its verse 1 (Ps 115 and 147), which is harmless, since verse 0 cannot be cited.
+- In `lxx`, `rsc`, and `rso` a psalm's verse 0 shares a target with its verse 1 (Ps 115 and 147): the title, which the Hebrew does not have at that point, maps to the verse it heads (`org` 116:10 and 147:12), and those map back to verse 1.
 - `lxx` Jer 25:20 and `rso` Isa 3:19 share targets with a neighbouring range in ways that need the text to sort out; they have not been examined.
 
 One entry was corrected from the text rather than merged.

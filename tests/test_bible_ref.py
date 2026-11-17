@@ -1410,3 +1410,43 @@ def test_map_divides_where_the_target_is_interrupted(
     assert mapped is not None
     assert mapped.is_valid()
     assert mapped.format(SBL) == expected
+
+
+@pytest.mark.parametrize(
+    ("versification", "text", "reason"),
+    [
+        # eng numbers the titles of the Psalms that org counts as verses 0.
+        ("eng", "Ps 51:0", None),
+        ("eng", "Ps 51:0–2", None),
+        ("eng", "Ps 3:0", None),
+        # Where the title is part of verse 1, there is no verse 0.
+        ("eng", "Ps 132:0", "PSA 132 has no verse 0 (only 18 verses)"),
+        ("org", "Ps 51:0", "PSA 51 has no verse 0 (only 21 verses)"),
+        ("eng", "Gen 1:0", "GEN 1 has no verse 0 (only 31 verses)"),
+    ],
+)
+def test_verse_0_is_valid_where_the_versification_has_one(
+    versification: str, text: str, reason: str | None
+) -> None:
+    """A psalm's title is a verse 0 only where the versification numbers it so."""
+    assert _parsed(text, versification).invalid_reason() == reason
+
+
+@pytest.mark.parametrize(
+    ("source", "reference", "target", "expected"),
+    [
+        ("org", "Ps 51:2–20", "eng", "Ps 51:0–18"),
+        ("org", "Ps 51:1–2", "eng", "Ps 51:0"),
+        ("eng", "Ps 51:0", "org", "Ps 51:1–2"),
+        # A mapped range keeps the title it begins with.
+        ("cei", "Ps 13", "eng", "Ps 13:0–5"),
+    ],
+)
+def test_map_to_verse_0(
+    source: str, reference: str, target: str, expected: str
+) -> None:
+    """A range that maps onto a psalm's title starts at its verse 0."""
+    mapped = _parsed(reference, source).map_to(Versification.named(target))
+    assert mapped is not None
+    assert mapped.is_valid()
+    assert mapped.format(SBL) == expected
