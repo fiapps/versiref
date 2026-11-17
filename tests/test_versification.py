@@ -373,7 +373,7 @@ def test_cei_greek_esther_covers_org_exactly_once() -> None:
         covered: list[int] = []
         for verse in range(1, cei.last_verse("ESG", chapter) + 1):
             ordinals = cei._partial_verses.get(("ESG", chapter, verse), {})
-            for subverse in ["", *sorted(ordinals, key=lambda s: ordinals[s])]:
+            for subverse in {"", *ordinals}:
                 start = cei.map_verse("ESG", chapter, verse, org, subverse)
                 end = cei.map_verse("ESG", chapter, verse, org, subverse, end=True)
                 assert start is not None

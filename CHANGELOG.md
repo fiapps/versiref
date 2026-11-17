@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - A number that follows a chapter separator without a book name is taken for a chapter only if some book of the versification has that many chapters. A parser for a style with Roman chapter numbers had read the series abbreviation in "Prov. IX, 1; CCL IX, 156" as chapter 250 of Proverbs, which made the whole reference invalid; it now ends at "Prov. IX, 1". A chapter number that follows a book's name is not limited, so that "Ps. CCL, 1" is still found and reported as invalid.
+- Verse keys put Addition A to Esther before the verse it precedes. In `lxx` and `cei`, where the addition is lettered as part of Greek Esther 1:1, `ESG 1:1` had sorted before `ESG 1:1a`; `range_keys()` now orders the addition first, as the text does. A versification's `partialVerses` entry gives the reading order, and the position of `"-"` in it, which had been ignored, is the base verse's place.
 
 ## 0.13.0 - 2026-11-15
 

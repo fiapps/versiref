@@ -806,8 +806,9 @@ class BibleRef:
         Yields:
             (start_key, end_key): integer keys for the start and end of a range in the ref
                 Each key has 2 book digits, 3 chapter digits, 3 verse digits, and
-                2 subverse-ordinal digits (0 for the base verse; nonzero for an
-                inserted verse such as ESG 4:17k). A range end that spreads to
+                2 subverse-ordinal digits (which place a verse and the verses
+                inserted beside it, such as ESG 4:17k, in reading order; 0 for
+                a verse that has none). A range end that spreads to
                 a whole verse carries the maximal subverse ordinal so that it
                 includes that verse's inserted verses.
 

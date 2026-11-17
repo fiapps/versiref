@@ -98,11 +98,13 @@ class Versification:
     # such a mapping and must be discarded.
     _multi_to_org: set[_VerseLoc] = field(default_factory=set, repr=False)
     _multi_from_org: set[_VerseLoc] = field(default_factory=set, repr=False)
-    # For each verse that is followed by inserted or partial verses (e.g. the
-    # Greek additions to Esther), maps each inserted subverse letter to its
-    # ordinal within the verse (the base verse being 0). Verses absent here have
-    # no inserted verses; a subverse cited on them is a portion of a single
-    # verse, not an insertion. Loaded from the data's ``partialVerses``.
+    # For each verse that has inserted verses beside it (e.g. the Greek
+    # additions to Esther), maps each inserted subverse letter, and "" for the
+    # base verse, to its ordinal in reading order. The base verse usually comes
+    # first, but Addition A to Esther precedes its base verse, 1:1. Verses
+    # absent here have no inserted verses; a subverse cited on them is a
+    # portion of a single verse, not an insertion. Loaded from the data's
+    # ``partialVerses``.
     _partial_verses: dict[tuple[str, int, int], dict[str, int]] = field(
         default_factory=dict, repr=False
     )
@@ -229,9 +231,9 @@ class Versification:
                 continue
             loc = (m.group(1), int(m.group(2)), int(m.group(3)))
             partial_verses[loc] = {
-                stripped: idx
+                "" if stripped == "-" else stripped: idx
                 for idx, part in enumerate(parts)
-                if (stripped := part.strip()) and stripped != "-"
+                if (stripped := part.strip())
             }
 
         excluded: set[tuple[str, int, int]] = set()
@@ -433,16 +435,18 @@ class Versification:
     ) -> int:
         """Return the sort ordinal of a subverse within its verse.
 
-        A verse listed in the versification's ``partialVerses`` is followed by
-        inserted or partial verses (for example the Greek additions to Esther,
-        ESG 4:17a-z, which follow but are not part of ESG 4:17). Each such part
-        is numbered by its position in that verse's part list, the base
-        (unlettered) verse being 0, so that an inserted verse sorts after its
-        base verse and before the next verse.
+        A verse listed in the versification's ``partialVerses`` has inserted
+        verses beside it (for example the Greek additions to Esther, ESG
+        4:17a-z, which follow but are not part of ESG 4:17). The base
+        (unlettered) verse and each inserted verse are numbered by their
+        position in that verse's part list, which is their reading order: the
+        base verse is usually 0, with the inserted verses after it and before
+        the next verse, but where the inserted verses come first (Addition A
+        to Esther, before ESG 1:1) the base verse has the highest ordinal.
 
-        A subverse cited on a verse that is *not* so listed is a mere portion of
-        a single verse (for example a scholarly "8:1a"); it shares the base
-        verse's ordinal, 0, so that it is not mistaken for an inserted verse.
+        A subverse that is not an inserted verse is a mere portion of a single
+        verse (for example a scholarly "8:1a"); it shares the base verse's
+        ordinal so that it is not mistaken for an inserted verse.
 
         Args:
             book: The book ID (using Paratext three-letter codes)
@@ -451,18 +455,17 @@ class Versification:
             subverse: The subverse string ("" for the base verse)
 
         Returns:
-            The subverse's ordinal within the verse: 0 for the base verse, or for
-            a portion of a verse that has no inserted verses.
+            The subverse's ordinal within the verse: the base verse's own
+            ordinal for the base verse or a portion of it, which is 0 unless
+            inserted verses precede it.
 
         """
-        if not subverse:
-            return 0
         if book == "PSAS":  # plural of PSA
             book = "PSA"
         parts = self._partial_verses.get((book, chapter, verse))
         if parts is None:
             return 0
-        return parts.get(subverse, 0)
+        return parts.get(subverse, parts.get("", 0))
 
     def map_verse(
         self,

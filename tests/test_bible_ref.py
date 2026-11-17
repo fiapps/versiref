@@ -1238,6 +1238,32 @@ def test_range_keys_inserted_verses_sort_in_reading_order() -> None:
     assert [k - keys[0] for k in keys] == list(range(len(keys)))
 
 
+def test_range_keys_addition_a_precedes_its_base_verse() -> None:
+    """Addition A to Esther (ESG 1:1a-r) keys before ESG 1:1, as it reads."""
+    cei = Versification.named("cei")
+
+    def keys(
+        verse: int | None = 1, subverse: str = "", end_verse: int | None = None
+    ) -> tuple[int, int]:
+        ref = BibleRef.for_range(
+            "ESG",
+            1,
+            verse,
+            end_verse=end_verse,
+            start_subverse=subverse,
+            versification=cei,
+        )
+        return next(iter(ref.range_keys()))
+
+    first, last, base, following = keys(1, "a"), keys(1, "r"), keys(1), keys(2)
+    assert first < last < base < following
+    # A portion of the base verse, not an inserted verse, shares its key.
+    assert cei.partial_ordinal("ESG", 1, 1, "z") == cei.partial_ordinal("ESG", 1, 1, "")
+    # "ESG 1:1-3" leaves the addition out; the whole chapter takes it in.
+    assert keys(1, end_verse=3)[0] > last[1]
+    assert keys(None)[0] < first[0]
+
+
 def test_range_keys_portion_of_uninserted_verse_collapses() -> None:
     """A subverse on a verse with no inserted verses shares the base key.
 

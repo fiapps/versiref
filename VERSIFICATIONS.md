@@ -33,17 +33,16 @@ This matters because such an entry would otherwise be keyed on the base verse an
 
 ### `partialVerses`
 
-Lists the parts of a verse that is followed by inserted verses, such as the Greek additions to Esther.
-Each entry is a list whose position gives the sort ordinal: `"-"` is the base verse and the letters follow it.
+Lists the parts of a verse that has inserted verses beside it, such as the Greek additions to Esther.
+Each entry is a list in reading order, whose positions give the sort ordinals: `"-"` is the base verse and the letters are the inserted verses.
 The ordinal becomes the last field of the integer verse key, which is what lets an inserted verse sort after its base verse and before the next verse.
 
-A subverse cited on a verse that is *not* listed here is treated as a mere portion of that verse and shares the base verse's ordinal, so it collapses onto the same key.
-That distinction is the whole point of the table: `ESG 4:17k` is a verse in its own right, while `Rom 8:1a` is half of a verse.
+The base verse usually comes first, but it need not.
+Addition A to Esther precedes the Hebrew 1:1, and Rahlfs and the CEI print it that way (`1:1a`–`1:1r`, then `1:1`), so `"-"` ends the list for `ESG 1:1` in `lxx` and `cei`, and `1:1` sorts after the whole addition.
+A range that starts with chapter 1 as a whole still takes the addition in, because it starts from verse 0.
 
-**Known limitation.**
-The base verse's ordinal is fixed at 0, so inserted verses always sort *after* it.
-Addition A to Esther precedes the Hebrew 1:1, and the CEI prints it that way (`1:1a`–`1:1r`, then `1:1`), but a verse key cannot express that and `1:1` sorts first.
-This is accepted rather than special-cased; `nabre` has related trouble placing its insertions.
+A subverse cited on a verse that is *not* listed here is treated as a mere portion of that verse and shares the base verse's ordinal, so it collapses onto the same key; so does an unlisted subverse of a listed verse.
+That distinction is the whole point of the table: `ESG 4:17k` is a verse in its own right, while `Rom 8:1a` is half of a verse.
 
 ### `excludedVerses`
 
