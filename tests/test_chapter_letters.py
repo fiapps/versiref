@@ -63,6 +63,7 @@ def _points(ref: BibleRef) -> list[tuple[str, str]]:
         ("Esth C–5", [("4:17C", "5")], "Esth C–5"),
         ("Esth D–5", [("5:1D", "5")], "Esth D–5"),
         ("Esth B:1; 3:14", [("3:13B1", "3:13B1"), ("3:14", "3:14")], "Esth B:1; 3:14"),
+        ("Esth 2:21; C:4", [("2:21", "2:21"), ("4:17C4", "4:17C4")], "Esth 2:21; C:4"),
         (
             "Esth C:5; D:3; 6:1",
             [("4:17C5", "4:17C5"), ("5:1D3", "5:1D3"), ("6:1", "6:1")],
@@ -84,6 +85,27 @@ def test_parse_and_format(
     assert _points(ref) == points
     assert ref.format(parser.style) == formatted
     assert ref.is_valid()
+
+
+@pytest.mark.parametrize(
+    ("text", "formatted"),
+    [
+        ("Est A:12; B:3", "Esth A:12; B:3"),
+        ("Est A:12; 2:21", "Esth A:12; 2:21"),
+        ("Est 2:21; C:4", "Esth 2:21; C:4"),
+        ("Est A:12 ff; 2:21 ff; 6:1 ff", "Esth A:12ff; 2:21ff; 6:1ff"),
+    ],
+)
+def test_scan_continues_between_lettered_and_numbered_chapters(
+    parser: RefParser, text: str, formatted: str
+) -> None:
+    """A scan carries the book across lettered and numbered chapters alike."""
+    content = f"See {text}."
+    found = [
+        (content[start:end], ref.format(parser.style))
+        for ref, start, end in parser.scan_string(content)
+    ]
+    assert found == [(text, formatted)]
 
 
 def test_letters_come_from_the_versification() -> None:
