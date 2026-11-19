@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Fixed
+
+- A following-verse marker written against a verse ("Esg 1:1f", "Esg 3:13f") names the inserted verse by that letter where the versification has one, as `cei` and `lxx` do for Greek Esther, instead of the verse and the one after it. Elsewhere, and when a space separates it from the verse ("Esg 1:1 f"), the marker still means "and following".
+
 ## 0.14.0 - 2026-11-17
 
 ### Changed

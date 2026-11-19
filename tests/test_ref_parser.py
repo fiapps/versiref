@@ -717,6 +717,39 @@ def test_single_chapter_following_marker_glued_not_matched() -> None:
     assert _first_range(parser, "Jude 5seqq.foo") == (5, 5, "Jude 5")
 
 
+@pytest.mark.parametrize(
+    ("versification", "text", "start", "end"),
+    [
+        ("cei", "Esg 1:1f", ("ESG", 1, 1, "f"), ("ESG", 1, 1, "f")),
+        ("cei", "Esg 3:13f", ("ESG", 3, 13, "f"), ("ESG", 3, 13, "f")),
+        ("cei", "Esg 1:1 f", ("ESG", 1, 1, ""), ("ESG", 1, 2, "")),
+        ("cei", "Esg 1:1ff", ("ESG", 1, 1, ""), ("ESG", 1, None, "")),
+        ("cei", "Rom 8:1f", ("ROM", 8, 1, ""), ("ROM", 8, 2, "")),
+        ("lxx", "Esg 1:1f", ("ESG", 1, 1, "f"), ("ESG", 1, 1, "f")),
+    ],
+)
+def test_glued_following_marker_names_inserted_verse(
+    versification: str,
+    text: str,
+    start: tuple[str, int, int | None, str],
+    end: tuple[str, int, int | None, str],
+) -> None:
+    """A marker glued to a verse that has an inserted verse by its letter names that verse."""
+    parser = RefParser(
+        RefStyle.named("en-bibleworks"), Versification.named(versification)
+    )
+    ref = parser.parse(text)
+    assert ref is not None
+    (rng,) = ref.ranges
+    assert (
+        rng.start.book,
+        rng.start.chapter,
+        rng.start.verse,
+        rng.start.subverse,
+    ) == start
+    assert (rng.end.book, rng.end.chapter, rng.end.verse, rng.end.subverse) == end
+
+
 def _make_dot_separator_parser() -> RefParser:
     """Return a parser whose verse-range separator is "." rather than ", ".
 

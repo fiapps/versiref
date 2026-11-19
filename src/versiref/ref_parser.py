@@ -520,17 +520,17 @@ class RefParser:
         has_end = any(
             name in tokens for name in ("end_book", "end_verse", "end_subverse")
         )
-        # A following-verses marker may have parsed as a subverse.
+        # A following-verses marker may have parsed as a subverse. It keeps
+        # the subverse until _finish_ranges can tell whether the versification
+        # has an inserted verse by that letter.
         if "following_verses" in tokens:
             draft.following = "ff"
         elif "following_verse" in tokens:
             draft.following = "f"
         elif not has_end and draft.subverse == self.style.following_verses:
             draft.following = "ff"
-            draft.subverse = ""
         elif not has_end and draft.subverse == self.style.following_verse:
             draft.following = "f"
-            draft.subverse = ""
         elif has_end:
             draft.has_end = True
             if "end_book" in tokens:
@@ -661,6 +661,19 @@ class RefParser:
             else:
                 if draft.chapter is not None:
                     chapter = draft.chapter
+                if draft.following and draft.subverse:
+                    # A marker glued to the verse names an inserted verse
+                    # where there is one ("Esg 1:1f" in the CEI).
+                    assert draft.verse is not None
+                    if (
+                        chapter is not None
+                        and chapter >= 0
+                        and draft.subverse
+                        in self.versification.verse_parts(book, chapter, draft.verse)
+                    ):
+                        draft.following = ""
+                    else:
+                        draft.subverse = ""
                 start = point(book, chapter, draft.verse, draft.subverse)
 
             if draft.end_book is not None:
