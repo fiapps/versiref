@@ -77,7 +77,7 @@ When asked to make a release, Claude performs steps 1–8; publishing and pushin
    GitHub renders this annotation as the release notes on the releases page.
 8. Build the artifacts (Claude builds them but does not publish or push), in order:
    1. Regenerate the bundled API reference with `uv run python scripts/build_api_md.py`. `src/versiref/docs/api.md` is generated and git-ignored but ships in the wheel, so skipping this bundles a stale copy (left over from an earlier code state) or, on a fresh checkout, none at all — and because the file is untracked, neither the tests nor the release commit would reveal it.
-   2. Delete any artifacts from previous versions with `rm -f dist/*`, so the directory holds only the current release's files and a publish step that uploads `dist/*` cannot pick up stale builds.
+   2. Delete any artifacts from previous versions with `find dist -mindepth 1 -delete` (run it exactly as written, so that an exact-match permission rule can allow it without a prompt), so the directory holds only the current release's files and a publish step that uploads `dist/*` cannot pick up stale builds.
    3. Run `uv build` to produce the wheel and sdist in `dist/`.
 9. Manual: publish and push the commit and tag.
 
