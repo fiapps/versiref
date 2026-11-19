@@ -750,6 +750,35 @@ def test_glued_following_marker_names_inserted_verse(
     assert (rng.end.book, rng.end.chapter, rng.end.verse, rng.end.subverse) == end
 
 
+@pytest.mark.parametrize(
+    ("versification", "start", "end"),
+    [
+        ("cei", ("ESG", 1, 1, "f"), ("ESG", 1, 1, "f")),
+        ("org", ("ESG", 1, 1, ""), ("ESG", 1, 2, "")),
+        ("eng", ("ESG", 1, 1, ""), ("ESG", 1, 2, "")),
+    ],
+)
+def test_glued_following_marker_depends_on_versification(
+    versification: str,
+    start: tuple[str, int, int | None, str],
+    end: tuple[str, int, int | None, str],
+) -> None:
+    """The same "f" is an inserted verse only in a versification that has one there."""
+    parser = RefParser(
+        RefStyle.named("en-bibleworks"), Versification.named(versification)
+    )
+    ref = parser.parse("Esg 1:1f")
+    assert ref is not None
+    (rng,) = ref.ranges
+    assert (
+        rng.start.book,
+        rng.start.chapter,
+        rng.start.verse,
+        rng.start.subverse,
+    ) == start
+    assert (rng.end.book, rng.end.chapter, rng.end.verse, rng.end.subverse) == end
+
+
 def _make_dot_separator_parser() -> RefParser:
     """Return a parser whose verse-range separator is "." rather than ", ".
 
