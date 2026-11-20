@@ -297,7 +297,6 @@ def test_mapping_to_the_same_versification_changes_nothing(style_name: str) -> N
         assert mapped.format(canonical_style) == canonical
 
 
-@pytest.mark.xfail(strict=True, reason="#39")
 def test_psalm_151_can_be_formatted() -> None:
     """PS2 formats in a style that names the Psalms."""
     ref = BibleRef.for_range("PS2", 1, 1, versification=_versification("lxx"))

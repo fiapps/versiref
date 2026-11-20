@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Fixed
+
+- Psalm 151 stored as `PS2` formats under the Psalms name and parses back into the separate book where the versification has no native Psalm 151. Native Psalm 151 references keep their existing representation, and style dictionaries ignore separate `PS2` names.
+
 ## 0.14.1 - 2026-11-19
 
 ### Fixed

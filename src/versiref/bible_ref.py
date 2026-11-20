@@ -403,6 +403,8 @@ def _shown(verse_range: "VerseRange") -> tuple[_Shown, _Shown]:
     """
 
     def show(point: RefPoint) -> _Shown:
+        if point.book == "PS2":
+            return _Shown("PSA", 151, point.verse, point.subverse)
         parts = None if point.verse is None else lettered_subverse(point.subverse)
         if parts is None:
             return _Shown(point.book, point.chapter, point.verse, point.subverse)
@@ -1423,6 +1425,14 @@ class BibleRef:
 
         """
         versification = self.versification
+        if any(
+            verse_range.start.book != verse_range.end.book
+            and "PS2" in (verse_range.start.book, verse_range.end.book)
+            for verse_range in self.ranges
+        ):
+            raise ValueError(
+                "A cross-book range involving PS2 cannot be written as Psalm 151"
+            )
         shown = [_shown(verse_range) for verse_range in self.ranges]
 
         def single_chapter(book: str) -> bool:
