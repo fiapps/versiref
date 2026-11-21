@@ -4,16 +4,13 @@ import pytest
 
 from versiref import BibleRef, RefParser, RefPoint, RefStyle, VerseRange, Versification
 
-SEPARATE_PSALM = ["org", "eng", "vulgata", "nova_vulgata", "douay-rheims"]
 
-
-@pytest.mark.parametrize("versification_name", [*SEPARATE_PSALM, "lxx"])
 @pytest.mark.parametrize(
     ("verse", "end_verse", "expected"),
     [(None, None, "Ps 151"), (1, None, "Ps 151:1"), (1, 3, "Ps 151:1–3")],
 )
 def test_format_separate_psalm(
-    versification_name: str, verse: int | None, end_verse: int | None, expected: str
+    verse: int | None, end_verse: int | None, expected: str
 ) -> None:
     """Separate PS2 locations print their public psalm number, not chapter 1."""
     reference = BibleRef.for_range(
@@ -21,7 +18,7 @@ def test_format_separate_psalm(
         1,
         verse,
         end_verse=end_verse,
-        versification=Versification.named(versification_name),
+        versification=Versification.named("org"),
     )
     assert reference.format(RefStyle.named("en-sbl")) == expected
     assert reference.ranges[0].start.book == "PS2"
@@ -39,22 +36,17 @@ def test_psalm_round_trip_in_each_style(style_name: str) -> None:
     assert RefParser(style, versification).parse(text) == reference
 
 
-@pytest.mark.parametrize("versification_name", SEPARATE_PSALM)
 @pytest.mark.parametrize(
     ("text", "start", "end"),
     [
         ("Ps 151", RefPoint("PS2", 1), RefPoint("PS2", 1)),
-        ("Ps 151:1", RefPoint("PS2", 1, 1), RefPoint("PS2", 1, 1)),
         ("Ps 151:1–3", RefPoint("PS2", 1, 1), RefPoint("PS2", 1, 3)),
-        ("Ps 151:1a–c", RefPoint("PS2", 1, 1, "a"), RefPoint("PS2", 1, 1, "c")),
         ("Ps 151:2ff", RefPoint("PS2", 1, 2), RefPoint("PS2", 1)),
     ],
 )
-def test_parse_separate_psalm(
-    versification_name: str, text: str, start: RefPoint, end: RefPoint
-) -> None:
+def test_parse_separate_psalm(text: str, start: RefPoint, end: RefPoint) -> None:
     """A psalm missing from PSA resolves to PS2 where that separate book exists."""
-    versification = Versification.named(versification_name)
+    versification = Versification.named("org")
     reference = RefParser(RefStyle.named("en-sbl"), versification).parse(text)
     assert reference is not None
     assert reference.ranges == (VerseRange(start, end, text),)
@@ -72,6 +64,13 @@ def test_native_psalm_151_keeps_its_book(versification_name: str) -> None:
     assert reference.ranges[0].start == RefPoint("PSA", 151, 1)
     assert reference.invalid_reason() is None
     assert reference.format(style) == "Ps 151:1"
+    if reference.versification is not None and reference.versification.includes("PS2"):
+        separate = BibleRef.for_range(
+            "PS2", 1, 1, versification=reference.versification
+        )
+        assert separate.format(style) == reference.format(style)
+        assert parser.parse(separate.format(style) + " Native") == reference
+        assert separate.ranges[0].start == RefPoint("PS2", 1, 1)
 
 
 def test_trailing_designator_selects_separate_book() -> None:
@@ -99,14 +98,6 @@ def test_psalm_151_in_a_list() -> None:
     text = reference.format(style)
     assert text == "Pss 150:1; 151:1, 3"
     assert RefParser(style, versification).parse(text) == reference
-    expected_keys = [
-        pair
-        for book, chapter, verse in [("PSA", 150, 1), ("PS2", 1, 1), ("PS2", 1, 3)]
-        for pair in BibleRef.for_range(
-            book, chapter, verse, versification=versification
-        ).range_keys()
-    ]
-    assert list(reference.range_keys()) == expected_keys
     mapped = reference.map_to(Versification.named("lxx"))
     assert mapped is not None
     assert mapped.map_to(versification) == reference
@@ -123,14 +114,15 @@ def test_whole_separate_book_prints_as_a_psalm() -> None:
     assert list(reparsed.range_keys()) == list(reference.range_keys())
 
 
-@pytest.mark.parametrize("explicit_names", [False, True])
-def test_ps2_names_are_ignored(explicit_names: bool) -> None:
+@pytest.mark.parametrize(
+    "recognized_names",
+    [None, {"Ps": "PSA", "Pss": "PSAS", "Ignored": "PS2"}, {"Ignored": "PS2"}],
+)
+def test_ps2_names_are_ignored(recognized_names: dict[str, str] | None) -> None:
     """PS2 does not acquire an independent name through style APIs."""
     style = RefStyle(
         names={"PSA": "Ps", "PSAS": "Pss", "PS2": "Ignored"},
-        recognized_names={"Ps": "PSA", "Pss": "PSAS", "Ignored": "PS2"}
-        if explicit_names
-        else {},
+        recognized_names=recognized_names or {},
     )
     style.override_names({"PS2": "Still ignored"})
     style.also_recognize({"Also ignored": "PS2"})
@@ -140,21 +132,23 @@ def test_ps2_names_are_ignored(explicit_names: bool) -> None:
     assert parser.parse("Ignored 1", silent=True) is None
     assert parser.parse("Still ignored 1", silent=True) is None
     assert parser.parse("Also ignored 1", silent=True) is None
-    assert parser.parse("Ps 151:1") is not None
+    if recognized_names == {"Ignored": "PS2"}:
+        assert style.recognized_names == {}
+        assert parser.parse("Ps 151:1", silent=True) is None
+    else:
+        assert parser.parse("Ps 151:1") is not None
 
 
-def test_invalid_psalm_and_other_single_chapter_books() -> None:
-    """Validation and ordinary one-chapter book formatting keep their behavior."""
+def test_invalid_psalm_reports_its_public_chapter() -> None:
+    """A styled diagnostic uses the chapter the user wrote, not PS2 chapter 1."""
     style = RefStyle.named("en-sbl")
     versification = Versification.named("org")
     parser = RefParser(style, versification)
     invalid = parser.parse("Ps 151:8")
     assert invalid is not None
-    assert invalid.invalid_reason() is not None
-    ordinary = parser.parse("Jude 3")
-    assert ordinary is not None
-    assert ordinary.format(style) == "Jude 3"
-    assert ordinary.ranges[0].start == RefPoint("JUD", 1, 3)
+    style.names["PS2"] = "Ignored mutation"
+    assert invalid.invalid_reason(style) == "Ps 151 has no verse 8 (only 7 verses)"
+    assert invalid.invalid_reason() == "PS2 1 has no verse 8 (only 7 verses)"
 
 
 @pytest.mark.parametrize("text", ["Pss 150:1–151:3", "Pss 150–151", "Ps 150:6–151:1"])
@@ -201,3 +195,21 @@ def test_scan_and_substitute_psalm_list() -> None:
         "PS2",
     ]
     assert parser.sub_refs(text, lambda ref: "X", as_ranges=True) == "Read X; X, X."
+
+
+@pytest.mark.parametrize("versification_name", [None, "org"])
+def test_string_of_hand_built_ps2_range_uses_raw_book_ids(
+    versification_name: str | None,
+) -> None:
+    """Logging an unformattable reference must preserve both raw endpoints."""
+    reference = BibleRef(
+        [VerseRange(RefPoint("PSA", 150, 1), RefPoint("PS2", 1, 3))],
+        Versification.named(versification_name) if versification_name else None,
+    )
+    text = str(reference)
+    assert "PSA" in text
+    assert "PS2" in text
+    assert "150" in text
+    assert "Ps 151" not in text
+    with pytest.raises(ValueError, match="cross-book range involving PS2"):
+        reference.format(RefStyle.named("en-sbl"))

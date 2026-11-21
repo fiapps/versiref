@@ -97,14 +97,14 @@ class RefStyle:
             self.names = {
                 book: name for book, name in self.names.items() if book != "PS2"
             }
+        if not self.recognized_names:
+            self.recognized_names = _invert(self.names)
         if "PS2" in self.recognized_names.values():
             self.recognized_names = {
                 name: book
                 for name, book in self.recognized_names.items()
                 if book != "PS2"
             }
-        if not self.recognized_names:
-            self.recognized_names = _invert(self.names)
 
     def __str__(self) -> str:
         """Return a string representation of this style.

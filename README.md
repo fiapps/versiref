@@ -10,7 +10,11 @@ VersiRef is a Python package for sophisticated parsing, manipulation, and printi
 
 Psalm 151 uses the Psalms name, for example `Ps 151:1`, even when a versification stores it in the separate `PS2` book. Parsing preserves a native `PSA` chapter 151 where one exists; otherwise it selects `PS2` chapter 1. Style dictionaries use the `PSA`/`PSAS` names for it and ignore `PS2` names.
 
+In a versification such as the LXX that contains both books, formatting treats `PS2` as the existing `PSA` chapter 151. Parsing that text chooses native `PSA` 151, so this round trip intentionally does not preserve the separate book ID. Formatting leaves the stored ranges unchanged.
+
 A range crossing from the main Psalms book into separate `PS2` remains unsupported; cite the psalms as a list (for example `Pss 150; 151`) instead. Stored cross-book ranges involving `PS2` are rejected during formatting, since writing them as a natural psalm range could hide intervening books in the versification order. Native Psalm 151 versifications retain their usual cross-chapter support.
+
+`str()` still works for a hand-built range that cannot be formatted: it shows the raw ranges and book IDs, so printing or logging the reference does not raise a formatting error.
 
 ## Overview of `versiref` classes
 

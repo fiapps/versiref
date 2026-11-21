@@ -112,7 +112,9 @@ The order of books in a versification's `maxVerses` decides which books lie insi
 
 - **PSA/PSAS**: Psalm vs Psalms (singular/plural). PSAS is a key in book name dictionaries for the plural form, never a book ID in a reference: a parser reads a plural name as PSA, and formatting chooses the plural when the ranges under one statement of the name cite more than one psalm.
 - **PS2**: Psalm 151, printed as chapter 151 under the PSA name (or PSAS alongside other psalms). PS2 names in style dictionaries are ignored. Parsing keeps a native PSA chapter 151 where the versification has one; otherwise it resolves Psalm 151 to PS2 chapter 1 where that separate book exists.
+  - Where a versification contains both PS2 and native PSA 151 (the LXX), formatting treats PS2 as that native chapter without modifying the stored ranges. Parsing the result therefore selects PSA 151, intentionally losing the separate book ID.
   - A range crossing from the main Psalms book into separate `PS2` remains unsupported; cite the psalms as a list (for example `Pss 150; 151`) instead. Stored cross-book ranges involving `PS2` are rejected during formatting, since writing them as a natural psalm range could hide intervening books in the versification order. Native Psalm 151 versifications retain their usual cross-chapter support.
+  - `str()` falls back to raw ranges and book IDs if the default style cannot format the reference, keeping printing and logging safe for hand-built cross-book ranges.
 - **EST/ESG**: Esther vs Greek Esther (some versifications separate them). The NABRE has only EST: its lettered chapters A–F are held as verses inserted beside a verse of EST, with a subverse made of the letter and verse number (Esther C:12 is the subverse "C12" of EST 4:17, and "C" alone is the whole chapter). The versification data defines them, not the style; see "Lettered chapters" in `VERSIFICATIONS.md`.
 
 ## Code Conventions
