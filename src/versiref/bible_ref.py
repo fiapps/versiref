@@ -62,6 +62,7 @@ def _chapter_verse_reason(
     chapter: int,
     verse: int | None,
     has_title: bool = False,
+    display_chapter: int | None = None,
 ) -> str | None:
     """Explain why a (chapter, verse) is out of range, or None if it is in range.
 
@@ -72,6 +73,8 @@ def _chapter_verse_reason(
         verse: The verse number to check, or None for an unspecified verse.
         has_title: Whether the chapter has a verse 0, as a psalm does whose
             title the versification numbers 0.
+        display_chapter: A public chapter number to use in verse diagnostics,
+            where the stored chapter has a different number.
 
     Returns:
         An explanatory string, or None if the chapter (and verse, if specified)
@@ -83,8 +86,9 @@ def _chapter_verse_reason(
     if verse is not None:
         max_verse = chapters[chapter - 1]
         if verse < (0 if has_title else 1) or verse > max_verse:
+            shown_chapter = chapter if display_chapter is None else display_chapter
             return (
-                f"{label} {chapter} has no verse {verse} "
+                f"{label} {shown_chapter} has no verse {verse} "
                 f"(only {_count(max_verse, 'verse')})"
             )
     return None
@@ -403,6 +407,10 @@ def _shown(verse_range: "VerseRange") -> tuple[_Shown, _Shown]:
     """
 
     def show(point: RefPoint) -> _Shown:
+        if point.book == "PS2":
+            # This also maps PS2 to the existing PSA 151 in the LXX. Parsing
+            # that text chooses native PSA 151; the stored point stays PS2.
+            return _Shown("PSA", 151, point.verse, point.subverse)
         parts = None if point.verse is None else lettered_subverse(point.subverse)
         if parts is None:
             return _Shown(point.book, point.chapter, point.verse, point.subverse)
@@ -598,7 +606,22 @@ def _range_reason(
     """Explain why a verse range is invalid under a versification, or None."""
 
     def label(book: str) -> str:
-        return book if style is None else style.names.get(book, book)
+        if style is None:
+            return book
+        try:
+            return style.book_name(book)
+        except ValueError:
+            return book
+
+    def chapter_number(point: RefPoint) -> int | None:
+        if (
+            style is not None
+            and "PSA" in style.names
+            and point.book == "PS2"
+            and point.chapter == 1
+        ):
+            return 151
+        return point.chapter
 
     start, end = verse_range.start, verse_range.end
     for book in dict.fromkeys((start.book, end.book)):
@@ -627,6 +650,7 @@ def _range_reason(
                 point.chapter,
                 point.verse,
                 versification.first_verse(point.book, point.chapter) == 0,
+                display_chapter=chapter_number(point),
             )
             if reason is not None:
                 return reason
@@ -670,7 +694,7 @@ def _range_reason(
             and point.verse is not None
             and versification.is_excluded(point.book, point.chapter, point.verse)
         ):
-            return f"{label(point.book)} {point.chapter} has no verse {point.verse}"
+            return f"{label(point.book)} {chapter_number(point)} has no verse {point.verse}"
     return None
 
 
@@ -1043,15 +1067,21 @@ class BibleRef:
         """Return a string representation of this Bible reference.
 
         Shows a concise representation using the versification identifier if available,
-        and the reference's original text or formatted representation.
+        and the reference's original text or formatted representation. If the
+        default style cannot format it, the raw ranges are shown instead.
 
         Returns:
             A string representation of this Bible reference
 
         """
-        ref_part = self.original_text or self.format(
-            RefStyle(names=standard_names("en-sbl_abbreviations"))
-        )
+        ref_part = self.original_text
+        if not ref_part:
+            try:
+                ref_part = self.format(
+                    RefStyle(names=standard_names("en-sbl_abbreviations"))
+                )
+            except ValueError:
+                ref_part = repr(self.ranges)
         if self.versification is None:
             return f'BibleRef("{ref_part}")'
         return f'BibleRef("{ref_part}", versification={self.versification})'
@@ -1414,6 +1444,9 @@ class BibleRef:
         If the reference has a versification, chapter numbers are omitted for
         one-chapter books. A book's name is stated where the book changes, and
         the Psalms are named in the plural where more than one is cited.
+        PS2 is shown as PSA chapter 151, including when that chapter already
+        exists in the versification (as in the LXX). Parsing the result then
+        selects native PSA 151; formatting does not change the stored ranges.
 
         Args:
             style: The RefStyle to use for formatting
@@ -1423,6 +1456,14 @@ class BibleRef:
 
         """
         versification = self.versification
+        if any(
+            verse_range.start.book != verse_range.end.book
+            and "PS2" in (verse_range.start.book, verse_range.end.book)
+            for verse_range in self.ranges
+        ):
+            raise ValueError(
+                "A cross-book range involving PS2 cannot be written as Psalm 151"
+            )
         shown = [_shown(verse_range) for verse_range in self.ranges]
 
         def single_chapter(book: str) -> bool:

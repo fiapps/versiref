@@ -44,7 +44,8 @@ class RefStyle:
     that use a RefStyle as a specification.
 
     Attributes:
-        names: Maps Bible book IDs to string abbreviations or full names
+        names: Maps Bible book IDs to string abbreviations or full names.
+            PS2 entries are ignored; Psalm 151 uses the PSA name.
         chapter_verse_separator: Separates chapter number from verse ranges
         range_separator: Separates the ends of a range. Defaults to an en dash.
         following_verse: indicates the range ends at the verse following the start
@@ -92,8 +93,18 @@ class RefStyle:
                 f"Invalid chapter_number_style: {self.chapter_number_style!r} "
                 f"(expected one of {', '.join(_CHAPTER_NUMBER_STYLES)})"
             )
+        if "PS2" in self.names:
+            self.names = {
+                book: name for book, name in self.names.items() if book != "PS2"
+            }
         if not self.recognized_names:
             self.recognized_names = _invert(self.names)
+        if "PS2" in self.recognized_names.values():
+            self.recognized_names = {
+                name: book
+                for name, book in self.recognized_names.items()
+                if book != "PS2"
+            }
 
     def __str__(self) -> str:
         """Return a string representation of this style.
@@ -125,6 +136,8 @@ class RefStyle:
             ValueError: If the style has no name for the book.
 
         """
+        if book_id == "PS2":
+            book_id = "PSA"
         if plural and book_id == "PSA" and "PSAS" in self.names:
             return self.names["PSAS"]
         if book_id not in self.names:
@@ -165,7 +178,7 @@ class RefStyle:
             {
                 name: id
                 for name, id in names.items()
-                if name not in self.recognized_names
+                if name not in self.recognized_names and id != "PS2"
             }
         )
 
@@ -186,6 +199,7 @@ class RefStyle:
                 PSA/PSAS and EST/ESG. The style is left unchanged.
 
         """
+        names = {book: name for book, name in names.items() if book != "PS2"}
         new_names = {**self.names, **names}
         inverted = _invert(new_names)
         self.names = new_names

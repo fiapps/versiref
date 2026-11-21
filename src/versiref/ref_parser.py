@@ -183,6 +183,7 @@ class RefParser:
         names = {
             name: "PSA" if book_id == "PSAS" else book_id
             for name, book_id in self.style.recognized_names.items()
+            if book_id != "PS2"
         }
         book = _book_element(names)
         # The chapter can be omitted for single-chapter (sc) books
@@ -200,6 +201,11 @@ class RefParser:
             (len(chapters) for chapters in self.versification.max_verses.values()),
             default=_MOST_CHAPTERS,
         )
+        if self.versification.includes("PS2") or any(
+            versification.includes("PS2")
+            for versification in self._designator_versifications.values()
+        ):
+            most_chapters = max(most_chapters, 151)
         # The lookahead keeps a Roman numeral from matching the start of a
         # longer word ("Cl" in "Clemens"); it counts the æ/œ ligatures common
         # in Latin text as word characters ("Cœna", "Lætitia").
@@ -728,6 +734,26 @@ class RefParser:
             designated = tokens["versification_designator"]
             assert isinstance(designated, Versification)
             versification = designated
+
+        if versification.includes("PS2") and versification.last_verse("PSA", 151) < 0:
+
+            def psalm(point: RefPoint) -> RefPoint:
+                """Place Psalm 151 in the book this versification gives it."""
+                if point.book == "PSA" and point.chapter == 151:
+                    return RefPoint("PS2", 1, point.verse, point.subverse)
+                return point
+
+            ranges = [
+                VerseRange(
+                    psalm(verse_range.start),
+                    psalm(verse_range.end),
+                    verse_range.original_text,
+                )
+                if verse_range.start.book == verse_range.end.book == "PSA"
+                and verse_range.start.chapter == verse_range.end.chapter == 151
+                else verse_range
+                for verse_range in ranges
+            ]
 
         return BibleRef(
             ranges=ranges,
