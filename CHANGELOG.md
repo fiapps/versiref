@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Changed
+
+- Added support for Python 3.15 (tested).
+- Dropped support for Python 3.10, which is EOL since 2026-10-01.
+
 ### Fixed
 
 - Psalm 151 stored as `PS2` formats under the Psalms name and parses back into the separate book where the versification has no native Psalm 151. Native Psalm 151 references keep their existing representation, and style dictionaries ignore separate `PS2` names.
