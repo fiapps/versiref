@@ -64,13 +64,17 @@ def test_native_psalm_151_keeps_its_book(versification_name: str) -> None:
     assert reference.ranges[0].start == RefPoint("PSA", 151, 1)
     assert reference.invalid_reason() is None
     assert reference.format(style) == "Ps 151:1"
-    if reference.versification is not None and reference.versification.includes("PS2"):
-        separate = BibleRef.for_range(
-            "PS2", 1, 1, versification=reference.versification
-        )
-        assert separate.format(style) == reference.format(style)
-        assert parser.parse(separate.format(style) + " Native") == reference
-        assert separate.ranges[0].start == RefPoint("PS2", 1, 1)
+
+
+def test_separate_book_formats_as_native_psalm_151() -> None:
+    """Where PSA has a chapter 151, PS2 prints as it and parses back as PSA."""
+    style = RefStyle.named("en-sbl")
+    versification = Versification.named("lxx")
+    separate = BibleRef.for_range("PS2", 1, 1, versification=versification)
+    assert separate.format(style) == "Ps 151:1"
+    assert RefParser(style, versification).parse("Ps 151:1") == BibleRef.for_range(
+        "PSA", 151, 1, versification=versification
+    )
 
 
 def test_trailing_designator_selects_separate_book() -> None:

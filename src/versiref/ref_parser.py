@@ -183,7 +183,6 @@ class RefParser:
         names = {
             name: "PSA" if book_id == "PSAS" else book_id
             for name, book_id in self.style.recognized_names.items()
-            if book_id != "PS2"
         }
         book = _book_element(names)
         # The chapter can be omitted for single-chapter (sc) books
