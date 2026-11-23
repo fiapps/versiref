@@ -63,7 +63,9 @@ Run after any lockfile change and before each release.
 
 ### Releasing
 
-When asked to make a release, Claude performs steps 1–8; publishing and pushing are done manually afterward (step 9).
+When asked to make a release, Claude performs steps 1–8; pushing is done manually afterward (step 9), and pushing the tag publishes the release.
+
+Publishing is done by `.github/workflows/release.yml`, not by hand. When a version tag is pushed, it reruns CI (`.github/workflows/ci.yml`), checks that the tag matches the version in `pyproject.toml`, builds the wheel and sdist, uploads them to PyPI through Trusted Publishing (the `pypi` environment, with no API token; this gives PyPI's provenance attestations), and then makes a GitHub Release from the same files, using the tag annotation as its notes. Release immutability is on, so once a release is published its files and tag are frozen. A mistake after the tag is pushed is fixed with a new patch version, not by moving the tag.
 
 1. Bump the version in `pyproject.toml` (the sole source of the version number).
 2. Update `CHANGELOG.md` following the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format: rename the `## Unreleased` heading to the new version with the release date (`## X.Y.Z - YYYY-MM-DD`).
@@ -74,12 +76,12 @@ When asked to make a release, Claude performs steps 1–8; publishing and pushin
 7. Create an annotated tag named with the bare version number (e.g., `0.5.0`, not `v0.5.0`).
    The tag annotation message is the new version's `CHANGELOG.md` section — its `### Added`/`### Changed`/`### Removed` subsection headings and their entries, but **without** the `## X.Y.Z` version heading line.
    Tag with `git tag -a --cleanup=verbatim -F <file>`: the default cleanup strips lines beginning with `#`, which would silently drop the `###` subsection headings.
-   GitHub renders this annotation as the release notes on the releases page.
-8. Build the artifacts (Claude builds them but does not publish or push), in order:
+   The release workflow copies this annotation into the GitHub Release as its notes.
+8. Build the artifacts locally as a final check before the tag is pushed (Claude builds them but does not publish or push). CI rebuilds the files it publishes, so these local files are only for inspection. In order:
    1. Regenerate the bundled API reference with `uv run python scripts/build_api_md.py`. `src/versiref/docs/api.md` is generated and git-ignored but ships in the wheel, so skipping this bundles a stale copy (left over from an earlier code state) or, on a fresh checkout, none at all — and because the file is untracked, neither the tests nor the release commit would reveal it.
-   2. Delete any artifacts from previous versions with `find dist -mindepth 1 -delete` (run it exactly as written, so that an exact-match permission rule can allow it without a prompt), so the directory holds only the current release's files and a publish step that uploads `dist/*` cannot pick up stale builds.
+   2. Delete any artifacts from previous versions with `find dist -mindepth 1 -delete` (run it exactly as written, so that an exact-match permission rule can allow it without a prompt), so the directory holds only the current release's files.
    3. Run `uv build` to produce the wheel and sdist in `dist/`.
-9. Manual: publish and push the commit and tag.
+9. Manual: push the commit, then the tag (`git push origin main && git push origin X.Y.Z`). Approve the `pypi` deployment if the environment requires it, and check that the workflow succeeds.
 
 ## Architecture
 
