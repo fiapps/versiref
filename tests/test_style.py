@@ -82,6 +82,38 @@ def test_from_dict_missing_names() -> None:
         RefStyle.from_dict({"chapter_verse_separator": ":"})
 
 
+@pytest.mark.parametrize(
+    ("data", "match"),
+    [
+        (
+            {"base": "en-sbl", "chapter_seperator": "; "},
+            "Unknown key.*chapter_seperator",
+        ),
+        ({"base": "en-sbl", "also_recognise": ["en-sbl_names"]}, "also_recognise"),
+        ({"base": "en-sbl", "chapter_separator": 5}, "'chapter_separator' must be"),
+        ({"names": 5}, "'names' must be"),
+        ({"names": {"GEN": 1}}, "'names' must be"),
+        ({"base": "en-sbl", "chapter_number_style": "greek"}, "chapter_number_style"),
+        ({"base": "en-sbl", "also_recognize": "en-sbl_names"}, "also_recognize"),
+        ({"base": "en-sbl", "also_recognize": ["en-sbl_names", 5]}, "also_recognize"),
+        ({"base": "en-sbl", "override_names": ["GEN"]}, "override_names"),
+        ({"base": 5}, "'base' must be"),
+    ],
+)
+def test_from_dict_rejects_unknown_keys_and_wrong_types(
+    data: dict[str, object], match: str
+) -> None:
+    """A key from_dict doesn't know, or a value of the wrong type, raises ValueError."""
+    with pytest.raises(ValueError, match=match):
+        RefStyle.from_dict(data)
+
+
+def test_from_dict_with_base_sets_chapter_number_style() -> None:
+    """A base style's chapter_number_style can be overridden."""
+    style = RefStyle.from_dict({"base": "en-sbl", "chapter_number_style": "roman"})
+    assert style.chapter_number_style == "roman"
+
+
 def test_from_dict_with_base() -> None:
     """Test from_dict with base inherits names and separators from the base style."""
     base = RefStyle.named("en-sbl")
@@ -479,26 +511,6 @@ def test_given_recognized_names_are_kept() -> None:
     """Recognized names passed to the constructor are not derived from names."""
     style = RefStyle(names={"GEN": "Gn"}, recognized_names={"Genesis": "GEN"})
     assert style.recognized_names == {"Genesis": "GEN"}
-
-
-def test_from_dict_base_must_be_a_string() -> None:
-    """from_dict rejects a base that is not an identifier."""
-    with pytest.raises(ValueError, match="'base' must be a string identifier"):
-        RefStyle.from_dict({"base": 3})
-
-
-def test_from_dict_names_must_be_a_string_or_dict() -> None:
-    """from_dict rejects names of any other type."""
-    with pytest.raises(ValueError, match="'names' must be a string or dict"):
-        RefStyle.from_dict({"names": 3})
-
-
-def test_from_dict_also_recognize_skips_other_types() -> None:
-    """An also_recognize entry that is neither a string nor a dict is passed over."""
-    style = RefStyle.from_dict(
-        {"base": "en-sbl", "also_recognize": [3, {"Gene": "GEN"}]}
-    )
-    assert style.recognized_names["Gene"] == "GEN"
 
 
 @pytest.mark.parametrize(

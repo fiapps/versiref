@@ -2,6 +2,7 @@
 
 import logging
 import pathlib
+from importlib import resources
 
 import pytest
 
@@ -1006,3 +1007,16 @@ def test_map_verse_portion_of_unmapped_lettered_verse(tmp_path: pathlib.Path) ->
     )
     org = Versification.named("org")
     assert v.map_verse("EST", 4, 17, org, subverse="C2a") == ("EST", 4, 17, "C2a")
+
+
+@pytest.mark.parametrize("identifier", Versification.available_names())
+def test_bundled_versification_loads_without_warnings(
+    identifier: str, caplog: pytest.LogCaptureFixture
+) -> None:
+    """No entry in a bundled versification is skipped as malformed."""
+    path = resources.files("versiref").joinpath(
+        "data", "versifications", f"{identifier}.json"
+    )
+    with caplog.at_level(logging.WARNING, logger="versiref.versification"):
+        Versification.from_file(str(path), identifier)
+    assert not caplog.records

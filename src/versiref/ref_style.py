@@ -7,12 +7,61 @@ are converted to and from strings.
 import fnmatch
 import json
 import warnings
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from importlib import resources
+from typing import cast
 
 from versiref.roman import int_to_roman
 
 _CHAPTER_NUMBER_STYLES = ("arabic", "roman", "roman-lower")
+
+
+def _is_str_dict(value: object) -> bool:
+    return isinstance(value, dict) and all(
+        isinstance(k, str) and isinstance(v, str) for k, v in value.items()
+    )
+
+
+def _is_str(value: object) -> bool:
+    return isinstance(value, str)
+
+
+_SEPARATOR_KEYS = (
+    "chapter_verse_separator",
+    "range_separator",
+    "following_verse",
+    "following_verses",
+    "verse_range_separator",
+    "chapter_separator",
+)
+
+_FIELD_KEYS = (*_SEPARATOR_KEYS, "chapter_number_style")
+
+# Each key RefStyle.from_dict accepts, with a test of its value and the
+# description of the expected type that an error message gives.
+_STYLE_KEYS: dict[str, tuple[Callable[[object], bool], str]] = {
+    **dict.fromkeys(_SEPARATOR_KEYS, (_is_str, "a string")),
+    "chapter_number_style": (
+        lambda v: v in _CHAPTER_NUMBER_STYLES,
+        f"one of {', '.join(_CHAPTER_NUMBER_STYLES)}",
+    ),
+    "names": (
+        lambda v: isinstance(v, str) or _is_str_dict(v),
+        "a string or a dict of strings",
+    ),
+    "base": (_is_str, "a string"),
+    "override_names": (_is_str_dict, "a dict of strings"),
+    "also_recognize": (
+        lambda v: (
+            isinstance(v, list)
+            and all(isinstance(e, str) or _is_str_dict(e) for e in v)
+        ),
+        "a list of strings and dicts of strings",
+    ),
+    "versification_identifiers": (_is_str_dict, "a dict of strings"),
+    "chapter_letters": (lambda v: True, "anything"),
+}
 
 
 def _invert(d: dict[str, str]) -> dict[str, str]:
@@ -248,63 +297,38 @@ class RefStyle:
 
         Raises:
             ValueError: If neither "names" nor "base" is present, if both are,
-                or if "override_names" would give two books the same name.
+                if a key is not one of those above, if a value has the wrong
+                type, or if "override_names" would give two books the same name.
 
         Returns:
             A newly constructed RefStyle
 
         """
-        has_names = "names" in data
-        has_base = "base" in data
+        for key, value in data.items():
+            if key not in _STYLE_KEYS:
+                raise ValueError(f"Unknown key in RefStyle data: {key!r}")
+            is_valid, expected = _STYLE_KEYS[key]
+            if not is_valid(value):
+                raise ValueError(f"RefStyle data {key!r} must be {expected}")
 
-        if has_names and has_base:
+        if "names" in data and "base" in data:
             raise ValueError("RefStyle data must not include both 'names' and 'base'")
-
-        _separator_keys = (
-            "chapter_verse_separator",
-            "range_separator",
-            "following_verse",
-            "following_verses",
-            "verse_range_separator",
-            "chapter_separator",
-            "chapter_number_style",
-        )
-
-        if has_base:
-            base_value = data["base"]
-            if not isinstance(base_value, str):
-                raise ValueError("'base' must be a string identifier")
-            style = cls.named(base_value)
+        if "base" in data:
+            style = cls.named(cast(str, data["base"]))
             style.identifier = None
-            for key in _separator_keys:
-                val = data.get(key)
-                if isinstance(val, str):
-                    setattr(style, key, val)
         else:
-            if not has_names:
+            if "names" not in data:
                 raise ValueError("RefStyle data must include 'names' or 'base'")
-            names_value = data["names"]
-            if isinstance(names_value, str):
-                names = standard_names(names_value)
-            elif isinstance(names_value, dict):
-                names = dict(names_value)
-            else:
-                raise ValueError("'names' must be a string or dict")
-
-            def _str(key: str, default: str) -> str:
-                val = data.get(key, default)
-                return val if isinstance(val, str) else default
-
-            style = cls(
-                names=names,
-                chapter_verse_separator=_str("chapter_verse_separator", ":"),
-                range_separator=_str("range_separator", "\u2013"),
-                following_verse=_str("following_verse", "f"),
-                following_verses=_str("following_verses", "ff"),
-                verse_range_separator=_str("verse_range_separator", ", "),
-                chapter_separator=_str("chapter_separator", "; "),
-                chapter_number_style=_str("chapter_number_style", "arabic"),
+            names_value = cast(str | dict[str, str], data["names"])
+            names = (
+                standard_names(names_value)
+                if isinstance(names_value, str)
+                else dict(names_value)
             )
+            style = cls(names=names)
+        for key in _FIELD_KEYS:
+            if key in data:
+                setattr(style, key, data[key])
 
         if "chapter_letters" in data:
             warnings.warn(
@@ -315,25 +339,13 @@ class RefStyle:
                 stacklevel=2,
             )
 
-        override_names = data.get("override_names")
-        if isinstance(override_names, dict):
-            style.override_names({str(k): str(v) for k, v in override_names.items()})
-
-        also_recognize = data.get("also_recognize")
-        if isinstance(also_recognize, list):
-            for entry in also_recognize:
-                if isinstance(entry, str):
-                    style.also_recognize(entry)
-                elif isinstance(entry, dict):
-                    str_dict: dict[str, str] = {
-                        str(k): str(v) for k, v in entry.items()
-                    }
-                    style.also_recognize(str_dict)
-
-        versification_identifiers = data.get("versification_identifiers")
-        if isinstance(versification_identifiers, dict):
+        if "override_names" in data:
+            style.override_names(cast(dict[str, str], data["override_names"]))
+        for entry in cast(list[str | dict[str, str]], data.get("also_recognize", [])):
+            style.also_recognize(entry)
+        if "versification_identifiers" in data:
             style.also_recognize_versifications(
-                {str(k): str(v) for k, v in versification_identifiers.items()}
+                cast(dict[str, str], data["versification_identifiers"])
             )
 
         return style

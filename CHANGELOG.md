@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Added support for Python 3.15 (tested).
 - Dropped support for Python 3.10, which is EOL since 2026-10-01.
+- `RefStyle.from_dict()` and `RefStyle.from_file()` raise `ValueError` for a key they do not recognize or a value of the wrong type, naming the key. They used to skip such keys silently, so a misspelled key such as `"chapter_seperator"` had no effect. A style file with extra keys must now drop them. An invalid `chapter_number_style` is also caught when the style has a `"base"`.
 
 ### Fixed
 
