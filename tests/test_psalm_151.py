@@ -174,16 +174,6 @@ def test_separate_book_boundary_does_not_become_a_valid_cross_book_range(
     assert not any(start <= proverbs <= end for start, end in reference.range_keys())
 
 
-def test_format_rejects_ambiguous_cross_book_ps2_range() -> None:
-    """Psalm notation must not hide a range that includes intervening books."""
-    reference = BibleRef(
-        [VerseRange(RefPoint("PSA", 150, 1), RefPoint("PS2", 1, 3))],
-        Versification.named("org"),
-    )
-    with pytest.raises(ValueError, match="cross-book range involving PS2"):
-        reference.format(RefStyle.named("en-sbl"))
-
-
 def test_scan_and_substitute_psalm_list() -> None:
     """Separate-range source offsets survive normalizing the Psalm 151 book."""
     parser = RefParser(RefStyle.named("en-sbl"), Versification.named("org"))

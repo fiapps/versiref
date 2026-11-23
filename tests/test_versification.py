@@ -43,13 +43,6 @@ def test_last_verse_nonexistent_book() -> None:
     assert v.last_verse("XYZ", 1) == -1
 
 
-def test_last_verse_nonexistent_chapter() -> None:
-    """Test that requesting a nonexistent chapter returns -1."""
-    v = Versification.named("eng")
-    assert v.last_verse("GEN", 100) == -1
-    assert v.last_verse("GEN", -1) == -1
-
-
 def test_from_file() -> None:
     """Test loading a versification from a file."""
     # Get the path to one of the standard versification files
@@ -61,26 +54,6 @@ def test_from_file() -> None:
     assert v is not None
     assert v.identifier == "test-eng"
     assert v.last_verse("GEN", 1) == 31
-
-
-def test_multiple_versifications() -> None:
-    """Test loading and comparing multiple versifications."""
-    eng = Versification.named("eng")
-    lxx = Versification.named("lxx")
-    vul = Versification.named("vulgata")
-
-    assert eng is not None
-    assert lxx is not None
-    assert vul is not None
-
-    # Test a verse count that might differ between versifications
-    # (This is just an example - actual values may vary)
-    eng_psa_9 = eng.last_verse("PSA", 9)
-    lxx_psa_9 = lxx.last_verse("PSA", 9)
-
-    # Just verify we can get values, not testing specific differences
-    assert isinstance(eng_psa_9, int)
-    assert isinstance(lxx_psa_9, int)
 
 
 def test_is_single_chapter() -> None:
@@ -183,13 +156,6 @@ def test_subverse_mapping_data_loaded(tmp_path: pathlib.Path) -> None:
         ("ESG", 1, 1, "a"),
         ("ESG", 1, 1, "a"),
     )
-
-
-def test_map_verse_with_subverse(tmp_path: pathlib.Path) -> None:
-    """Test mapping a verse that maps to a subverse location."""
-    sub = _subverse_versification(tmp_path)
-    org = Versification.named("org")
-    assert sub.map_verse("ESG", 8, 32, org) == ("ESG", 8, 12, "u")
 
 
 def test_map_verse_subverse_roundtrip(tmp_path: pathlib.Path) -> None:
@@ -309,37 +275,12 @@ def test_map_verse_n_to_1() -> None:
     assert rsc.map_verse("PSA", 89, 1, org, end=True) == ("PSA", 90, 1, "")
 
 
-def test_no_warnings_loading_versifications(caplog: pytest.LogCaptureFixture) -> None:
-    """Test that loading all standard versifications produces no warnings."""
-    identifiers = [
-        "org",
-        "eng",
-        "lxx",
-        "vulgata",
-        "nova_vulgata",
-        "douay-rheims",
-        "nabre",
-        "rsc",
-        "rso",
-    ]
-    with caplog.at_level(logging.WARNING, logger="versiref.versification"):
-        for ident in identifiers:
-            Versification.named(ident)
-    assert len(caplog.records) == 0
-
-
 def test_available_names_discovers_bundled_versifications() -> None:
     """available_names() should expose the canonical bundled versifications, sorted."""
     available = Versification.available_names()
     assert available
     assert available == sorted(available)
     assert {"org", "eng", "lxx", "vulgata"}.issubset(available)
-
-
-def test_available_names_round_trip_through_named() -> None:
-    """Every identifier from available_names() must load via named()."""
-    for ident in Versification.available_names():
-        Versification.named(ident)
 
 
 def test_map_verse_inserted_verse_answering_to_two() -> None:

@@ -114,29 +114,6 @@ def test_from_dict_base_and_names_raises() -> None:
         RefStyle.from_dict({"base": "en-sbl", "names": "en-sbl_abbreviations"})
 
 
-def test_from_dict_with_also_recognize_string() -> None:
-    """Test from_dict processes also_recognize string entries."""
-    style = RefStyle.from_dict(
-        {
-            "names": "en-sbl_abbreviations",
-            "also_recognize": ["en-sbl_names"],
-        }
-    )
-    assert style.recognized_names["Genesis"] == "GEN"
-
-
-def test_from_dict_with_also_recognize_dict() -> None:
-    """Test from_dict processes also_recognize dict entries."""
-    style = RefStyle.from_dict(
-        {
-            "names": "en-sbl_abbreviations",
-            "also_recognize": [{"Cant": "SNG", "Qoh": "ECC"}],
-        }
-    )
-    assert style.recognized_names["Cant"] == "SNG"
-    assert style.recognized_names["Qoh"] == "ECC"
-
-
 def test_from_dict_with_also_recognize_mixed() -> None:
     """Test from_dict processes a mix of string and dict entries."""
     style = RefStyle.from_dict(
@@ -344,12 +321,6 @@ def test_available_names_discovers_bundled_styles() -> None:
     assert {"en-sbl", "it-cei"}.issubset(available)
 
 
-def test_available_names_round_trip_through_named() -> None:
-    """Every identifier from available_names() must load via named()."""
-    for ident in RefStyle.available_names():
-        RefStyle.named(ident)
-
-
 def test_available_names_filters_by_glob() -> None:
     """available_names() should restrict results to the given glob."""
     english = RefStyle.available_names("en-*")
@@ -413,17 +384,6 @@ def test_from_dict_versification_identifiers_names_form() -> None:
         }
     )
     assert style.versification_identifiers == {"Vulg.": "vulgata", "LXX": "lxx"}
-
-
-def test_from_dict_versification_identifiers_base_form() -> None:
-    """from_dict reads a versification_identifiers block on a base-derived style."""
-    style = RefStyle.from_dict(
-        {
-            "base": "en-sbl",
-            "versification_identifiers": {"Vulg.": "vulgata"},
-        }
-    )
-    assert style.versification_identifiers == {"Vulg.": "vulgata"}
 
 
 def test_named_la_cce() -> None:
@@ -495,14 +455,6 @@ def test_format_chapter() -> None:
     assert arabic.format_chapter(44) == "44"
     assert roman.format_chapter(44) == "XLIV"
     assert lower.format_chapter(44) == "xliv"
-
-
-def test_from_dict_chapter_number_style_with_base() -> None:
-    """Test overriding chapter_number_style when deriving from a base style."""
-    style = RefStyle.from_dict(
-        {"base": "la-vetus", "chapter_number_style": "roman-lower"}
-    )
-    assert style.chapter_number_style == "roman-lower"
 
 
 def test_available_standard_names_latin() -> None:

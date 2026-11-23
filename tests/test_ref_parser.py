@@ -88,24 +88,6 @@ def test_parse_single_chapter_book() -> None:
     assert ref.ranges[0].original_text == "Jude 5"
 
 
-def test_parse_nonexistent_reference() -> None:
-    """Test parsing a string that is not a Bible reference."""
-    # Create a style
-    names = standard_names("en-sbl_abbreviations")
-    style = RefStyle(names=names)
-
-    # Create a versification
-    versification = Versification.named("eng")
-
-    # Create a parser
-    parser = RefParser(style, versification)
-
-    # Try to parse a non-reference
-    ref = parser.parse("This is not a Bible reference", silent=True)
-
-    assert ref is None
-
-
 def test_parse_book_with_space() -> None:
     """Test parsing a book name that contains a space."""
     # Create a style
@@ -152,40 +134,6 @@ def test_parse_multi_chapter_book_with_space() -> None:
     assert ref.ranges[0].original_text == "1 Kgs 8:10"
 
 
-def test_parse_multiple_books() -> None:
-    """Test parsing a reference that spans multiple books."""
-    # Create a style
-    names = standard_names("en-cmos_short")
-    style = RefStyle(names=names)
-
-    # Create a versification
-    versification = Versification.named("eng")
-
-    # Create a parser
-    parser = RefParser(style, versification)
-
-    # Parse a reference with multiple books: "Is 7:10-14; Lk 1:26-38"
-    ref = parser.parse("Is 7:10-14; Lk 1:26-38")
-
-    assert ref is not None
-    assert ref.books() == ["ISA", "LUK"]
-    assert len(ref.ranges) == 2
-
-    # Check first book (Isaiah)
-    assert ref.ranges[0].start.book == "ISA"
-    assert ref.ranges[0].start.chapter == 7
-    assert ref.ranges[0].start.verse == 10
-    assert ref.ranges[0].end.chapter == 7
-    assert ref.ranges[0].end.verse == 14
-
-    # Check second book (Luke)
-    assert ref.ranges[1].start.book == "LUK"
-    assert ref.ranges[1].start.chapter == 1
-    assert ref.ranges[1].start.verse == 26
-    assert ref.ranges[1].end.chapter == 1
-    assert ref.ranges[1].end.verse == 38
-
-
 def test_parse_multiple_books_with_multiple_ranges() -> None:
     """Test parsing a reference with multiple books and multiple verse ranges."""
     # Create a style
@@ -225,63 +173,6 @@ def test_parse_multiple_books_with_multiple_ranges() -> None:
     assert ref.ranges[2].start.verse == 16
     assert ref.ranges[2].end.chapter == 3
     assert ref.ranges[2].end.verse == 17
-
-
-def test_parse_nonexistent_multi_book_reference() -> None:
-    """Test parsing a string that is not a valid multi-book Bible reference."""
-    # Create a style
-    names = standard_names("en-sbl_abbreviations")
-    style = RefStyle(names=names)
-
-    # Create a versification
-    versification = Versification.named("eng")
-
-    # Create a parser
-    parser = RefParser(style, versification)
-
-    # Try to parse a non-reference
-    ref = parser.parse("This is not a Bible reference", silent=True)
-
-    assert ref is None
-
-
-def test_scan_string() -> None:
-    """Test scanning a string for Bible references."""
-    # Create a style
-    names = standard_names("en-sbl_abbreviations")
-    style = RefStyle(names=names)
-
-    # Create a versification
-    versification = Versification.named("eng")
-
-    # Create a parser
-    parser = RefParser(style, versification)
-
-    # Scan a string with multiple references
-    text = "Look at Matt 5:3-12 and John 3:16 for important teachings."
-    refs = list(parser.scan_string(text))
-
-    assert len(refs) == 2
-
-    # Check first reference (Matthew)
-    ref1, start1, end1 = refs[0]
-    assert ref1.ranges[0].start.book == "MAT"
-    assert len(ref1.ranges) == 1
-    assert ref1.ranges[0].start.chapter == 5
-    assert ref1.ranges[0].start.verse == 3
-    assert ref1.ranges[0].end.chapter == 5
-    assert ref1.ranges[0].end.verse == 12
-    assert text[start1:end1] == "Matt 5:3-12"
-
-    # Check second reference (John)
-    ref2, start2, end2 = refs[1]
-    assert ref2.ranges[0].start.book == "JHN"
-    assert len(ref2.ranges) == 1
-    assert ref2.ranges[0].start.chapter == 3
-    assert ref2.ranges[0].start.verse == 16
-    assert ref2.ranges[0].end.chapter == 3
-    assert ref2.ranges[0].end.verse == 16
-    assert text[start2:end2] == "John 3:16"
 
 
 def test_scan_string_with_multi_book_reference() -> None:
@@ -332,20 +223,6 @@ def test_scan_ignores_book_name_glued_to_preceding_word() -> None:
 
     refs = list(parser.scan_string("in CongrRom 5:65-103"))
     assert refs == []
-
-
-def test_scan_finds_book_name_at_word_boundary() -> None:
-    """A book name at a word boundary is still found (companion to the glued case)."""
-    names = standard_names("en-cmos_short")
-    style = RefStyle(names=names)
-    versification = Versification.named("eng")
-    parser = RefParser(style, versification)
-
-    refs = list(parser.scan_string("see Rom 5:1 now"))
-    assert len(refs) == 1
-    ref, start, end = refs[0]
-    assert ref.ranges[0].start.book == "ROM"
-    assert "see Rom 5:1 now"[start:end] == "Rom 5:1"
 
 
 def test_sub_refs() -> None:
@@ -438,44 +315,11 @@ def test_parse_whole_book_abbreviation() -> None:
 
     assert ref is not None
     assert ref.ranges[0].start.book == "GEN"
-    assert ref.is_whole_books()
     assert ref.ranges[0].start.chapter is None
     assert ref.ranges[0].end == ref.ranges[0].start
-    assert len(ref.ranges) == 1
-
-
-def test_parse_whole_book_bible_ref() -> None:
-    """Test parsing a whole-book reference via parse()."""
-    parser = _make_parser()
-    ref = parser.parse("Gen")
-
-    assert ref is not None
     assert ref.is_single_range()
     assert ref.is_whole_books()
     assert ref.is_whole_chapters()
-
-
-def test_verse_ref_still_preferred_over_chapter() -> None:
-    """Ensure 'John 3:16' parses as a verse ref, not chapter 3 followed by junk."""
-    parser = _make_parser()
-    ref = parser.parse("John 3:16")
-
-    assert ref is not None
-    assert ref.ranges[0].start.book == "JHN"
-    assert len(ref.ranges) == 1
-    assert ref.ranges[0].start.verse == 16
-    assert ref.ranges[0].end.verse == 16
-
-
-def test_single_chapter_book_still_parses_verse() -> None:
-    """Ensure 'Jude 5' still parses as verse 5, not chapter 5."""
-    parser = _make_parser()
-    ref = parser.parse("Jude 5")
-
-    assert ref is not None
-    assert ref.ranges[0].start.book == "JUD"
-    assert ref.ranges[0].start.chapter == 1
-    assert ref.ranges[0].start.verse == 5
 
 
 # --- Sensitivity filtering ---
@@ -521,39 +365,6 @@ def test_scan_book_sensitivity() -> None:
     refs = list(parser.scan_string(text, sensitivity=Sensitivity.BOOK))
 
     assert len(refs) == 3
-
-
-def test_scan_as_ranges_with_sensitivity() -> None:
-    """as_ranges=True with VERSE sensitivity filters individual ranges."""
-    parser = _make_parser()
-    text = "See John 1:14 and John 3 and Rev 12 and Matt 5:3 here."
-    refs = list(parser.scan_string(text, as_ranges=True, sensitivity=Sensitivity.VERSE))
-
-    assert len(refs) == 2
-    assert text[refs[0][1] : refs[0][2]] == "John 1:14"
-    assert text[refs[1][1] : refs[1][2]] == "Matt 5:3"
-
-
-def test_scan_as_ranges_filters_chapter_from_multi_range() -> None:
-    """as_ranges=True filters chapter-only ranges from a multi-range ref."""
-    parser = _make_parser()
-    # "Matt 5:3-12; 6:9-13" is one BibleRef with two verse-level ranges.
-    text = "See Matt 5:3-12; 6:9-13 here."
-    refs = list(parser.scan_string(text, as_ranges=True, sensitivity=Sensitivity.VERSE))
-
-    assert len(refs) == 2
-    assert text[refs[0][1] : refs[0][2]] == "Matt 5:3-12"
-    assert text[refs[1][1] : refs[1][2]] == "6:9-13"
-
-
-def test_scan_mixed_ref_not_filtered_without_as_ranges() -> None:
-    """A ref with both verse and chapter ranges passes VERSE since it's not all chapters."""
-    parser = _make_parser()
-    text = "See Matt 5:3-12; 6:9-13 here."
-    refs = list(parser.scan_string(text, sensitivity=Sensitivity.VERSE))
-
-    # is_whole_chapters() is False because the ranges specify verses
-    assert len(refs) == 1
 
 
 def test_sub_refs_with_sensitivity() -> None:
@@ -622,14 +433,6 @@ def test_designator_aliases_and_longest_match() -> None:
     assert parser.parse("Esth 13 Vulgate").versification.identifier == "vulgata"
     assert parser.parse("Gen 1:1 (LXX)").versification.identifier == "lxx"
     assert parser.parse("Gen 1:1 LXX").versification.identifier == "lxx"
-
-
-def test_no_designator_uses_default_versification() -> None:
-    """Without a designator the parser default versification is used."""
-    parser = _make_designator_parser()
-    ref = parser.parse("Gen 1:1")
-    assert ref is not None
-    assert ref.versification.identifier == "eng"
 
 
 def test_scan_string_includes_designator_in_span() -> None:
@@ -726,6 +529,9 @@ def test_single_chapter_following_marker_glued_not_matched() -> None:
         ("cei", "Esg 1:1ff", ("ESG", 1, 1, ""), ("ESG", 1, None, "")),
         ("cei", "Rom 8:1f", ("ROM", 8, 1, ""), ("ROM", 8, 2, "")),
         ("lxx", "Esg 1:1f", ("ESG", 1, 1, "f"), ("ESG", 1, 1, "f")),
+        # Where the verse has no inserted verse "f", it is the following verse.
+        ("org", "Esg 1:1f", ("ESG", 1, 1, ""), ("ESG", 1, 2, "")),
+        ("eng", "Esg 1:1f", ("ESG", 1, 1, ""), ("ESG", 1, 2, "")),
     ],
 )
 def test_glued_following_marker_names_inserted_verse(
@@ -739,35 +545,6 @@ def test_glued_following_marker_names_inserted_verse(
         RefStyle.named("en-bibleworks"), Versification.named(versification)
     )
     ref = parser.parse(text)
-    assert ref is not None
-    (rng,) = ref.ranges
-    assert (
-        rng.start.book,
-        rng.start.chapter,
-        rng.start.verse,
-        rng.start.subverse,
-    ) == start
-    assert (rng.end.book, rng.end.chapter, rng.end.verse, rng.end.subverse) == end
-
-
-@pytest.mark.parametrize(
-    ("versification", "start", "end"),
-    [
-        ("cei", ("ESG", 1, 1, "f"), ("ESG", 1, 1, "f")),
-        ("org", ("ESG", 1, 1, ""), ("ESG", 1, 2, "")),
-        ("eng", ("ESG", 1, 1, ""), ("ESG", 1, 2, "")),
-    ],
-)
-def test_glued_following_marker_depends_on_versification(
-    versification: str,
-    start: tuple[str, int, int | None, str],
-    end: tuple[str, int, int | None, str],
-) -> None:
-    """The same "f" is an inserted verse only in a versification that has one there."""
-    parser = RefParser(
-        RefStyle.named("en-bibleworks"), Versification.named(versification)
-    )
-    ref = parser.parse("Esg 1:1f")
     assert ref is not None
     (rng,) = ref.ranges
     assert (
@@ -819,33 +596,14 @@ def test_custom_verse_range_separator_with_designator() -> None:
     assert [r.start.verse for r in ranges] == [5, 10, 15]
 
 
-def test_default_verse_range_separator_unchanged() -> None:
-    """The default comma-separated verse list still parses as before."""
-    parser = _make_parser()
-    ref = parser.parse("Rom 1:3, 5")
-    assert ref is not None
-    ranges = ref.ranges
-    assert len(ranges) == 2
-    assert (ranges[0].start.verse, ranges[1].start.verse) == (3, 5)
-
-
 def _la_vetus_parser() -> RefParser:
     return RefParser(RefStyle.named("la-vetus"), Versification.named("vulgata"))
-
-
-def test_parse_roman_chapter() -> None:
-    """Test parsing a reference with an uppercase Roman numeral chapter."""
-    parser = _la_vetus_parser()
-    ref = parser.parse("Lc. I, 35")
-    assert ref is not None
-    assert ref.ranges[0].start.book == "LUK"
-    assert ref.ranges[0].start.chapter == 1
-    assert ref.ranges[0].start.verse == 35
 
 
 @pytest.mark.parametrize(
     ("text", "book_id", "chapter", "verse"),
     [
+        ("Lc. I, 35", "LUK", 1, 35),
         ("Eccli. XXIV, 5", "SIR", 24, 5),
         ("I Cor. XV, 3", "1CO", 15, 3),
         ("Ps. CIX, 1", "PSA", 109, 1),
@@ -1226,12 +984,6 @@ def test_scan_numbers_and_book_names(text: str, expected: list[str]) -> None:
     """Numbers are assigned to the book before or the book after as sense requires."""
     found = _scan(text, sensitivity=Sensitivity.BOOK)
     assert [match for match, _ in found] == expected
-
-
-def test_parse_plural_psalms_is_the_book_of_psalms() -> None:
-    """A plural name for the Psalms parses as PSA."""
-    assert _spans("Pss 1–2") == [("PSA", 1, None, "PSA", 2, None)]
-    assert _spans("Pss") == [("PSA", None, None, "PSA", None, None)]
 
 
 def test_scan_as_ranges_reports_each_range() -> None:

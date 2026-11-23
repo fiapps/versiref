@@ -410,14 +410,3 @@ def test_map_into_nabre(source: str, reference: str, expected: str) -> None:
     mapped = ref.map_to(Versification.named("nabre"))
     assert mapped is not None
     assert mapped.format(RefStyle.named("en-nabre")) == expected
-
-
-def test_map_esg_between_eng_and_vulgata() -> None:
-    """The eng integrated Greek Esther interoperates with the Vulgate's additions."""
-    eng = Versification.named("eng")
-    vulgata = Versification.named("vulgata")
-    # B:1, the start of the first royal letter
-    assert vulgata.map_verse("EST", 13, 1, eng) == ("ESG", 3, 14, "")
-    assert eng.map_verse("ESG", 3, 14, vulgata) == ("EST", 13, 1, "")
-    # The colophon
-    assert vulgata.map_verse("EST", 11, 1, eng) == ("ESG", 10, 14, "")

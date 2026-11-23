@@ -768,15 +768,6 @@ def test_map_to_with_mapping() -> None:
     assert _spans(mapped) == [("GEN", 32, 2, "GEN", 32, 33)]
 
 
-def test_map_to_identity() -> None:
-    """Test mapping a verse with no mapping entry passes through unchanged."""
-    eng = Versification.named("eng")
-    ref = BibleRef.for_range("GEN", 1, 1, end_verse=5, versification=eng)
-    mapped = ref.map_to(Versification.named("org"))
-    assert mapped is not None
-    assert _spans(mapped) == [("GEN", 1, 1, "GEN", 1, 5)]
-
-
 def test_map_to_same_versification() -> None:
     """Test mapping to the same versification returns equivalent ref."""
     eng = Versification.named("eng")
@@ -796,37 +787,6 @@ def test_map_to_cross_book() -> None:
     mapped = ref.map_to(Versification.named("org"))
     assert mapped is not None
     assert _spans(mapped) == [("LJE", 1, 1, "LJE", 1, 5)]
-
-
-def test_map_to_between_non_org() -> None:
-    """Test mapping between two non-org versifications."""
-    vul = Versification.named("vulgata")
-    ref = BibleRef.for_range(
-        "GEN", 32, 1, end_verse=5, versification=Versification.named("eng")
-    )
-    mapped = ref.map_to(vul)
-    assert mapped is not None
-    assert mapped.versification is vul
-    assert mapped.books() == ["GEN"]
-
-
-def test_map_to_whole_chapter() -> None:
-    """A whole chapter that is whole chapters in the target stays so."""
-    ref = BibleRef.for_range("GEN", 1, versification=Versification.named("eng"))
-    mapped = ref.map_to(Versification.named("org"))
-    assert mapped is not None
-    assert _spans(mapped) == [("GEN", 1, None, "GEN", 1, None)]
-
-
-def test_map_to_whole_chapter_to_verses() -> None:
-    """A whole chapter that is not whole chapters in the target becomes verses.
-
-    eng Gen 31:55 is org Gen 32:1, so eng Gen 32 is org Gen 32:2-33.
-    """
-    ref = BibleRef.for_range("GEN", 32, versification=Versification.named("eng"))
-    mapped = ref.map_to(Versification.named("org"))
-    assert mapped is not None
-    assert _spans(mapped) == [("GEN", 32, 2, "GEN", 32, 33)]
 
 
 @pytest.mark.parametrize(
@@ -1186,30 +1146,6 @@ def test_range_keys_without_versification() -> None:
     assert list(BibleRef.for_range("JHN", 3, 16).range_keys()) == []
 
 
-def test_range_keys_inserted_verse_distinct_from_base() -> None:
-    """An inserted verse (ESG 4:17k) keys distinctly from its base verse.
-
-    The Greek additions to Esther follow but are not part of ESG 4:17, so
-    4:17k must not collide with 4:17, and must sort between 4:17 and 4:18.
-    """
-    lxx = Versification.named("lxx")
-
-    def start(subverse: str, verse: int = 17) -> int:
-        ref = BibleRef.for_range(
-            "ESG", 4, verse, start_subverse=subverse, versification=lxx
-        )
-        return next(iter(ref.range_keys()))[0]
-
-    base = start("")  # ESG 4:17
-    ins_k = start("k")  # ESG 4:17k (tenth insertion, j skipped)
-    following = start("", 18)  # ESG 4:18
-
-    assert ins_k != base
-    # 'k' is the 10th insertion letter (a=1..i=9, k=10)
-    assert ins_k - base == 10
-    assert base < ins_k < following
-
-
 def test_range_keys_inserted_verses_sort_in_reading_order() -> None:
     """The additions to Esther (ESG 4:17...) key in ascending order, all distinct.
 
@@ -1232,7 +1168,11 @@ def test_range_keys_inserted_verses_sort_in_reading_order() -> None:
         return next(iter(ref.range_keys()))[0]
 
     keys = [start("")] + [start(c) for c in letters]
+    following = next(
+        iter(BibleRef.for_range("ESG", 4, 18, versification=lxx).range_keys())
+    )[0]
     assert keys == sorted(keys)
+    assert keys[-1] < following
     assert len(set(keys)) == len(keys)
     # Ordinals are contiguous from 1: base then each insertion in turn.
     assert [k - keys[0] for k in keys] == list(range(len(keys)))

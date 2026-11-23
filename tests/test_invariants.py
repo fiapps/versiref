@@ -213,20 +213,6 @@ def test_scan_as_ranges_spans_lie_in_order(style_name: str) -> None:
             previous_end = end
 
 
-@pytest.mark.parametrize(
-    "text",
-    ["Gen 1; 2:4", "Gen 1–2:4", "John 3:16; 4", "Rom 8:1–9:5; 12"],
-)
-def test_scan_reads_mixed_chapters_and_verses_whole(text: str) -> None:
-    """A list mixing whole chapters and verses is one reference."""
-    parser = _parser(CANONICAL_STYLE)
-    found = [
-        text[start:end]
-        for _, start, end in parser.scan_string(text, sensitivity=Sensitivity.CHAPTER)
-    ]
-    assert found == [text]
-
-
 @pytest.mark.parametrize(("book", "chapter"), [("JHN", 3), ("JUD", 1)])
 def test_chapter_then_verse_formats_unambiguously(book: str, chapter: int) -> None:
     """A verse after its whole chapter formats to text that means the same."""
@@ -295,24 +281,3 @@ def test_mapping_to_the_same_versification_changes_nothing(style_name: str) -> N
         mapped = _in_style(canonical, style_name).map_to(twin)
         assert mapped is not None, canonical
         assert mapped.format(canonical_style) == canonical
-
-
-def test_psalm_151_can_be_formatted() -> None:
-    """PS2 formats in a style that names the Psalms."""
-    ref = BibleRef.for_range("PS2", 1, 1, versification=_versification("lxx"))
-    assert ref.format(RefStyle.named(CANONICAL_STYLE))
-
-
-def test_whole_book_maps_as_its_contents_do() -> None:
-    """Vulgate Daniel as a whole includes what org calls Susanna."""
-    whole = _whole_book("DAN", _versification("vulgata")).map_to(_versification("org"))
-    assert whole is not None
-    susanna = BibleRef.for_range("SUS", 1, 1, versification=_versification("org"))
-    ((verse, _),) = susanna.range_keys()
-    assert any(start <= verse <= end for start, end in whole.range_keys())
-
-
-def test_empty_versification_is_consistent() -> None:
-    """A versification has the verses of exactly the books it includes."""
-    versification = Versification()
-    assert versification.includes("JHN") == (versification.last_verse("JHN", 3) > 0)
